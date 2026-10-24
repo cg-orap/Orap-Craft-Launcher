@@ -75,50 +75,117 @@ public sealed class MicrosoftAuthService
     }
 
     /// <summary>
-    /// Extracts the authorization code from whatever the user pastes back: a full redirect
-    /// URL, a bare <c>code=...</c> fragment, or the code itself.
+    /// Extracts the authorization code from whatever the user pastes back.
+    ///
+    /// Real-world paste material is messy, so all of these are accepted:
+    /// a full <c>https://login.live.com/oauth20_desktop.srf?code=...</c> link,
+    /// the same link without its scheme, a bare <c>code=...</c> fragment,
+    /// text surrounded by quotes / angle brackets / line breaks, and the code on its own
+    /// (which is what the Live Connect desktop page displays for manual copying).
+    ///
+    /// Returns <c>null</c> when the input carries an OAuth error instead of a code — use
+    /// <see cref="TryGetAuthorizationError"/> to explain why.
     /// </summary>
     public static string? TryExtractCode(string? input)
     {
+        var text = Normalize(input);
+        if (text is null) return null;
+
+        // A cancelled/failed login still produces a redirect URL; never treat it as a code.
+        if (TryGetAuthorizationError(text) is not null) return null;
+
+        var fromUrl = FirstParameter(text, "code");
+        if (!string.IsNullOrWhiteSpace(fromUrl)) return fromUrl;
+
+        return LooksLikeBareCode(text) ? text : null;
+    }
+
+    /// <summary>
+    /// Returns a human readable description when the pasted URL is an OAuth error callback
+    /// (<c>error=access_denied&amp;error_description=...</c>), otherwise <c>null</c>.
+    /// </summary>
+    public static string? TryGetAuthorizationError(string? input)
+    {
+        var text = Normalize(input);
+        if (text is null) return null;
+
+        var error = FirstParameter(text, "error");
+        if (string.IsNullOrWhiteSpace(error)) return null;
+
+        // Query strings encode spaces as '+'; the message is shown to the user, so decode them.
+        var description = FirstParameter(text, "error_description")?.Replace('+', ' ');
+        return string.IsNullOrWhiteSpace(description) ? error : $"{error}: {description}";
+    }
+
+    /// <summary>
+    /// Trims quotes/brackets and collapses the line breaks browsers insert when a long URL is
+    /// copied from a wrapped address bar.
+    /// </summary>
+    private static string? Normalize(string? input)
+    {
         if (string.IsNullOrWhiteSpace(input)) return null;
 
-        var text = input.Trim();
+        var text = input.Trim()
+            .Trim('"', '\'', '<', '>', '“', '”', '‘', '’', '「', '」')
+            .Trim();
 
-        if (Uri.TryCreate(text, UriKind.Absolute, out var uri))
+        text = text.Replace("\r", string.Empty, StringComparison.Ordinal)
+                   .Replace("\n", string.Empty, StringComparison.Ordinal)
+                   .Replace("\t", string.Empty, StringComparison.Ordinal)
+                   .Trim();
+
+        return text.Length == 0 ? null : text;
+    }
+
+    /// <summary>Finds <c>key=value</c> anywhere in a URL or fragment, tolerating a missing scheme.</summary>
+    private static string? FirstParameter(string text, string key)
+    {
+        var token = key + "=";
+        var index = 0;
+
+        while (index < text.Length)
         {
-            var query = uri.Query;
-            if (!string.IsNullOrEmpty(query))
-            {
-                foreach (var pair in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var index = pair.IndexOf('=');
-                    if (index <= 0) continue;
+            var at = text.IndexOf(token, index, StringComparison.OrdinalIgnoreCase);
+            if (at < 0) return null;
 
-                    var key = pair[..index];
-                    if (!key.Equals("code", StringComparison.OrdinalIgnoreCase)) continue;
+            index = at + token.Length;
 
-                    var value = Uri.UnescapeDataString(pair[(index + 1)..]);
-                    if (value.Length > 0) return value;
-                }
-            }
+            // Only treat it as a parameter when it starts a query/fragment segment, so that a
+            // value like "...&redirect=code" cannot be mistaken for the parameter itself.
+            if (at > 0 && text[at - 1] is not ('?' or '&' or '#' or ';')) continue;
+
+            var start = at + token.Length;
+            var end = start;
+            while (end < text.Length && text[end] is not ('&' or '#' or '"' or '\'' or ' ' or '\t')) end++;
+
+            var raw = text[start..end];
+            if (raw.Length == 0) continue;
+
+            return SafeUnescape(raw);
         }
-
-        // "code=..." without a URL
-        var codeIndex = text.IndexOf("code=", StringComparison.OrdinalIgnoreCase);
-        if (codeIndex >= 0)
-        {
-            var rest = text[(codeIndex + 5)..];
-            var end = rest.IndexOfAny(['&', '\r', '\n', ' ', '#']);
-            if (end >= 0) rest = rest[..end];
-            if (rest.Length > 0) return Uri.UnescapeDataString(rest);
-        }
-
-        // Already a bare code: Microsoft codes contain only urlsafe characters.
-        if (text.Length is > 10 and < 4096 && text.All(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' or '~'))
-            return text;
 
         return null;
     }
+
+    private static string SafeUnescape(string value)
+    {
+        try
+        {
+            return Uri.UnescapeDataString(value);
+        }
+        catch (Exception ex) when (ex is UriFormatException or ArgumentException)
+        {
+            return value;
+        }
+    }
+
+    /// <summary>
+    /// Heuristic for a raw code: Microsoft codes look like <c>M.C50A_BAY.2.U.xxxx</c>, i.e. only
+    /// URL-safe characters. Anything containing spaces or a path separator is not a bare code.
+    /// </summary>
+    private static bool LooksLikeBareCode(string text)
+        => text.Length is >= 10 and <= 4096
+           && text.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or '~' or '+' or '/' or '=');
 
     public async Task<Account> AuthenticateWithCodeAsync(string code, CancellationToken ct = default)
     {

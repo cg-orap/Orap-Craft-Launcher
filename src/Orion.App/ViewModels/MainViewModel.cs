@@ -268,7 +268,7 @@ public sealed class MainViewModel : ObservableObject
     public string AccountDisplay => CurrentAccount?.Username ?? "未登录";
     public string AccountDetail => CurrentAccount switch
     {
-        null => "点击右侧按钮添加账户",
+        null => "在首页添加离线账户，或使用微软账户登录",
         { Type: AccountType.Microsoft } a => a.IsExpired ? "微软账户 · 需要刷新令牌" : "微软正版账户",
         _ => "离线账户（仅单机 / 局域网）",
     };
