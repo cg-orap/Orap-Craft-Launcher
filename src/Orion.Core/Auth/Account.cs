@@ -33,6 +33,12 @@ public sealed class Account
     /// <summary>Xbox user hash (the <c>uhs</c> claim); required for token refresh chains.</summary>
     public string? XboxUserId { get; set; }
 
+    /// <summary>
+    /// Which Microsoft login mechanism produced this account, so tokens are refreshed against the
+    /// same authority that issued them (legacy Live Connect vs. the v2.0 identity platform).
+    /// </summary>
+    public string? AuthFlow { get; set; }
+
     public DateTimeOffset? ExpiresAt { get; set; }
     public DateTimeOffset? LastUsedAt { get; set; }
     public string? SkinModel { get; set; }

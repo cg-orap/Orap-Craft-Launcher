@@ -30,6 +30,29 @@ public sealed class MicrosoftAuthOptions
     public string XboxRelyingParty { get; set; } = "http://auth.xboxlive.com";
     public string XstsRelyingParty { get; set; } = "rp://api.minecraftservices.com/";
 
+    /// <summary>
+    /// Microsoft identity platform (v2.0) authority. The modern device-code and loopback flows
+    /// target this, because the legacy Live Connect endpoints (<c>login.live.com/oauth20_*</c>)
+    /// are the reason login kept failing for users.
+    /// </summary>
+    public string Authority { get; set; } = "https://login.microsoftonline.com/consumers";
+
+    /// <summary>Scope for the v2.0 flows: Xbox Live sign-in plus a refresh token.</summary>
+    public string ModernScope { get; set; } = "XboxLive.signin offline_access";
+
+    public string DeviceCodeEndpoint => Authority.TrimEnd('/') + "/oauth2/v2.0/devicecode";
+    public string ModernTokenEndpoint => Authority.TrimEnd('/') + "/oauth2/v2.0/token";
+    public string ModernAuthorizeEndpoint => Authority.TrimEnd('/') + "/oauth2/v2.0/authorize";
+
+    /// <summary>
+    /// The built-in client id belongs to the legacy Live Connect flow. Device code and loopback
+    /// require an application registered by the user (public client), so this flag lets the UI
+    /// explain that instead of failing with an opaque <c>invalid_client</c>.
+    /// </summary>
+    public bool HasModernClientId =>
+        !string.IsNullOrWhiteSpace(ClientId)
+        && !ClientId.Equals("00000000402b5328", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Subtracted from the reported token lifetime so we refresh slightly early.</summary>
     public TimeSpan ExpirySafetyMargin { get; set; } = TimeSpan.FromMinutes(2);
 }
@@ -80,20 +103,20 @@ public static class MicrosoftAuthMessages
 
         return exception.ErrorCode?.ToLowerInvariant() switch
         {
-            "invalid_client" =>
-                "微软不接受当前应用标识（invalid_client）。\n"
-                + "如果你在「设置 → 微软登录」里填过自定义客户端 ID，请确认它允许此类登录流程，或清空后重试。",
+            // The identity platform reports most client configuration problems as AADSTS codes,
+            // which are far more actionable than the generic OAuth error identifier.
+            "invalid_client" or "unauthorized_client" => DescribeClientProblem(exception),
 
             "invalid_request" =>
                 "登录请求被微软拒绝（invalid_request）：通常是回调地址或权限范围不匹配。\n"
-                + "请清空「设置 → 微软登录」中的自定义客户端 ID 后重试。",
-
-            "unauthorized_client" =>
-                "该应用未被授权使用此登录方式（unauthorized_client）。\n"
-                + "请使用默认客户端 ID，或在 Azure 中为你的应用启用对应的重定向地址。",
+                + DescribeClientProblem(exception),
 
             "temporarily_unavailable" or "http_429" or "http_500" or "http_502" or "http_503" or "http_504" =>
                 "微软登录服务暂时不可用，请稍等片刻后重试。",
+
+            "authorization_declined" => "你取消了微软登录。需要登录时请重新点击「设备代码登录」。",
+
+            "expired_token" => "设备代码已过期。请重新点击「设备代码登录」获取新的代码。",
 
             "not_entitled" => "该 Microsoft 账户未拥有 Minecraft: Java Edition，无法启动正版游戏。",
 
@@ -109,6 +132,42 @@ public static class MicrosoftAuthMessages
             _ => exception.Message,
         };
     }
+
+    /// <summary>Turns Azure AD error codes (AADSTS…) into concrete configuration instructions.</summary>
+    private static string DescribeClientProblem(MicrosoftAuthException exception)
+    {
+        var description = exception.ErrorDescription ?? string.Empty;
+
+        if (description.Contains("AADSTS700016", StringComparison.OrdinalIgnoreCase))
+        {
+            return "微软找不到这个应用 ID（AADSTS700016）。\n"
+                   + "请确认「设置 → 微软登录」里填的是你自己在 Azure 注册的应用（客户端）ID，"
+                   + "并且该应用的「受支持的账户类型」选择「个人 Microsoft 账户」或「任何组织目录中的账户和个人 Microsoft 账户」。";
+        }
+
+        if (description.Contains("AADSTS7000218", StringComparison.OrdinalIgnoreCase))
+        {
+            return "该应用不允许公共客户端登录（AADSTS7000218）。\n"
+                   + "请在 Azure 应用页面的「身份验证」中启用“允许公共客户端流”，然后重试。";
+        }
+
+        if (description.Contains("AADSTS65001", StringComparison.OrdinalIgnoreCase) ||
+            description.Contains("consent", StringComparison.OrdinalIgnoreCase))
+        {
+            return "该应用尚未获得授权（需要 consent）。\n"
+                   + "请在 Azure 应用页面为 Microsoft Graph / Xbox Live 授予用户同意，或在首次登录时接受授权页面。";
+        }
+
+        if (description.Contains("AADSTS90002", StringComparison.OrdinalIgnoreCase) ||
+            description.Contains("tenant", StringComparison.OrdinalIgnoreCase))
+        {
+            return "应用所在目录与登录入口不匹配（应使用 consumers 端点登录个人账户）。\n"
+                   + "请确认应用注册在支持个人 Microsoft 账户的目录下。";
+        }
+
+        return "微软拒绝了该应用的登录请求：" + (string.IsNullOrWhiteSpace(description) ? exception.Message : description)
+               + "\n请检查「设置 → 微软登录」里填写的客户端 ID 是否正确，以及该应用是否已启用“允许公共客户端流”。";
+    }
 }
 
 /// <summary>
@@ -118,7 +177,7 @@ public static class MicrosoftAuthMessages
 ///
 /// Only documented, first-party endpoints are used. No token is ever written to a log.
 /// </summary>
-public sealed class MicrosoftAuthService
+public sealed partial class MicrosoftAuthService
 {
     private readonly HttpClient _http;
     private readonly MicrosoftAuthOptions _options;
@@ -258,20 +317,69 @@ public sealed class MicrosoftAuthService
         => text.Length is >= 10 and <= 4096
            && text.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or '~' or '+' or '/' or '=');
 
+    /// <summary>
+    /// Exchanges a legacy (Live Connect) authorization code for tokens.
+    ///
+    /// The code arrives URL-encoded inside the redirect URL and is normally decoded before the
+    /// token request. Some issuers already percent-encode the code itself, and decoding then
+    /// corrupts it — Microsoft answers with a generic "the 'code' parameter is not valid. The code
+    /// has expired." Therefore the decoded form is tried first and the raw form second. Only one
+    /// of them can ever be accepted, and a rejected attempt does not consume the valid code.
+    /// </summary>
     public async Task<Account> AuthenticateWithCodeAsync(string code, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(code)) throw new MicrosoftAuthException("授权码为空。");
 
-        var token = await RequestTokenAsync(new Dictionary<string, string>
-        {
-            ["client_id"] = _options.ClientId,
-            ["code"] = code,
-            ["grant_type"] = "authorization_code",
-            ["redirect_uri"] = _options.RedirectUri,
-            ["scope"] = _options.Scope,
-        }, ct).ConfigureAwait(false);
+        var candidates = new List<string> { code };
 
-        return await CompleteLoginAsync(token, null, ct).ConfigureAwait(false);
+        var rawForm = Uri.EscapeDataString(code.Replace("%", "%25", StringComparison.Ordinal)
+                                                   .Replace(" ", "%20", StringComparison.Ordinal));
+        if (!string.Equals(rawForm, code, StringComparison.Ordinal) &&
+            code.Contains('%', StringComparison.Ordinal))
+        {
+            // Re-encode the percent signs so the server receives the literal characters it issued.
+            candidates.Add(code.Replace("%", "%25", StringComparison.Ordinal));
+        }
+
+        MicrosoftAuthException? last = null;
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var token = await RequestTokenAsync(new Dictionary<string, string>
+                {
+                    ["client_id"] = _options.ClientId,
+                    ["code"] = candidate,
+                    ["grant_type"] = "authorization_code",
+                    ["redirect_uri"] = _options.RedirectUri,
+                    ["scope"] = _options.Scope,
+                }, ct).ConfigureAwait(false);
+
+                if (candidates.Count > 1)
+                {
+                    AppLog.Info("auth", "legacy-code-variant-accepted",
+                        ("variant", ReferenceEquals(candidate, code) ? "decoded" : "raw"));
+                }
+
+                return await CompleteLoginAsync(
+                    token.AccessToken!,
+                    token.RefreshToken,
+                    token.ExpiresIn,
+                    FlowLegacy,
+                    null,
+                    ct).ConfigureAwait(false);
+            }
+            catch (MicrosoftAuthException ex) when (ex.IsAuthorizationCodeRejected)
+            {
+                last = ex;
+                AppLog.Warn("auth", "legacy-code-variant-rejected",
+                    ("variant", ReferenceEquals(candidate, code) ? "decoded" : "raw"),
+                    ("detail", ex.ErrorDescription ?? "none"));
+            }
+        }
+
+        throw last ?? new MicrosoftAuthException("微软拒绝了该授权码。", "invalid_grant");
     }
 
     /// <summary>Exchanges a stored refresh token for a fresh account (Microsoft token rotation).</summary>
@@ -279,6 +387,10 @@ public sealed class MicrosoftAuthService
     {
         if (string.IsNullOrWhiteSpace(account.RefreshToken))
             throw new MicrosoftAuthException("该账户没有可用的刷新令牌，需要重新登录。", "no_refresh_token");
+
+        // Accounts created by the v2.0 flows must be refreshed against the same authority.
+        if (account.AuthFlow is FlowDeviceCode or FlowLoopback)
+            return await RefreshModernAsync(account, ct).ConfigureAwait(false);
 
         var token = await RequestTokenAsync(new Dictionary<string, string>
         {
@@ -289,16 +401,28 @@ public sealed class MicrosoftAuthService
             ["scope"] = _options.Scope,
         }, ct).ConfigureAwait(false);
 
-        return await CompleteLoginAsync(token, account, ct).ConfigureAwait(false);
+        return await CompleteLoginAsync(
+            token.AccessToken!,
+            token.RefreshToken,
+            token.ExpiresIn,
+            flow: account.AuthFlow ?? FlowLegacy,
+            previous: account,
+            ct).ConfigureAwait(false);
     }
 
-    private async Task<Account> CompleteLoginAsync(LiveTokenResponse token, Account? previous, CancellationToken ct)
+    private async Task<Account> CompleteLoginAsync(
+        string msaAccessToken,
+        string? refreshToken,
+        int expiresIn,
+        string flow,
+        Account? previous,
+        CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(token.AccessToken))
+        if (string.IsNullOrEmpty(msaAccessToken))
             throw new MicrosoftAuthException("微软返回的访问令牌为空。", "empty_access_token");
 
         // 1. Xbox Live user token
-        var (xblToken, uhs) = await RequestXboxLiveTokenAsync(token.AccessToken, ct).ConfigureAwait(false);
+        var (xblToken, uhs) = await RequestXboxLiveTokenAsync(msaAccessToken, ct).ConfigureAwait(false);
 
         // 2. XSTS token
         var xsts = await RequestXstsTokenAsync(xblToken, ct).ConfigureAwait(false);
@@ -318,14 +442,20 @@ public sealed class MicrosoftAuthService
             Uuid = profile?.Id ?? previous?.Uuid ?? "",
             Type = AccountType.Microsoft,
             AccessToken = minecraft.AccessToken,
-            RefreshToken = string.IsNullOrEmpty(token.RefreshToken) ? previous?.RefreshToken : token.RefreshToken,
+            RefreshToken = string.IsNullOrEmpty(refreshToken) ? previous?.RefreshToken : refreshToken,
             XboxUserId = xsts.UserHash ?? uhs,
+            AuthFlow = flow,
             ExpiresAt = expiresAt,
             SkinModel = profile?.Skins?.FirstOrDefault()?.Variant,
             LastUsedAt = DateTimeOffset.UtcNow,
         };
 
-        AppLog.Info("auth", "microsoft-login-ok", ("name", account.Username), ("uuid", account.Uuid), ("expiresAt", account.ExpiresAt));
+        AppLog.Info("auth", "microsoft-login-ok",
+            ("name", account.Username),
+            ("uuid", account.Uuid),
+            ("flow", flow),
+            ("expiresAt", account.ExpiresAt));
+
         return account;
     }
 

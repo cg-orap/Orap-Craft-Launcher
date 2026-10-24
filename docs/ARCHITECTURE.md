@@ -178,15 +178,20 @@ installer 还要求目标目录「看起来像一个 Minecraft 安装」，否�
 
 ## 6. 账户与安全
 
-- **微软登录**：OAuth 2.0 授权码 → Xbox Live 用户令牌 → XSTS → Minecraft 服务令牌 → 档案。
-  XSTS 的 `XErr` 错误码会翻译成可操作的中文提示（无 Xbox 档案、地区不支持、需要成人验证、儿童账户）；
-  refresh token 可换取新的成套令牌。
-- **授权码时效处理**：OAuth 授权码**只能用一次且有效期只有几分钟**。因此：
-  - 点击「在浏览器中登录」后，UI 每秒侦测剪贴板（最长 4 分钟），一发现回调链接就立即提交；
-  - 同时提供一键「从剪贴板登录」，把「读取 + 提交」合并为一次点击；
-  - 已提交过的授权码会被本地记住，重复提交直接拒绝，而不是让微软回一个 `invalid_grant`；
-  - `invalid_grant`（过期/已用）会清空失效输入并提示重新登录，其它 OAuth 错误
-    （`invalid_client`、`temporarily_unavailable`、`not_entitled`…）各有专门文案。
+- **三种微软登录方式**（详见 [`MICROSOFT-LOGIN.md`](MICROSOFT-LOGIN.md)）：
+  - **设备代码流（推荐）**：`POST /oauth2/v2.0/devicecode` 取短代码 → 用户在任意浏览器授权 →
+    启动器按 RFC 8628 轮询 `/oauth2/v2.0/token`（正确处理 `authorization_pending`、
+    `slow_down`、`expired_token`、`authorization_declined`）。**无需复制任何链接**，
+    因此不存在“授权码过期”。
+  - **回环回调**：本地 `TcpListener` 监听 `http://localhost:<随机端口>`，浏览器登录后
+    自动回调；校验 `state` 防 CSRF，收到 `code` 立即换令牌。
+  - **旧版粘贴（备用）**：`login.live.com` 授权码 + 剪贴板自动侦测；授权码会被本地记忆，
+    拒绝复用，并对「解码/原始」两种形态各尝试一次。
+  - 两条现代流程需要一个用户自行注册的**公共客户端**应用 ID（不冒用他人注册），
+    因此在未配置时 UI 直接给出注册指引而不是抛错；`AADSTS700016`（应用不存在）、
+    `AADSTS7000218`（未允许公共客户端流）等错误会被翻译成具体修复步骤。
+- **令牌链**：三种方式拿到微软访问令牌后统一走 Xbox Live → XSTS → Minecraft → profile；
+  XSTS 的 `XErr` 错误码翻译成可操作提示（无 Xbox 档案、地区不支持、需要成人验证、儿童账户）。
 - **令牌落盘加密**：`Auth/AccountStore.cs` 用 Windows **DPAPI**（当前用户范围）加密
   access/refresh token，并在密文前加 `ORION1` 魔数避免把明文误当密文。
   测试会断言磁盘文件里**不包含**明文令牌。

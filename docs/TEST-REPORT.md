@@ -225,6 +225,33 @@ UI 自动化实测（真实网络，使用无效码触发 `invalid_grant`）：
 > 说明：上述验证使用的是伪造授权码，目的就是让微软返回真实的 `invalid_grant`，
 > 从而验证错误处置与自动侦测链路；因此这**不等于**「真实账户登录成功」已通过。
 
+### 3.12 改用主流登录方式（设备代码流 / 回环回调）
+
+旧版 `login.live.com` 流程对第三方应用已明显弱化（授权码换令牌一直被拒绝），
+因此新增与主流启动器等价的两条**不需要复制链接**的登录链路（详见
+[`MICROSOFT-LOGIN.md`](MICROSOFT-LOGIN.md)）：
+
+| 机制 | 端点 | 验证状态 |
+| --- | --- | --- |
+| 设备代码流 | `login.microsoftonline.com/consumers/oauth2/v2.0/devicecode` + `/token` | 请求形状已用**真实端点**验证（返回结构化 `AADSTS700016`，说明 URL 与请求体正确，只缺一个已注册的应用 ID）；轮询状态机（`authorization_pending` / `slow_down` / 成功 / `authorization_declined` / `expired_token`）由桩 HTTP 全覆盖 |
+| 回环回调 | `/oauth2/v2.0/authorize` + `http://localhost:<随机端口>` 本地监听 | **端到端本地实测**：启动监听器 → 用真实 HTTP 请求访问回调地址 → 正确解析 `code`/`state`、返回中文落地页、`state` 校验与超时路径均有测试 |
+| 旧版粘贴（备用） | `login.live.com` | 保留；新增「解码/原始」两种授权码形态各尝试一次 |
+
+真实端点探测记录：
+
+```
+POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
+  client_id=11111111-2222-3333-4444-555555555555 & scope=XboxLive.signin offline_access
+→ HTTP 400 {"error":"unauthorized_client","error_description":"AADSTS700016: Application with identifier ... was not found ..."}
+```
+
+该响应正是「应用未注册」时应有的结果，证明启动器发出的请求格式、作用域与端点都正确；
+把真实注册的客户端 ID 填入后即可获得设备代码。`AADSTS700016` / `AADSTS7000218` /
+`consent` 等错误也都已被翻译成具体修复步骤（单测覆盖）。
+
+界面侧：首页新增「设备代码登录」「浏览器自动回调登录」，未配置客户端 ID 时直接给出
+可操作提示而不是抛错（UI 自动化实测按钮存在且提示正确）。
+
 
 
 ---

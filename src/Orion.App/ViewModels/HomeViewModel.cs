@@ -40,6 +40,13 @@ public sealed class HomeViewModel : ObservableObject
     private DispatcherTimer? _clipboardWatch;
     private DateTimeOffset _clipboardWatchDeadline;
 
+    private bool _microsoftLoginBusy;
+    private string _deviceCodeText = "";
+    private string _deviceCodeUrl = "";
+    private string _clientIdInput = "";
+    private bool _showLegacyPaste;
+    private CancellationTokenSource? _loginCts;
+
     public HomeViewModel(MainViewModel main)
     {
         _main = main;
@@ -60,6 +67,17 @@ public sealed class HomeViewModel : ObservableObject
         // explains the problem itself when there is nothing usable in the clipboard.
         LoginFromClipboardCommand = new AsyncRelayCommand(LoginFromClipboardAsync);
         ClearCallbackCommand = new RelayCommand(ClearCallback);
+
+        LoginWithDeviceCodeCommand = new AsyncRelayCommand(LoginWithDeviceCodeAsync, () => !MicrosoftLoginBusy);
+        LoginWithLoopbackCommand = new AsyncRelayCommand(LoginWithLoopbackAsync, () => !MicrosoftLoginBusy);
+        CancelMicrosoftLoginCommand = new RelayCommand(CancelMicrosoftLogin, () => MicrosoftLoginBusy);
+        CopyDeviceCodeCommand = new RelayCommand(CopyDeviceCode, () => DeviceCodeText.Length > 0);
+        OpenDeviceCodePageCommand = new RelayCommand(OpenDeviceCodePage, () => DeviceCodeText.Length > 0);
+        SaveClientIdCommand = new AsyncRelayCommand(SaveClientIdAsync);
+        OpenAzureGuideCommand = new RelayCommand(OpenAzureGuide);
+        ToggleLegacyPasteCommand = new RelayCommand(() => ShowLegacyPaste = !ShowLegacyPaste);
+
+        ClientIdInput = _main.Context.Settings.MicrosoftClientId ?? "";
         RefreshTokenCommand = new AsyncRelayCommand(RefreshTokenAsync, () => _main.CurrentAccount?.Type == AccountType.Microsoft);
         OpenGameFolderCommand = new RelayCommand(OpenGameFolder);
         OpenInstanceSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));
@@ -75,6 +93,70 @@ public sealed class HomeViewModel : ObservableObject
     public ICommand PasteCallbackCommand { get; }
     public ICommand LoginFromClipboardCommand { get; }
     public ICommand ClearCallbackCommand { get; }
+    public ICommand LoginWithDeviceCodeCommand { get; }
+    public ICommand LoginWithLoopbackCommand { get; }
+    public ICommand CancelMicrosoftLoginCommand { get; }
+    public ICommand CopyDeviceCodeCommand { get; }
+    public ICommand OpenDeviceCodePageCommand { get; }
+    public ICommand SaveClientIdCommand { get; }
+    public ICommand OpenAzureGuideCommand { get; }
+    public ICommand ToggleLegacyPasteCommand { get; }
+
+    /// <summary>True while any Microsoft sign-in is running (device code, loopback or paste).</summary>
+    public bool MicrosoftLoginBusy
+    {
+        get => _microsoftLoginBusy;
+        private set
+        {
+            if (!SetProperty(ref _microsoftLoginBusy, value)) return;
+
+            ((AsyncRelayCommand)LoginWithDeviceCodeCommand).RaiseCanExecuteChanged();
+            ((AsyncRelayCommand)LoginWithLoopbackCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)CancelMicrosoftLoginCommand).RaiseCanExecuteChanged();
+        }
+    }
+
+    /// <summary>The short code the user must type at the verification page (device-code flow).</summary>
+    public string DeviceCodeText
+    {
+        get => _deviceCodeText;
+        private set
+        {
+            if (!SetProperty(ref _deviceCodeText, value)) return;
+            OnPropertyChanged(nameof(HasDeviceCode));
+            ((RelayCommand)CopyDeviceCodeCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)OpenDeviceCodePageCommand).RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool HasDeviceCode => DeviceCodeText.Length > 0;
+
+    public string DeviceCodeUrl
+    {
+        get => _deviceCodeUrl;
+        private set => SetProperty(ref _deviceCodeUrl, value);
+    }
+
+    /// <summary>Azure application (client) id used by the modern flows.</summary>
+    public string ClientIdInput
+    {
+        get => _clientIdInput;
+        set => SetProperty(ref _clientIdInput, value);
+    }
+
+    /// <summary>True when a user registered client id is configured, enabling the modern flows.</summary>
+    public bool CanUseModernLogin => _main.Context.Auth.CanUseModernFlows;
+
+    /// <summary>Explains why the modern flows need a client id, or null when they are ready.</summary>
+    public string? ModernLoginUnavailableReason => _main.Context.Auth.ModernFlowsUnavailableReason;
+
+    public bool NeedsClientId => !CanUseModernLogin;
+
+    public bool ShowLegacyPaste
+    {
+        get => _showLegacyPaste;
+        set => SetProperty(ref _showLegacyPaste, value);
+    }
     public ICommand RefreshTokenCommand { get; }
     public ICommand OpenGameFolderCommand { get; }
     public ICommand OpenInstanceSettingsCommand { get; }
@@ -503,7 +585,7 @@ public sealed class HomeViewModel : ObservableObject
         }
 
         // While the token exchange runs we must not start a second one.
-        if (IsMicrosoftLoginBusy) return;
+        if (MicrosoftLoginBusy) return;
 
         var text = TryGetClipboardText();
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -525,6 +607,230 @@ public sealed class HomeViewModel : ObservableObject
 
         if (CompleteMicrosoftLoginCommand.CanExecute(null)) CompleteMicrosoftLoginCommand.Execute(null);
     }
+
+    #region Modern Microsoft sign-in (device code / loopback)
+
+    private void BeginLoginOperation()
+    {
+        _loginCts?.Dispose();
+        _loginCts = new CancellationTokenSource();
+        MicrosoftLoginBusy = true;
+        DeviceCodeText = "";
+        DeviceCodeUrl = "";
+    }
+
+    private void EndLoginOperation()
+    {
+        MicrosoftLoginBusy = false;
+        _loginCts?.Dispose();
+        _loginCts = null;
+    }
+
+    /// <summary>
+    /// Device code flow: the launcher displays a short code, the user authorises it in any browser
+    /// (even on another device) and the launcher polls until Microsoft confirms. Nothing has to be
+    /// copied back, so an authorization code can never expire while the user hunts for a text box.
+    /// </summary>
+    private async Task LoginWithDeviceCodeAsync()
+    {
+        if (!CanUseModernLogin)
+        {
+            MicrosoftStatus = "请先在下方填写 Azure 应用 ID（说明见输入框上方），然后重新点击「设备代码登录」。";
+            return;
+        }
+
+        BeginLoginOperation();
+        MicrosoftStatus = "正在向微软申请设备代码…";
+
+        try
+        {
+            var session = await _main.Context.Auth.StartDeviceCodeAsync(_loginCts!.Token).ConfigureAwait(true);
+
+            DeviceCodeText = session.UserCode;
+            DeviceCodeUrl = session.VerificationUri;
+
+            MicrosoftStatus = $"请在浏览器中打开 {session.VerificationUri} 并输入代码 {session.UserCode}。"
+                              + "授权后启动器会自动完成登录（无需复制任何链接）。";
+            MicrosoftCodeHint = $"代码 {session.UserCode} 约 {session.ExpiresInSeconds / 60} 分钟内有效。";
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(session.VerificationUri) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn("auth", "devicecode-browser-failed", ("error", ex.Message));
+            }
+
+            var progress = new Progress<string>(line => MicrosoftStatus = line);
+            var account = await _main.Context.Auth
+                .WaitForDeviceCodeAsync(session, progress, _loginCts.Token)
+                .ConfigureAwait(true);
+
+            await SaveLoggedInAccountAsync(account).ConfigureAwait(true);
+            MicrosoftStatus = $"登录成功：{account.Username}";
+            MicrosoftCodeHint = "";
+            DeviceCodeText = "";
+        }
+        catch (OperationCanceledException)
+        {
+            MicrosoftStatus = "已取消登录。";
+        }
+        catch (MicrosoftAuthException ex)
+        {
+            MicrosoftStatus = MicrosoftAuthMessages.Describe(ex);
+            AppLog.Warn("auth", "devicecode-failed", ("code", ex.ErrorCode ?? "unknown"));
+        }
+        catch (Exception ex)
+        {
+            MicrosoftStatus = "设备代码登录失败：" + ex.Message;
+            AppLog.Error("ui", "devicecode-failed", ex);
+        }
+        finally
+        {
+            EndLoginOperation();
+        }
+    }
+
+    /// <summary>
+    /// Loopback flow: opens the browser and catches the redirect on a local listener, so the whole
+    /// sign-in happens automatically.
+    /// </summary>
+    private async Task LoginWithLoopbackAsync()
+    {
+        if (!CanUseModernLogin)
+        {
+            MicrosoftStatus = "请先在下方填写 Azure 应用 ID（说明见输入框上方），然后重新点击「浏览器自动回调登录」。";
+            return;
+        }
+
+        BeginLoginOperation();
+        MicrosoftStatus = "正在打开浏览器…";
+
+        try
+        {
+            var progress = new Progress<string>(line => MicrosoftStatus = line);
+            var account = await _main.Context.Auth
+                .SignInWithLoopbackAsync(null, progress, TimeSpan.FromMinutes(5), _loginCts!.Token)
+                .ConfigureAwait(true);
+
+            await SaveLoggedInAccountAsync(account).ConfigureAwait(true);
+            MicrosoftStatus = $"登录成功：{account.Username}";
+            MicrosoftCodeHint = "";
+        }
+        catch (OperationCanceledException)
+        {
+            MicrosoftStatus = "已取消登录。";
+        }
+        catch (TimeoutException)
+        {
+            MicrosoftStatus = "等待浏览器回调超时。请重新点击「浏览器自动回调」登录。";
+        }
+        catch (MicrosoftAuthException ex)
+        {
+            MicrosoftStatus = MicrosoftAuthMessages.Describe(ex);
+            AppLog.Warn("auth", "loopback-failed", ("code", ex.ErrorCode ?? "unknown"));
+        }
+        catch (Exception ex)
+        {
+            MicrosoftStatus = "浏览器自动回调登录失败：" + ex.Message;
+            AppLog.Error("ui", "loopback-failed", ex);
+        }
+        finally
+        {
+            EndLoginOperation();
+        }
+    }
+
+    private void CancelMicrosoftLogin()
+    {
+        _loginCts?.Cancel();
+        StopClipboardWatch();
+        MicrosoftStatus = "正在取消登录…";
+    }
+
+    private void CopyDeviceCode()
+    {
+        if (DeviceCodeText.Length == 0) return;
+
+        MicrosoftStatus = TrySetClipboard(DeviceCodeText)
+            ? $"代码 {DeviceCodeText} 已复制，请在浏览器页面中粘贴。"
+            : "无法写入剪贴板，请手动输入上面的代码。";
+    }
+
+    private void OpenDeviceCodePage()
+    {
+        var url = DeviceCodeUrl.Length > 0 ? DeviceCodeUrl : "https://microsoft.com/link";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MicrosoftStatus = $"无法打开浏览器：{ex.Message}。请手动访问 {url}。";
+        }
+    }
+
+    private async Task SaveClientIdAsync()
+    {
+        _main.Context.UpdateMicrosoftClientId(ClientIdInput);
+        await _main.Context.SettingsStore.SaveAsync(_main.Context.Settings).ConfigureAwait(true);
+
+        OnPropertyChanged(nameof(CanUseModernLogin));
+        OnPropertyChanged(nameof(NeedsClientId));
+        OnPropertyChanged(nameof(ModernLoginUnavailableReason));
+
+        MicrosoftStatus = CanUseModernLogin
+            ? "已保存 Azure 应用 ID。现在可以使用「设备代码登录」或「浏览器自动回调」登录。"
+            : "已保存。内置客户端 ID 不支持设备代码流，请填写你自己注册的 Azure 应用 ID。";
+
+        _main.LogsPage.AppendSystem(CanUseModernLogin
+            ? "已配置 Azure 应用 ID，启用设备代码 / 回环登录。"
+            : "已清空 Azure 应用 ID，仅使用旧版粘贴登录。");
+    }
+
+    private void OpenAzureGuide()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://learn.microsoft.com/entra/identity-platform/quickstart-register-app")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            MicrosoftStatus = "无法打开浏览器：" + ex.Message;
+        }
+    }
+
+    /// <summary>Persists a freshly authenticated account and makes it current (shared by all flows).</summary>
+    private async Task SaveLoggedInAccountAsync(Account account)
+    {
+        var accounts = (await _main.Context.AccountStore.LoadAsync().ConfigureAwait(true))
+            .Where(a => !string.Equals(a.Uuid, account.Uuid, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        accounts.Add(account);
+        await _main.Context.AccountStore.SaveAsync(accounts).ConfigureAwait(true);
+
+        await _main.ReloadAccountsAsync().ConfigureAwait(true);
+        _main.CurrentAccount = _main.Accounts.FirstOrDefault(a => string.Equals(a.Uuid, account.Uuid, StringComparison.OrdinalIgnoreCase));
+
+        LaunchStatus = $"微软账户 {account.Username} 已登录。";
+        _main.LogsPage.AppendSystem($"微软账户 {account.Username} 登录成功（方式：{DescribeFlow(account.AuthFlow)}）");
+    }
+
+    private static string DescribeFlow(string? flow) => flow switch
+    {
+        "devicecode" => "设备代码流",
+        "loopback" => "浏览器自动回调",
+        "legacy" => "旧版粘贴",
+        _ => flow ?? "未知",
+    };
+
+    #endregion
 
     private void CopyLoginLink()
     {
@@ -574,8 +880,6 @@ public sealed class HomeViewModel : ObservableObject
         StopClipboardWatch();
         await CompleteMicrosoftLoginAsync().ConfigureAwait(true);
     }
-
-    private bool IsMicrosoftLoginBusy => CompleteMicrosoftLoginCommand is AsyncRelayCommand { IsRunning: true };
 
     private void ClearCallback()
     {
@@ -675,27 +979,19 @@ public sealed class HomeViewModel : ObservableObject
         }
 
         MicrosoftStatus = "正在与微软账户服务交换令牌…";
+        MicrosoftLoginBusy = true;
 
         try
         {
             var account = await _main.Context.Auth.AuthenticateWithCodeAsync(code).ConfigureAwait(true);
 
-            var accounts = (await _main.Context.AccountStore.LoadAsync().ConfigureAwait(true))
-                .Where(a => !string.Equals(a.Uuid, account.Uuid, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            accounts.Add(account);
-            await _main.Context.AccountStore.SaveAsync(accounts).ConfigureAwait(true);
-
-            await _main.ReloadAccountsAsync().ConfigureAwait(true);
-            _main.CurrentAccount = _main.Accounts.FirstOrDefault(a => string.Equals(a.Uuid, account.Uuid, StringComparison.OrdinalIgnoreCase));
+            await SaveLoggedInAccountAsync(account).ConfigureAwait(true);
 
             StopClipboardWatch();
             MicrosoftCallback = "";
             MicrosoftLoginUrl = "";
             MicrosoftStatus = $"登录成功: {account.Username}";
             MicrosoftCodeHint = "";
-            LaunchStatus = $"微软账户 {account.Username} 已登录。";
-            _main.LogsPage.AppendSystem($"微软账户 {account.Username} 登录成功");
         }
         catch (MicrosoftAuthException ex)
         {
@@ -722,6 +1018,10 @@ public sealed class HomeViewModel : ObservableObject
             MicrosoftStatus = "登录过程中出现错误: " + ex.Message
                               + "\n如果授权码还没有被微软处理过，可以立即重试；否则请重新登录。";
             AppLog.Error("ui", "microsoft-login-failed", ex);
+        }
+        finally
+        {
+            MicrosoftLoginBusy = false;
         }
     }
 

@@ -157,6 +157,20 @@ public sealed class LauncherContext : IAsyncDisposable
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Applies a Microsoft client id at runtime (settings page / login panel) so the modern
+    /// device-code and loopback flows start working without restarting the launcher.
+    /// </summary>
+    public void UpdateMicrosoftClientId(string? clientId)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(clientId) ? null : clientId.Trim();
+
+        Settings.MicrosoftClientId = trimmed;
+        Auth.Options.ClientId = string.IsNullOrWhiteSpace(trimmed) ? new MicrosoftAuthOptions().ClientId : trimmed;
+
+        AppLog.Info("auth", "client-id-updated", ("modern", Auth.Options.HasModernClientId));
+    }
+
     /// <summary>The account that should be used for the next launch.</summary>
     public async Task<Account> GetActiveAccountAsync(CancellationToken ct = default)
     {
