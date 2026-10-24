@@ -100,6 +100,8 @@ public sealed class AccountStore
         [JsonPropertyName("expiresAt")] public DateTimeOffset? ExpiresAt { get; set; }
         [JsonPropertyName("lastUsedAt")] public DateTimeOffset? LastUsedAt { get; set; }
         [JsonPropertyName("skinModel")] public string? SkinModel { get; set; }
+        [JsonPropertyName("skinUrl")] public string? SkinUrl { get; set; }
+        [JsonPropertyName("authFlow")] public string? AuthFlow { get; set; }
 
         /// <summary>DPAPI protected JSON blob: <c>{"accessToken":"...","refreshToken":"..."}</c>.</summary>
         [JsonPropertyName("protectedTokens")] public string? ProtectedTokens { get; set; }
@@ -128,6 +130,8 @@ public sealed class AccountStore
                 ExpiresAt = account.ExpiresAt,
                 LastUsedAt = account.LastUsedAt,
                 SkinModel = account.SkinModel,
+                SkinUrl = account.SkinUrl,
+                AuthFlow = account.AuthFlow,
                 ProtectedTokens = protectedTokens,
             };
         }
@@ -146,6 +150,8 @@ public sealed class AccountStore
                 ExpiresAt = ExpiresAt,
                 LastUsedAt = LastUsedAt,
                 SkinModel = SkinModel,
+                SkinUrl = SkinUrl,
+                AuthFlow = AuthFlow,
             };
 
             if (!string.IsNullOrWhiteSpace(ProtectedTokens))

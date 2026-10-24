@@ -21,6 +21,24 @@
 
                 <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                     <StackPanel>
+                        <TextBlock Text="主界面外观" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="可以为主界面设置一张自定义背景图片（也可以在主界面右键更换）。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding DataContext.Home.BackgroundImagePath, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   Style="{StaticResource MonoText}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Visibility="{Binding DataContext.Home.BackgroundImagePath, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource StringToVisibility}}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <Button Content="选择背景图片…" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding DataContext.Home.ChooseBackgroundCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            <Button Content="恢复默认背景" Style="{StaticResource GhostButton}"
+                                    Command="{Binding DataContext.Home.ClearBackgroundCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Margin="8,0,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                    <StackPanel>
                         <TextBlock Text="数据目录" Style="{StaticResource SectionTitle}" />
                         <TextBlock Text="{Binding DataRoot}" Style="{StaticResource MonoText}" TextWrapping="Wrap" />
                         <TextBlock Text="把 portable.txt 放到 EXE 同目录即可切换为便携模式（数据保存在 data 子目录）。"

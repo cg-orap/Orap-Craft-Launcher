@@ -43,6 +43,12 @@ public sealed class Account
     public DateTimeOffset? LastUsedAt { get; set; }
     public string? SkinModel { get; set; }
 
+    /// <summary>
+    /// Mojang texture URL of this account's skin (from the profile API), used to render the head
+    /// as an avatar. Null for offline accounts, which fall back to an initial badge.
+    /// </summary>
+    public string? SkinUrl { get; set; }
+
     public bool IsExpired => Type == AccountType.Microsoft
                              && (ExpiresAt is null || ExpiresAt.Value <= DateTimeOffset.UtcNow.AddMinutes(1));
 

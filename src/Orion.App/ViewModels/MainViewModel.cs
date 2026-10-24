@@ -1,5 +1,7 @@
 using System.Windows;
+using System.IO;
 using System.Windows.Input;
+using System.Windows.Media;
 using Orion.App.Mvvm;
 using Orion.Core;
 using Orion.Core.Auth;
@@ -130,6 +132,7 @@ public sealed class MainViewModel : ObservableObject
     private ObservableObject? _currentPage;
     private string _navKey = "home";
     private Account? _currentAccount;
+    private ImageSource? _currentAccountAvatar;
     private Instance? _currentInstance;
     private string _versionStatus = "";
     private NavItem? _selectedNavItem;
@@ -163,6 +166,8 @@ public sealed class MainViewModel : ObservableObject
             new NavItem("logs", "日志", "\uE8A5"),
         ]);
 
+        OpenLoginCommand = new RelayCommand(OpenLogin);
+
         _selectedNavItem = NavItems[0];
         _currentPage = Home;
     }
@@ -186,6 +191,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand NavigateCommand { get; }
 
     public ObservableList<NavItem> NavItems { get; } = [];
+
+    public ICommand OpenLoginCommand { get; }
 
     public NavItem? SelectedNavItem
     {
@@ -245,6 +252,73 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(AccountDetail));
             Context.Settings.SelectedAccountId = value?.Id;
             _ = Context.SettingsStore.SaveAsync(Context.Settings);
+            _ = LoadAvatarAsync();
+        }
+    }
+
+    /// <summary>Skin head of the current account (null → the sidebar shows an initial badge).</summary>
+    public ImageSource? CurrentAccountAvatar
+    {
+        get => _currentAccountAvatar;
+        private set
+        {
+            if (!SetProperty(ref _currentAccountAvatar, value)) return;
+            OnPropertyChanged(nameof(HasCurrentAccountAvatar));
+        }
+    }
+
+    public bool HasCurrentAccountAvatar => _currentAccountAvatar is not null;
+
+    private async Task LoadAvatarAsync()
+    {
+        var account = _currentAccount;
+
+        if (account is null || account.Type != AccountType.Microsoft)
+        {
+            CurrentAccountAvatar = null;
+            return;
+        }
+
+        try
+        {
+            // Accounts saved before skin avatars existed have no texture URL yet; ask the profile
+            // API once (only while the token is still valid) and remember the result.
+            if (string.IsNullOrWhiteSpace(account.SkinUrl) && !account.IsExpired)
+            {
+                var refreshed = await Context.Auth.RefreshProfileAsync(account).ConfigureAwait(true);
+
+                if (!string.IsNullOrWhiteSpace(refreshed.SkinUrl))
+                {
+                    account.SkinUrl = refreshed.SkinUrl;
+                    account.SkinModel = refreshed.SkinModel ?? account.SkinModel;
+                    if (!string.IsNullOrWhiteSpace(refreshed.Username)) account.Username = refreshed.Username;
+
+                    var accounts = (await Context.AccountStore.LoadAsync().ConfigureAwait(true)).ToList();
+                    var index = accounts.FindIndex(a => string.Equals(a.Id, account.Id, StringComparison.OrdinalIgnoreCase));
+                    if (index >= 0)
+                    {
+                        accounts[index] = account;
+                        await Context.AccountStore.SaveAsync(accounts).ConfigureAwait(true);
+                    }
+
+                    OnPropertyChanged(nameof(AccountDisplay));
+                    AppLog.Info("ui", "avatar-skin-url-resolved", ("name", account.Username));
+                }
+            }
+
+            var avatar = await Services.SkinAvatars
+                .LoadAsync(Context.Http, account.SkinUrl, account.EffectiveUuid, Context.Paths.Root)
+                .ConfigureAwait(true);
+
+            // The account may have changed while the download ran.
+            if (!ReferenceEquals(account, _currentAccount)) return;
+
+            CurrentAccountAvatar = avatar;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("ui", "avatar-load-failed", ("error", ex.Message));
+            CurrentAccountAvatar = null;
         }
     }
 
@@ -268,10 +342,39 @@ public sealed class MainViewModel : ObservableObject
     public string AccountDisplay => CurrentAccount?.Username ?? "未登录";
     public string AccountDetail => CurrentAccount switch
     {
-        null => "在首页添加离线账户，或使用微软账户登录",
+        null => "点击登录",
         { Type: AccountType.Microsoft } a => a.IsExpired ? "微软账户 · 需要刷新令牌" : "微软正版账户",
         _ => "离线账户（仅单机 / 局域网）",
     };
+
+    /// <summary>
+    /// Opens the dedicated login window (the only place accounts are managed) and reloads the
+    /// account list when it closes.
+    /// </summary>
+    public void OpenLogin()
+    {
+        try
+        {
+            var window = new Views.LoginWindow(
+                new LoginViewModel(Context),
+                Path.Combine(Context.Paths.CacheDir, "webview2"))
+            {
+                Owner = Application.Current?.MainWindow,
+            };
+
+            AppLog.Info("ui", "login-window-open");
+            window.ShowDialog();
+            AppLog.Info("ui", "login-window-closed");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("ui", "login-window-failed", ex);
+        }
+        finally
+        {
+            _ = ReloadAccountsAsync();
+        }
+    }
 
     public string InstanceDisplay => CurrentInstance?.Name ?? "未选择版本";
     public string InstanceDetail => CurrentInstance is null

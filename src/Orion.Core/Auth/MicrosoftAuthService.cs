@@ -503,6 +503,33 @@ public sealed partial class MicrosoftAuthService
             ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Re-reads the Minecraft profile (name, uuid and skin texture) with the account's current
+    /// token. Used to fill in <see cref="Account.SkinUrl"/> for accounts saved before the launcher
+    /// rendered skin avatars, so the sidebar can show the real head.
+    /// </summary>
+    public async Task<Account> RefreshProfileAsync(Account account, CancellationToken ct = default)
+    {
+        if (account.Type != AccountType.Microsoft || string.IsNullOrWhiteSpace(account.AccessToken))
+            return account;
+
+        var profile = await RequestProfileAsync(account.AccessToken, ct).ConfigureAwait(false);
+        if (profile is null) return account;
+
+        var updated = account.Clone();
+        if (!string.IsNullOrWhiteSpace(profile.Name)) updated.Username = profile.Name!;
+        if (!string.IsNullOrWhiteSpace(profile.Id)) updated.Uuid = profile.Id!;
+
+        var skin = profile.Skins?.FirstOrDefault();
+        if (skin is not null)
+        {
+            updated.SkinModel = skin.Variant ?? updated.SkinModel;
+            updated.SkinUrl = skin.Url ?? updated.SkinUrl;
+        }
+
+        return updated;
+    }
+
     private async Task<Account> CompleteLoginAsync(
         string msaAccessToken,
         string? refreshToken,
@@ -540,6 +567,7 @@ public sealed partial class MicrosoftAuthService
             AuthFlow = flow,
             ExpiresAt = expiresAt,
             SkinModel = profile?.Skins?.FirstOrDefault()?.Variant,
+            SkinUrl = profile?.Skins?.FirstOrDefault()?.Url,
             LastUsedAt = DateTimeOffset.UtcNow,
         };
 
@@ -880,6 +908,7 @@ public sealed partial class MicrosoftAuthService
         [JsonPropertyName("id")] public string? Id { get; set; }
         [JsonPropertyName("state")] public string? State { get; set; }
         [JsonPropertyName("variant")] public string? Variant { get; set; }
+        [JsonPropertyName("url")] public string? Url { get; set; }
     }
 
     #endregion

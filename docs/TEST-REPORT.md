@@ -363,3 +363,27 @@ POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
    （已为 Java ≥19 注入 `-Dstdout.encoding=UTF-8` 缓解）。
 3. `verify` 默认按「大小 + 必要时摘要」校验资源，`--deep` 才会对全部资源做 SHA-1。
 4. 未实现 Mojang 官方 Java 运行时自动下载，需要用户自备 Java。
+
+### 3.15 登录与主界面重构（仅保留内嵌浏览器登录）
+
+按需求把登录收敛为**一种**方式，并把界面结构调整为「一个居中的启动按钮 + 可自定义背景」：
+
+| 变更 | 实现 | 验证 |
+| --- | --- | --- |
+| 只保留内嵌浏览器登录 | 删除设备代码流与回环回调（含其 UI、命令与测试）；登录窗口内嵌 WebView2 打开微软登录页并在 `NavigationStarting` 拦截回调 | UI 自动化实测：窗口打开 → 点击「用浏览器登录」→ 日志 `browser-login-start flow=legacy host=login.live.com` + `webview2-navigation-ok`，截图显示微软官方登录页 |
+| 登录单独成窗 | 新 `LoginWindow`：左侧账户列表（含离线账户增删）、右侧内嵌浏览器、底部状态与操作；浏览器按需创建 | 截图 `docs/images/login-window.png` |
+| 主界面仅留启动按钮 | `HomeView` 只剩背景、居中大按钮、状态行与「结束游戏」 | 截图 `docs/images/page-home.png` |
+| 自定义背景图片 | `LauncherSettings.BackgroundImagePath` + 右键菜单 + 「设置 → 主界面外观」；图片以 `UniformToFill` 铺满并加暗色蒙版保证可读性 | 实测：写入一张 1600×900 测试图后启动，背景正确渲染（`docs/images/home-background.png`） |
+| 账户置于侧栏首位 + 皮肤头像 | 侧栏第一项为账户卡片（皮肤头 + 名称 + 类型），点击打开登录窗口；头像由档案 `skinUrl` 下载皮肤并**本地裁出 8×8 头部**（叠加帽子层、最近邻放大），缓存到 `<数据目录>/cache/skins` | 实测缓存文件 `cache/skins/<uuid>.png`（243 B）生成，侧栏与登录列表均显示真实皮肤头 |
+
+过程中修掉的两个真实缺陷：
+
+1. `AccountStore` 的持久化记录没有映射 `skinUrl` / `authFlow` —— 皮肤 URL 与登录流程在保存后丢失
+   （这也会导致重启后用错误的端点刷新令牌）。已补上映射，并有单元测试覆盖。
+2. `BitmapImage` 使用 `StreamSource` 时若设置 `IgnoreImageCache`，`EndInit()` 会抛
+   `ArgumentNullException("key")`（缓存键来自不存在的 URI），导致皮肤永远解码失败；
+   且 `RenderTargetBitmap` 不能在工作线程使用。改为纯像素合成（BGRA 叠加 + `BitmapSource.Create`），
+   线程安全且像素更锐利。
+
+测试数从 138 调整为 **136**：删除了设备代码流与回环监听器的用例，新增 v2.0 端点换取授权码、
+`skinUrl` 落库、授权码重定向 query 解析等用例。

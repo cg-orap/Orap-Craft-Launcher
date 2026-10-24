@@ -31,6 +31,9 @@ public sealed class LauncherSettings
     [JsonPropertyName("selectedAccountId")] public string? SelectedAccountId { get; set; }
     [JsonPropertyName("lastInstanceId")] public string? LastInstanceId { get; set; }
 
+    /// <summary>Custom home page background image; empty shows the built-in gradient.</summary>
+    [JsonPropertyName("backgroundImagePath")] public string? BackgroundImagePath { get; set; }
+
     [JsonPropertyName("showSnapshots")] public bool ShowSnapshots { get; set; } = true;
     [JsonPropertyName("showOldVersions")] public bool ShowOldVersions { get; set; } = true;
 

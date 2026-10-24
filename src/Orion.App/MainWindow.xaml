@@ -70,22 +70,47 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- current account -->
-                <Border DockPanel.Dock="Bottom" Margin="12,8,12,14" Padding="11"
-                        Background="{DynamicResource SurfaceAltBg}" CornerRadius="10">
+                <!-- account: first entry of the rail, opens the login window -->
+                <Button DockPanel.Dock="Top" Margin="10,0,10,10" Padding="0" Cursor="Hand"
+                        Command="{Binding OpenLoginCommand}"
+                        AutomationProperties.AutomationId="AccountButton"
+                        ToolTip="点击登录 / 切换账户">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Fill" Background="{DynamicResource SurfaceAltBg}"
+                                    CornerRadius="10" Padding="10" BorderThickness="1" BorderBrush="Transparent">
+                                <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                    <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Width="30" Height="30" CornerRadius="15" Background="{DynamicResource SurfaceBg}"
-                                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
-                                VerticalAlignment="Center" Margin="0,0,9,0">
-                            <TextBlock Text="{Binding CurrentAccount.Username, Converter={StaticResource Initial}}"
-                                       FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <!-- skin head (falls back to an initial badge) -->
+                        <Grid Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,10,0">
+                            <Border CornerRadius="6" Background="{DynamicResource SurfaceBg}"
+                                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
+                                    Visibility="{Binding HasCurrentAccountAvatar, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+                                <TextBlock Text="{Binding CurrentAccount.Username, Converter={StaticResource Initial}}"
+                                           FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border CornerRadius="6" ClipToBounds="True"
+                                    Visibility="{Binding HasCurrentAccountAvatar, Converter={StaticResource BoolToVisibility}}">
+                                <Image Source="{Binding CurrentAccountAvatar}" Stretch="UniformToFill"
+                                       RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                            </Border>
+                        </Grid>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="{Binding AccountDisplay}" FontWeight="SemiBold" FontSize="12.5"
@@ -94,7 +119,7 @@
                                        TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,2,0,0" />
                         </StackPanel>
                     </Grid>
-                </Border>
+                </Button>
 
                 <!-- nav -->
                 <ListBox ItemsSource="{Binding NavItems}"
