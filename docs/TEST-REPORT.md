@@ -429,3 +429,9 @@ POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
 | CurseForge 整合包拖入安装 | 新增 `PackArchiveInstaller`：识别 `manifest.json`，按清单安装加载器、解包 `overrides/`，模组按 `projectID/fileID` 走 CurseForge 公共下载；无法解析的条目逐条报告 | 格式识别 + 失败路径有明确提示 |
 | 国内整合包拖入安装 | 识别含 `.minecraft` 的 zip（交给现有导入器，保留原目录）与仅含 `mods/config` 的 zip（基于当前版本新建版本后复制） | 逻辑 + 提示 |
 | 设置拆分子页 | 设置页加子页签「常规与外观」「下载、账户与日志」 | 截图 |
+### 3.19 启动按钮改为 PCL 风格双行
+
+启动键内部改为两行：大字「启动游戏」+ 小字「版本名 · MC 版本 · 加载器」；下方并排放置「版本选择」「版本设置」两个等宽按钮。切换版本时小字即时更新（`LaunchVersionLine` 在 `CurrentInstance` 变化时广播）。
+
+- 截图证据：`docs/images/page-home.png`（显示「导入测试包 · 1.21.1 · NeoForge 21.1.264」）。
+- 「版本设置」进入版本管理页；「版本选择」进入窗口内的版本选择子页。

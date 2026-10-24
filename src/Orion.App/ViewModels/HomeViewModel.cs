@@ -45,6 +45,7 @@ public sealed class HomeViewModel : ObservableObject
         ChooseBackgroundCommand = new RelayCommand(ChooseBackground);
         ClearBackgroundCommand = new RelayCommand(ClearBackground, () => HasBackgroundImage);
         OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("version-picker"));
+        OpenVersionSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));
 
         ReloadBackground();
     }
@@ -55,6 +56,7 @@ public sealed class HomeViewModel : ObservableObject
     public ICommand ChooseBackgroundCommand { get; }
     public ICommand ClearBackgroundCommand { get; }
     public ICommand OpenVersionPickerCommand { get; }
+    public ICommand OpenVersionSettingsCommand { get; }
 
     public Instance? SelectedInstance => _main.CurrentInstance;
 
@@ -75,6 +77,7 @@ public sealed class HomeViewModel : ObservableObject
             OnPropertyChanged();
             OnPropertyChanged(nameof(InstanceTitle));
             OnPropertyChanged(nameof(InstanceSubtitle));
+            OnPropertyChanged(nameof(LaunchVersionLine));
             _ = RefreshAsync();
         }
     }
@@ -98,6 +101,11 @@ public sealed class HomeViewModel : ObservableObject
     }
 
     public string LaunchButtonText => IsLaunching ? "运行中…" : "启动游戏";
+
+    /// <summary>Second line of the launch button (PCL style): which version will start.</summary>
+    public string LaunchVersionLine => _main.CurrentInstance is { } instance
+        ? $"{instance.Name} · {instance.Subtitle}"
+        : "尚未选择版本";
 
     public string LaunchStatus
     {
