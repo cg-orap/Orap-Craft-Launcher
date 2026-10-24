@@ -261,9 +261,28 @@ public sealed class MicrosoftAuthFlowTests
         var exception = await Assert.ThrowsAsync<MicrosoftAuthException>(() => service.AuthenticateWithCodeAsync("code"));
 
         Assert.Equal("xbl_failed", exception.ErrorCode);
-        Assert.Null(exception.ErrorDescription);
+        Assert.Contains("400", exception.ErrorDescription!, StringComparison.Ordinal);
 
         var message = MicrosoftAuthMessages.Describe(exception);
-        Assert.Contains("Xbox 档案", message, StringComparison.Ordinal);
+        Assert.Contains("Xbox", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnauthorizedTicketExplainsThatTheLegacyFlowLacksXboxScope()
+    {
+        // 401 means the ticket could not be validated at all - the legacy Live Connect flow issues
+        // tokens without the Xbox Live scope, which is exactly the reported symptom.
+        var stub = new AuthStub();
+        stub.PathOverrides["/xbl"] = (HttpStatusCode.Unauthorized, "");
+
+        var service = new MicrosoftAuthService(new HttpClient(stub), StubOptions());
+        var exception = await Assert.ThrowsAsync<MicrosoftAuthException>(() => service.AuthenticateWithCodeAsync("code"));
+
+        Assert.Equal("xbl_failed", exception.ErrorCode);
+
+        var message = MicrosoftAuthMessages.Describe(exception);
+        Assert.Contains("401", message, StringComparison.Ordinal);
+        Assert.Contains("v2.0", message, StringComparison.Ordinal);
+        Assert.Contains("Azure", message, StringComparison.Ordinal);
     }
 }

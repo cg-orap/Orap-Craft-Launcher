@@ -282,6 +282,35 @@ POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
 写入日志与错误说明，并给出按序排查步骤（先到 xbox.com 创建 Xbox 档案、检查地区、家庭批准、
 新档案生效延迟），同时有单元测试锁定该行为。
 
+### 3.14 真实账号登录失败定位：XBL 401（旧版流程缺 Xbox 作用域）
+
+用户用**正版账号**（在 PCL/HMCL 可正常登录）在本启动器登录后，界面提示 Xbox Live 拒绝了令牌。
+日志给出了决定性证据：
+
+```
+2026-10-24 11:08:31 [INFO ] [auth] browser-login-captured length=584
+2026-10-24 11:08:32 [WARN ] [auth] xbl-rejected status=401 detail=empty
+2026-10-24 11:08:32 [WARN ] [auth] browser-login-rejected code=xbl_failed
+```
+
+- OAuth 授权码抓取成功（584 字符）→ 令牌交换成功（否则会是 `invalid_grant`）→
+  **`user.auth.xboxlive.com` 返回 401**（票据完全无法验证），而不是 400（账号侧问题）。
+- 结论：旧版 `login.live.com` 流程签发的令牌**缺少 Xbox Live 授权范围**；这与账号本身无关
+  （同一账号在 HMCL/PCL 正常，因为它们使用 v2.0 流程 + `XboxLive.signin` 作用域）。
+
+据此做了三件事：
+
+1. **票据形态自愈**：`RpsTicket` 依次尝试 `d=<token>`（MSA）、`t=<token>`（AAD）、`<token>`，
+   任一成功即用；每次尝试都记录前缀与状态码。
+2. **作用域可见**：令牌响应中的 `scope` 现在会写入日志，因此“到底授予了什么权限”可直接看到。
+3. **v2.0 搬进内嵌浏览器**：配置了应用 ID 后，「用浏览器登录」自动改走
+   `login.microsoftonline.com` v2.0 + `XboxLive.signin` + `http://localhost:<随机端口>`
+   （在 WebView2 内部拦截重定向，不需要真的监听端口），窗口与操作体验完全不变。
+4. **错误分诊**：401 → 明确告知是旧版流程的范围限制并给出“填应用 ID 后同一个窗口即可”的路径；
+   400 → 给出账号侧排查步骤；`AADSTS50011`（未登记 localhost 回调）等也有专门文案。
+
+对应单元测试：401/400 两种状态的分诊文案、票据前缀回退、现代码交换路由。
+
 
 
 ---

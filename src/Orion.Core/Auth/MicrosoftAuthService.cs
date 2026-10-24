@@ -144,13 +144,39 @@ public static class MicrosoftAuthMessages
     {
         var detail = exception.ErrorDescription;
 
+        // A 401 (rather than 400) means the ticket could not be validated at all. With the legacy
+        // Live Connect flow that almost always means the token was issued without the Xbox Live
+        // scope, which no amount of account fixing can solve - the v2.0 flow must be used.
+        if (detail is not null && detail.Contains("401", StringComparison.Ordinal))
+        {
+            return "微软登录成功，但 Xbox Live 拒绝了这个令牌（HTTP 401）。\n"
+                   + "这说明旧版 Live Connect 流程签发的令牌没有 Xbox Live 授权范围——这是微软对老流程的限制，"
+                   + "与你的账号无关（同一账号在 HMCL / PCL 里能登录，是因为它们使用新的 v2.0 流程）。\n"
+                   + "解决办法：\n"
+                   + "① 到「设置 → 微软登录」填写一个你自己免费注册的 Azure 应用 ID（约 2 分钟，见「如何获取？」）；\n"
+                   + "② 回到首页点「用浏览器登录」——仍然是同一个窗口、选择账户即完成，不需要复制任何内容；\n"
+                   + "③ 或者直接用「设备代码登录」。\n"
+                   + "填写 ID 后，登录窗口会改用 XboxLive.signin 权限，Xbox Live 就会接受。";
+        }
+
+        if (detail is not null && detail.Contains("400", StringComparison.Ordinal))
+        {
+            var hint = "微软登录成功，但 Xbox Live 拒绝了该账户的令牌（HTTP 400）。请按顺序排查：\n"
+                       + "1) 该微软账户还没有 Xbox 档案 —— 打开 https://www.xbox.com 用同一账户登录一次后重试；\n"
+                       + "2) 账户所在国家/地区不支持 Xbox Live；\n"
+                       + "3) 未成年人账户需要先加入 Microsoft 家庭并由成人批准；\n"
+                       + "4) 若刚登录成功不久，请稍等 1–2 分钟再重试（新档案生效有延迟）。";
+
+            return WithDetail(hint, detail);
+        }
+
         var lines = new List<string>
         {
-            "微软账户已登录，但 Xbox Live 拒绝了该账户的令牌。这通常不是启动器的问题，请按顺序排查：",
-            "1) 该微软账户还没有 Xbox 档案 —— 打开 https://www.xbox.com 用同一账户登录一次（创建档案）后重试；",
-            "2) 账户所在国家/地区不支持 Xbox Live（可在微软账户页面修改地区）；",
+            "微软账户已登录，但 Xbox Live 拒绝了该账户的令牌。请按顺序排查：",
+            "1) 打开 https://www.xbox.com 用同一账户登录一次，确认能创建/进入 Xbox 档案；",
+            "2) 检查账户国家/地区是否支持 Xbox Live；",
             "3) 未成年人账户需要先加入 Microsoft 家庭并由成人批准；",
-            "4) 若刚登录成功不久，请稍等 1–2 分钟再重试（新档案生效有延迟）。",
+            "4) 若仍失败，请改用「设备代码登录」或填写自己的 Azure 应用 ID 后重试。",
         };
 
         if (!string.IsNullOrWhiteSpace(detail))
@@ -159,6 +185,14 @@ public static class MicrosoftAuthMessages
         }
 
         return string.Join("\n", lines);
+    }
+
+    /// <summary>Appends the provider's raw detail when it adds information.</summary>
+    private static string WithDetail(string message, string detail)
+    {
+        // "HTTP 400" alone is not interesting; a real body (XErr etc.) is.
+        var body = detail.Contains('|') ? detail[(detail.IndexOf('|') + 1)..].Trim() : null;
+        return body is { Length: > 0 } ? message + "\n微软返回的详细信息：" + body : message;
     }
 
     /// <summary>Turns Azure AD error codes (AADSTS…) into concrete configuration instructions.</summary>
@@ -177,6 +211,13 @@ public static class MicrosoftAuthMessages
         {
             return "该应用不允许公共客户端登录（AADSTS7000218）。\n"
                    + "请在 Azure 应用页面的「身份验证」中启用“允许公共客户端流”，然后重试。";
+        }
+
+        if (description.Contains("AADSTS50011", StringComparison.OrdinalIgnoreCase))
+        {
+            return "该应用没有登记本启动器使用的回调地址（AADSTS50011）。\n"
+                   + "请在 Azure 应用 →「身份验证」→ 平台选择「公共客户端/本机(移动和桌面)」，"
+                   + "添加重定向 URI：http://localhost  然后重试。";
         }
 
         if (description.Contains("AADSTS65001", StringComparison.OrdinalIgnoreCase) ||
@@ -533,10 +574,56 @@ public sealed partial class MicrosoftAuthService
         if (token is null || string.IsNullOrEmpty(token.AccessToken))
             throw new MicrosoftAuthException("无法解析微软返回的令牌。", "parse_error");
 
+        // The granted scope decides whether Xbox Live will accept the token. The legacy flow
+        // silently downgrades the scope for some clients, which shows up later as a 401 from
+        // user.auth.xboxlive.com - logging it makes that diagnosable.
+        AppLog.Info("auth", "legacy-token-granted",
+            ("scope", string.IsNullOrWhiteSpace(token.Scope) ? "<not reported>" : token.Scope),
+            ("tokenType", token.TokenType ?? "?"));
+
         return token;
     }
 
+    /// <summary>
+    /// Exchanges an MSA access token for an Xbox Live user token.
+    ///
+    /// <c>RpsTicket</c> takes a single-letter source prefix: <c>d=</c> for a Microsoft account
+    /// token, <c>t=</c> for an Azure AD token. Some issuers accept neither form (the ticket is
+    /// simply not valid for Xbox Live), so the variants are tried in order — each rejected attempt
+    /// costs one request and the first success wins.
+    /// </summary>
     private async Task<(string Token, string UserHash)> RequestXboxLiveTokenAsync(string accessToken, CancellationToken ct)
+    {
+        string[] prefixes = ["d=", "t=", ""];
+        MicrosoftAuthException? last = null;
+
+        foreach (var prefix in prefixes)
+        {
+            try
+            {
+                var result = await TryRequestXboxLiveTokenAsync(accessToken, prefix, ct).ConfigureAwait(false);
+
+                if (prefix != "d=")
+                {
+                    AppLog.Warn("auth", "xbl-ticket-prefix-fallback",
+                        ("prefix", prefix.Length == 0 ? "<none>" : prefix));
+                }
+
+                return result;
+            }
+            catch (MicrosoftAuthException ex) when (ex.ErrorCode == "xbl_failed")
+            {
+                last = ex;
+            }
+        }
+
+        throw last ?? new MicrosoftAuthException("Xbox Live 认证失败。", "xbl_failed");
+    }
+
+    private async Task<(string Token, string UserHash)> TryRequestXboxLiveTokenAsync(
+        string accessToken,
+        string prefix,
+        CancellationToken ct)
     {
         var payload = new
         {
@@ -544,7 +631,7 @@ public sealed partial class MicrosoftAuthService
             {
                 AuthMethod = "RPS",
                 SiteName = "user.auth.xboxlive.com",
-                RpsTicket = "d=" + accessToken,
+                RpsTicket = prefix + accessToken,
             },
             RelyingParty = _options.XboxRelyingParty,
             TokenType = "JWT",
@@ -562,18 +649,23 @@ public sealed partial class MicrosoftAuthService
 
         if (!response.IsSuccessStatusCode)
         {
-            // Xbox Live answers a rejected ticket with 400 and (usually) an empty body, so the
+            // Xbox Live answers a rejected ticket with 400/401 and (usually) an empty body, so the
             // status plus whatever detail exists is all the diagnosis we can get. Log it: without
             // this the user only sees "Xbox Live 认证失败" with no way to report the cause.
             var detail = SummarizeBody(body);
             AppLog.Warn("auth", "xbl-rejected",
                 ("status", (int)response.StatusCode),
+                ("prefix", prefix.Length == 0 ? "<none>" : prefix),
                 ("detail", detail ?? "empty"));
+
+            var described = detail is null
+                ? $"HTTP {(int)response.StatusCode}"
+                : $"HTTP {(int)response.StatusCode} | {detail}";
 
             throw new MicrosoftAuthException(
                 $"Xbox Live 认证失败 (HTTP {(int)response.StatusCode})",
                 "xbl_failed",
-                detail);
+                described);
         }
 
         var parsed = JsonSerializer.Deserialize<XboxTokenResponse>(body);
@@ -748,6 +840,9 @@ public sealed partial class MicrosoftAuthService
         [JsonPropertyName("refresh_token")] public string? RefreshToken { get; set; }
         [JsonPropertyName("expires_in")] public int ExpiresIn { get; set; }
         [JsonPropertyName("token_type")] public string? TokenType { get; set; }
+
+        /// <summary>Scopes the provider actually granted — logged to diagnose missing Xbox access.</summary>
+        [JsonPropertyName("scope")] public string? Scope { get; set; }
     }
 
     private sealed class XboxTokenResponse

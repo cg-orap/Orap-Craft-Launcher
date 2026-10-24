@@ -312,6 +312,58 @@ public sealed partial class MicrosoftAuthService
         return token;
     }
 
+    /// <summary>
+    /// Exchanges an authorization code from the v2.0 authorize endpoint (used by the embedded
+    /// browser) and completes the chain. This is the flow that yields a token with the
+    /// <c>XboxLive.signin</c> scope, which Xbox Live actually accepts.
+    /// </summary>
+    public async Task<Account> SignInWithModernCodeAsync(string code, string redirectUri, CancellationToken ct = default)
+    {
+        RequireModernClient();
+
+        if (string.IsNullOrWhiteSpace(code)) throw new MicrosoftAuthException("授权码为空。", "missing_code");
+
+        var token = await RequestModernTokenAsync(new Dictionary<string, string>
+        {
+            ["client_id"] = _options.ClientId,
+            ["grant_type"] = "authorization_code",
+            ["code"] = code,
+            ["redirect_uri"] = redirectUri,
+            ["scope"] = _options.ModernScope,
+        }, ct).ConfigureAwait(false);
+
+        return await CompleteLoginAsync(
+            token.AccessToken!,
+            token.RefreshToken,
+            token.ExpiresIn,
+            FlowLoopback,
+            null,
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Picks a free loopback port for the redirect URI.
+    ///
+    /// The embedded browser intercepts the navigation before it reaches the network, so no listener
+    /// has to stay open; the port only has to be a plausible loopback port that Microsoft accepts
+    /// for native clients (<c>http://localhost</c> with any port).
+    /// </summary>
+    public static int PickLoopbackPort()
+    {
+        try
+        {
+            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            return Random.Shared.Next(30000, 45000);
+        }
+    }
+
     /// <summary>Refreshes a v2.0 token (device code / loopback accounts).</summary>
     private async Task<Account> RefreshModernAsync(Account account, CancellationToken ct)
     {

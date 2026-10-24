@@ -18,6 +18,10 @@ public partial class MicrosoftLoginWindow : Window
 {
     private readonly MicrosoftAuthService _auth;
     private readonly string _userDataFolder;
+    private readonly bool _modernFlow;
+    private readonly string _redirectUri;
+    private readonly string _state = Guid.NewGuid().ToString("N");
+
     private bool _completed;
     private bool _browserReady;
 
@@ -25,6 +29,14 @@ public partial class MicrosoftLoginWindow : Window
     {
         _auth = auth;
         _userDataFolder = userDataFolder;
+
+        // Use the v2.0 endpoint (XboxLive.signin scope) when the user configured an app id:
+        // that is the flow whose token Xbox Live accepts, and the embedded browser hides the
+        // loopback redirect, so the UX is identical and nothing has to be copied.
+        _modernFlow = auth.CanUseModernFlows;
+        _redirectUri = _modernFlow
+            ? $"http://localhost:{MicrosoftAuthService.PickLoopbackPort()}/"
+            : auth.Options.RedirectUri;
 
         InitializeComponent();
 
@@ -40,6 +52,12 @@ public partial class MicrosoftLoginWindow : Window
 
     /// <summary>True when the user asked to switch to the device-code flow instead.</summary>
     public bool SwitchToDeviceCode { get; private set; }
+
+    /// <summary>True when the code must be exchanged against the v2.0 endpoint.</summary>
+    public bool UsedModernFlow => _modernFlow;
+
+    /// <summary>The redirect URI that must be repeated in the token request.</summary>
+    public string RedirectUriUsed => _redirectUri;
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -94,8 +112,14 @@ public partial class MicrosoftLoginWindow : Window
             _browserReady = true;
             Overlay.Visibility = Visibility.Collapsed;
 
-            var authorizeUri = _auth.BuildAuthorizationUri();
-            AppLog.Info("auth", "webview2-navigating", ("host", authorizeUri.Host));
+            var authorizeUri = _modernFlow
+                ? _auth.BuildModernAuthorizeUri(_redirectUri, _state)
+                : _auth.BuildAuthorizationUri();
+
+            AppLog.Info("auth", "webview2-navigating",
+                ("host", authorizeUri.Host),
+                ("flow", _modernFlow ? "modern" : "legacy"));
+
             Browser.CoreWebView2.Navigate(authorizeUri.ToString());
         }
         catch (Exception ex)
@@ -116,7 +140,7 @@ public partial class MicrosoftLoginWindow : Window
 
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
     {
-        if (!MicrosoftAuthService.IsRedirectTo(e.Uri, _auth.Options.RedirectUri)) return;
+        if (!MicrosoftAuthService.IsRedirectTo(e.Uri, _redirectUri)) return;
 
         // This is our redirect: stop the browser and take the code out of the URL.
         e.Cancel = true;
@@ -130,6 +154,19 @@ public partial class MicrosoftLoginWindow : Window
             return;
         }
 
+        // CSRF guard for the modern flow (the legacy redirect has no state contract).
+        if (_modernFlow)
+        {
+            var parameters = LoopbackAuthListener.ParseQuery(e.Uri);
+            if (parameters.TryGetValue("state", out var returned) &&
+                !string.Equals(returned, _state, StringComparison.Ordinal))
+            {
+                AppLog.Warn("auth", "browser-login-state-mismatch");
+                Finish(success: false, "登录回调校验失败（state 不匹配），请重试。");
+                return;
+            }
+        }
+
         var code = MicrosoftAuthService.TryExtractCode(e.Uri);
         if (code is null)
         {
@@ -139,7 +176,7 @@ public partial class MicrosoftLoginWindow : Window
         }
 
         AuthorizationCode = code;
-        AppLog.Info("auth", "browser-login-captured", ("length", code.Length));
+        AppLog.Info("auth", "browser-login-captured", ("length", code.Length), ("flow", _modernFlow ? "modern" : "legacy"));
         Finish(success: true, "已获得授权，正在完成登录…");
     }
 

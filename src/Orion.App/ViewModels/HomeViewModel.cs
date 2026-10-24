@@ -652,9 +652,15 @@ public sealed class HomeViewModel : ObservableObject
 
             MicrosoftStatus = "已获得授权，正在与微软服务交换令牌…";
 
-            var account = await _main.Context.Auth
-                .AuthenticateWithCodeAsync(window.AuthorizationCode)
-                .ConfigureAwait(true);
+            // Modern flow tokens carry the XboxLive.signin scope, which Xbox Live accepts;
+            // legacy tokens are exchanged against login.live.com.
+            var account = window.UsedModernFlow
+                ? await _main.Context.Auth
+                    .SignInWithModernCodeAsync(window.AuthorizationCode, window.RedirectUriUsed)
+                    .ConfigureAwait(true)
+                : await _main.Context.Auth
+                    .AuthenticateWithCodeAsync(window.AuthorizationCode)
+                    .ConfigureAwait(true);
 
             await SaveLoggedInAccountAsync(account).ConfigureAwait(true);
             MicrosoftStatus = $"登录成功：{account.Username}";
