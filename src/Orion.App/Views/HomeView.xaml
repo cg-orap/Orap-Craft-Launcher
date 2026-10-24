@@ -7,20 +7,13 @@
              d:DesignHeight="760" d:DesignWidth="1120">
 
     <UserControl.Resources>
-        <!-- Keeps the button readable on top of any user picture. -->
-        <LinearGradientBrush x:Key="ScrimBrush" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#B3000000" Offset="0" />
-            <GradientStop Color="#66000000" Offset="0.45" />
-            <GradientStop Color="#B3000000" Offset="1" />
-        </LinearGradientBrush>
-
         <Style x:Key="LaunchHeroButton" TargetType="Button">
             <Setter Property="Foreground" Value="#FFFFFF" />
             <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
             <Setter Property="FontSize" Value="22" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="MinWidth" Value="260" />
+            <Setter Property="MinWidth" Value="264" />
             <Setter Property="Padding" Value="46,20" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -50,16 +43,9 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid>
-        <!-- layer 1: background -->
-        <Grid.Background>
-            <RadialGradientBrush Center="0.5,0.35" GradientOrigin="0.5,0.3" RadiusX="1.1" RadiusY="1.1">
-                <GradientStop Color="{DynamicResource SurfaceAltBgColor}" Offset="0" />
-                <GradientStop Color="{DynamicResource WindowBgColor}" Offset="0.72" />
-            </RadialGradientBrush>
-        </Grid.Background>
-
-        <!-- background is user supplied: right-click to change it -->
+    <!-- The window paints the wallpaper and its scrim behind every page, so this view stays
+         transparent; only the launch controls live here. -->
+    <Grid Background="Transparent">
         <Grid.ContextMenu>
             <ContextMenu>
                 <MenuItem Header="更换背景图片…" Command="{Binding ChooseBackgroundCommand}" />
@@ -67,23 +53,25 @@
             </ContextMenu>
         </Grid.ContextMenu>
 
-
-        <Image Source="{Binding BackgroundImage}" Stretch="UniformToFill"
-               RenderOptions.BitmapScalingMode="HighQuality"
-               Visibility="{Binding HasBackgroundImage, Converter={StaticResource BoolToVisibility}}" />
-
-        <!-- layer 3: the launch button, centred -->
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24">
-            <TextBlock Text="{Binding InstanceTitle}" HorizontalAlignment="Center"
-                       FontSize="15" FontWeight="SemiBold"
-                       Foreground="{DynamicResource MutedTextBrush}"
-                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxWidth="460" />
+            <!-- version picker: choose which game to start, right on the home page -->
+            <ComboBox Width="320" HorizontalAlignment="Center"
+                      ItemsSource="{Binding Instances}"
+                      SelectedItem="{Binding SelectedLaunchInstance, Mode=TwoWay}"
+                      AutomationProperties.AutomationId="VersionPicker"
+                      ToolTip="选择要启动的版本">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
 
             <Button Content="{Binding LaunchButtonText}" Style="{StaticResource LaunchHeroButton}"
                     Command="{Binding LaunchCommand}" Margin="0,14,0,0"
                     AutomationProperties.AutomationId="LaunchButton" />
 
-            <!-- progress / result of the launch: the only text on this page -->
+            <!-- progress / result of the launch only -->
             <TextBlock Text="{Binding LaunchStatus}" HorizontalAlignment="Center" TextAlignment="Center"
                        MaxWidth="560" TextWrapping="Wrap" Margin="0,16,0,0" FontSize="12"
                        Foreground="{DynamicResource MutedTextBrush}"

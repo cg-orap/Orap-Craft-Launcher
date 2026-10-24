@@ -39,7 +39,7 @@ public partial class App : Application
             var viewModel = new MainViewModel(_context);
             Shell = viewModel;
 
-            ApplyTheme(_context.Settings.Theme);
+            ApplyTheme(_context.Settings.Theme, _context.Settings.Accent);
 
             window.DataContext = viewModel;
             window.Show();
@@ -95,8 +95,11 @@ public partial class App : Application
         window.Loaded += (_, _) => Fit(window);
     }
 
-    /// <summary>Swaps the palette resource dictionary at runtime (dark / light).</summary>
-    public static void ApplyTheme(string theme)
+    /// <summary>
+    /// Swaps the palette (dark / light) and the accent colour scheme at runtime.
+    /// Both are merged resource dictionaries, so no restart is needed.
+    /// </summary>
+    public static void ApplyTheme(string theme, string? accent = null)
     {
         var app = Current;
         if (app is null) return;
@@ -109,13 +112,43 @@ public partial class App : Application
             (d.Source.OriginalString.EndsWith("Dark.xaml", StringComparison.OrdinalIgnoreCase) ||
              d.Source.OriginalString.EndsWith("Light.xaml", StringComparison.OrdinalIgnoreCase)));
 
-        if (palette?.Source is not null && palette.Source.OriginalString.EndsWith(fileName, StringComparison.OrdinalIgnoreCase))
+        if (palette?.Source is null ||
+            !palette.Source.OriginalString.EndsWith(fileName, StringComparison.OrdinalIgnoreCase))
+        {
+            var replacement = new ResourceDictionary { Source = new Uri("Themes/" + fileName, UriKind.Relative) };
+
+            if (palette is not null) dictionaries[dictionaries.IndexOf(palette)] = replacement;
+            else dictionaries.Insert(0, replacement);
+        }
+
+        ApplyAccent(accent);
+    }
+
+    /// <summary>Accent keys must be merged after the palette so they override its defaults.</summary>
+    private static void ApplyAccent(string? accent)
+    {
+        var app = Current;
+        if (app is null) return;
+
+        var dictionaries = app.Resources.MergedDictionaries;
+        var name = string.IsNullOrWhiteSpace(accent) ? "Blue" : accent.Trim();
+        var known = new[] { "Blue", "Violet", "Teal", "Amber", "Rose" };
+        if (!known.Contains(name, StringComparer.OrdinalIgnoreCase)) name = "Blue";
+
+        var existing = dictionaries.FirstOrDefault(d =>
+            d.Source is not null &&
+            d.Source.OriginalString.StartsWith("Themes/Accent-", StringComparison.OrdinalIgnoreCase));
+
+        if (existing?.Source is not null &&
+            existing.Source.OriginalString.EndsWith("Accent-" + name + ".xaml", StringComparison.OrdinalIgnoreCase))
+        {
             return;
+        }
 
-        var replacement = new ResourceDictionary { Source = new Uri("Themes/" + fileName, UriKind.Relative) };
+        var replacement = new ResourceDictionary { Source = new Uri("Themes/Accent-" + name + ".xaml", UriKind.Relative) };
 
-        if (palette is not null) dictionaries[dictionaries.IndexOf(palette)] = replacement;
-        else dictionaries.Insert(0, replacement);
+        if (existing is not null) dictionaries[dictionaries.IndexOf(existing)] = replacement;
+        else dictionaries.Add(replacement);
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

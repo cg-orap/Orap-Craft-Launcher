@@ -387,3 +387,17 @@ POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
 
 测试数从 138 调整为 **136**：删除了设备代码流与回环监听器的用例，新增 v2.0 端点换取授权码、
 `skinUrl` 落库、授权码重定向 query 解析等用例。
+### 3.16 主题、背景、版本选择与资源下载
+
+| 需求 | 实现 | 验证 |
+| --- | --- | --- |
+| 右键菜单文字看不清 | 根因：WPF 对 `ContextMenu` / `MenuItem` 使用**系统配色**，与深色主题的浅色文字冲突。现在两者都做了模板化（深色面板 + 强调色高亮 + 白字） | 截图 `docs/images/home-context-menu.png` |
+| 首页可选择启动的游戏 | 首页新增版本下拉框（`Instances` + `SelectedLaunchInstance`），选择即改变全局当前版本；空 `null` 回推不会清空当前版本 | 截图显示下拉框正确显示「1.21.1 NeoForge」，UIA 弹出列表 2 项 |
+| 去掉「背景图片已更新」 | 更换/清除背景只写系统日志，不再占用首页状态行 | 代码路径核对 |
+| 侧栏半透明 | 壁纸移到**窗口级**图层（所有页面共享），侧栏使用 `NavRailBg`（`#D9141820`）半透明填充 + 遮罩保证可读性 | 截图可见壁纸透过侧栏 |
+| 下载整合包 / 模组 + 搜索 | 新页面「资源下载」：整合包/模组两个分页、关键词搜索、结果列表、安装按钮；整合包走 `MrPackInstaller`（安装为新版本），模组按当前版本的 MC 版本与加载器过滤后装入 `mods/` | 实测：整合包搜索 18,917 个结果；模组搜索 sodium → 35 个匹配结果；点击安装实际下载 `sodium-neoforge-0.8.13+mc1.21.1.jar` 并写入目录（测试后已清理） |
+| 不同色系主题 | 新增 `Accent-{Blue,Violet,Teal,Amber,Rose}.xaml`，与深/浅色调色板分开合并，可在设置页色块**热切换** | 实测点击「紫罗兰」后品牌徽标、选中项、色块立即变紫（截图 `docs/images/page-settings.png`） |
+
+顺带修掉的缺陷：`ComboBox` 自定义模板下 `DisplayMemberPath` 不生效（改为显式 `ItemTemplate`）；
+分页标签用 `Command` 与 `IsChecked` 混合驱动，UI 自动化无法切换（改为 `IsChecked` 双向绑定）；
+`Controls.xaml` 里重复的 `Separator` 隐式样式会让整个资源字典加载失败（启动即崩溃），已删除重复项。

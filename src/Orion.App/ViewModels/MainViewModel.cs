@@ -145,6 +145,7 @@ public sealed class MainViewModel : ObservableObject
         Home = new HomeViewModel(this);
         VersionsPage = new VersionsViewModel(this);
         InstancesPage = new InstancesViewModel(this);
+        CatalogPage = new CatalogViewModel(this);
         ModsPage = new ModsViewModel(this);
         DownloadsPage = new DownloadsViewModel(this);
         SettingsPage = new SettingsViewModel(this);
@@ -159,6 +160,7 @@ public sealed class MainViewModel : ObservableObject
         [
             new NavItem("home", "首页", "\uE80F"),
             new NavItem("versions", "游戏下载", "\uE896"),
+            new NavItem("catalog", "资源下载", "\uE719"),
             new NavItem("instances", "版本管理", "\uE8F1"),
             new NavItem("mods", "Mod 管理", "\uE7B8"),
             new NavItem("downloads", "下载管理", "\uE81C"),
@@ -183,6 +185,7 @@ public sealed class MainViewModel : ObservableObject
     public HomeViewModel Home { get; }
     public VersionsViewModel VersionsPage { get; }
     public InstancesViewModel InstancesPage { get; }
+    public CatalogViewModel CatalogPage { get; }
     public ModsViewModel ModsPage { get; }
     public DownloadsViewModel DownloadsPage { get; }
     public SettingsViewModel SettingsPage { get; }
@@ -331,6 +334,7 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(InstanceDisplay));
             OnPropertyChanged(nameof(InstanceDetail));
             Home.RaisePropertyChanged(nameof(HomeViewModel.SelectedInstance));
+            Home.RaisePropertyChanged(nameof(HomeViewModel.SelectedLaunchInstance));
             ModsPage.RaisePropertyChanged(nameof(ModsViewModel.SelectedInstance));
 
             Context.Settings.LastInstanceId = value?.Id;
@@ -402,6 +406,7 @@ public sealed class MainViewModel : ObservableObject
         CurrentPage = item.Key switch
         {
             "versions" => VersionsPage,
+            "catalog" => CatalogPage,
             "instances" => InstancesPage,
             "mods" => ModsPage,
             "downloads" => DownloadsPage,
@@ -410,6 +415,7 @@ public sealed class MainViewModel : ObservableObject
             _ => Home,
         };
 
+        if (item.Key == "catalog") _ = CatalogPage.InitializeAsync();
         if (item.Key == "instances") _ = InstancesPage.LoadAsync();
         if (item.Key == "mods") _ = ModsPage.LoadModsAsync();
         if (item.Key == "home") _ = Home.RefreshAsync();
@@ -454,8 +460,13 @@ public sealed class MainViewModel : ObservableObject
         Instances.Replace(instances);
 
         var lastId = Context.Settings.LastInstanceId;
+
         CurrentInstance = instances.FirstOrDefault(i => string.Equals(i.Id, lastId, StringComparison.OrdinalIgnoreCase))
                           ?? instances.FirstOrDefault();
+
+        // Must be raised *after* CurrentInstance is set: the home page picker reads it.
+        Home.RaisePropertyChanged(nameof(HomeViewModel.SelectedLaunchInstance));
+
 
         foreach (var root in Context.Importer.VersionRootsOf(instances))
         {

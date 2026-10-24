@@ -23,6 +23,9 @@ public sealed class LauncherSettings
     [JsonPropertyName("proxyUrl")] public string? ProxyUrl { get; set; }
 
     [JsonPropertyName("theme")] public string Theme { get; set; } = "Dark";
+
+    /// <summary>Accent colour scheme: Blue / Violet / Teal / Amber / Rose.</summary>
+    [JsonPropertyName("accent")] public string Accent { get; set; } = "Blue";
     [JsonPropertyName("language")] public string Language { get; set; } = "zh-CN";
     [JsonPropertyName("closeLauncherOnGameStart")] public bool CloseLauncherOnGameStart { get; set; }
     [JsonPropertyName("forceUtf8Console")] public bool ForceUtf8Console { get; set; } = true;

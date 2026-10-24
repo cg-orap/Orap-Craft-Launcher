@@ -135,6 +135,43 @@
                         <ComboBox ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}"
                                   SelectedValuePath="Key" DisplayMemberPath="Name" Margin="0,6,0,12" />
 
+                        <TextBlock Text="主题色" Style="{StaticResource CaptionText}" />
+                        <ItemsControl ItemsSource="{Binding Accents}" Margin="0,8,0,12">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Width="34" Height="34" Margin="0,0,8,0" Cursor="Hand"
+                                            ToolTip="{Binding Name}"
+                                            Tag="{Binding Key}"
+                                            Click="OnAccentClick"
+                                            AutomationProperties.Name="{Binding Name}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Grid>
+                                                    <Ellipse Width="28" Height="28" x:Name="Dot">
+                                                        <Ellipse.Fill>
+                                                            <SolidColorBrush Color="{Binding Color}" />
+                                                        </Ellipse.Fill>
+                                                    </Ellipse>
+                                                    <Ellipse x:Name="Ring" Width="34" Height="34" StrokeThickness="2"
+                                                             Stroke="Transparent" />
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Ring" Property="Stroke" Value="{DynamicResource TextBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
                         <CheckBox Content="强制游戏日志使用 UTF-8（推荐，避免中文乱码）"
                                   IsChecked="{Binding ForceUtf8Console}" />
                     </StackPanel>

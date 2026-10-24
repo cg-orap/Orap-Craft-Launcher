@@ -1,0 +1,123 @@
+<UserControl x:Class="Orion.App.Views.CatalogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="1000">
+
+    <Grid Margin="20,18,20,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="资源下载" Style="{StaticResource TitleText}" />
+            <TextBlock Text="搜索并安装 Modrinth 上的整合包与模组。" Style="{StaticResource CaptionText}" Margin="0,6,0,14" />
+        </StackPanel>
+
+        <!-- category tabs + search -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="14" Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <RadioButton Content="整合包" GroupName="CatalogKind"
+                                 IsChecked="{Binding IsModpackTab, Mode=TwoWay}"
+                                 Style="{StaticResource TabRadio}"
+                                 AutomationProperties.AutomationId="ModpackTab" />
+                    <RadioButton Content="模组" GroupName="CatalogKind"
+                                 IsChecked="{Binding IsModTab, Mode=TwoWay}"
+                                 Style="{StaticResource TabRadio}" Margin="6,0,0,0"
+                                 AutomationProperties.AutomationId="ModTab" />
+                </StackPanel>
+
+                <TextBox Grid.Column="1" Margin="14,0,14,0" VerticalAlignment="Center"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.AutomationId="CatalogSearchBox"
+                         ToolTip="输入关键词后按回车搜索（留空则按下载量排序）">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+
+                <Button Grid.Column="2" Content="搜索" Style="{StaticResource PrimaryButton}"
+                        Command="{Binding SearchCommand}" Padding="20,8" VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="CatalogSearchButton" />
+            </Grid>
+        </Border>
+
+        <!-- results -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="8">
+            <ListBox ItemsSource="{Binding Results}" Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     AutomationProperties.AutomationId="CatalogList">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Margin" Value="0,0,0,6" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="10" Padding="14">
+                                        <ContentPresenter />
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"
+                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                    <Border Style="{StaticResource Chip}" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding KindLabel}" FontSize="10.5"
+                                                   Foreground="{DynamicResource MutedTextBrush}" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="{Binding Description}" Style="{StaticResource CaptionText}"
+                                           TextWrapping="Wrap" MaxHeight="34" Margin="0,6,0,0" />
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <TextBlock Text="{Binding Author}" Style="{StaticResource CaptionText}" />
+                                    <TextBlock Text="{Binding DownloadsText}" Style="{StaticResource CaptionText}" Margin="12,0,0,0" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Content="安装" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding InstallCommand}" VerticalAlignment="Center" Padding="18,8" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <Border Grid.Row="3" Style="{StaticResource Card}" Padding="14" Margin="0,12,0,0">
+            <StackPanel>
+            <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="CatalogStatus"
+                       Visibility="{Binding Status, Converter={StaticResource StringToVisibility}}" />
+                <TextBlock Text="{Binding KindHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0">
+                    <Run Text="模组目标版本：" />
+                    <Run Text="{Binding TargetVersionName, Mode=OneWay}" />
+                </TextBlock>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

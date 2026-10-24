@@ -56,6 +56,27 @@ public sealed class HomeViewModel : ObservableObject
 
     public Instance? SelectedInstance => _main.CurrentInstance;
 
+    /// <summary>Versions offered by the home page picker.</summary>
+    public ObservableList<Instance> Instances => _main.Instances;
+
+    /// <summary>Version chosen on the home page; changing it updates the selected version globally.</summary>
+    public Instance? SelectedLaunchInstance
+    {
+        get => _main.CurrentInstance;
+        set
+        {
+            // A ComboBox pushes null while its ItemsSource is still empty (startup) - that must not
+            // clear the selected version.
+            if (value is null || ReferenceEquals(value, _main.CurrentInstance)) return;
+
+            _main.CurrentInstance = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(InstanceTitle));
+            OnPropertyChanged(nameof(InstanceSubtitle));
+            _ = RefreshAsync();
+        }
+    }
+
     public string InstanceTitle => _main.CurrentInstance?.Name ?? "尚未选择版本";
 
     public string InstanceSubtitle => _main.CurrentInstance is null
@@ -389,13 +410,11 @@ public sealed class HomeViewModel : ObservableObject
         if (dialog.ShowDialog() != true) return;
 
         ApplyBackground(dialog.FileName, persist: true);
-        LaunchStatus = "背景图片已更新。";
     }
 
     private void ClearBackground()
     {
         ApplyBackground(null, persist: true);
-        LaunchStatus = "已恢复默认背景。";
     }
 
     private void ApplyBackground(string? path, bool persist)
@@ -424,8 +443,8 @@ public sealed class HomeViewModel : ObservableObject
             {
                 BackgroundImagePath = null;
                 BackgroundImage = null;
-                LaunchStatus = "无法读取该图片：" + ex.Message;
                 AppLog.Warn("ui", "background-load-failed", ("error", ex.Message));
+                _main.LogsPage.AppendSystem("无法读取该背景图片：" + ex.Message);
             }
         }
 

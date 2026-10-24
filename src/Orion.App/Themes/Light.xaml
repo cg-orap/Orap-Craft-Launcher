@@ -32,4 +32,10 @@
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
     <SolidColorBrush x:Key="ChipBg" Color="{StaticResource ChipBgColor}" />
 
+    <!-- translucent navigation rail so a custom wallpaper shows through -->
+    <Color x:Key="NavRailColor">#E6F7F9FC</Color>
+    <SolidColorBrush x:Key="NavRailBg" Color="{StaticResource NavRailColor}" />
+    <SolidColorBrush x:Key="NavRailHover" Color="#26000000" />
+    <SolidColorBrush x:Key="ScrimBrush" Color="#59000000" />
+
 </ResourceDictionary>

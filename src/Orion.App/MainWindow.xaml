@@ -46,14 +46,27 @@
         </Style>
     </Window.Resources>
 
-    <Grid Background="{DynamicResource WindowBg}">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <Grid>
+        <!-- layer 0: palette background (also what the translucent rail blends into) -->
+        <Rectangle Fill="{DynamicResource WindowBg}" />
+
+        <!-- layer 1: user wallpaper, shared by every page -->
+        <Image Source="{Binding Home.BackgroundImage}" Stretch="UniformToFill"
+               RenderOptions.BitmapScalingMode="HighQuality"
+               Visibility="{Binding Home.HasBackgroundImage, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- layer 2: scrim so cards and text stay readable over any picture -->
+        <Rectangle Fill="{DynamicResource ScrimBrush}"
+                   Visibility="{Binding Home.HasBackgroundImage, Converter={StaticResource BoolToVisibility}}" />
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
         <!-- ======================= navigation rail ======================= -->
-        <Border Grid.Column="0" Background="{DynamicResource SurfaceBg}"
+        <Border Grid.Column="0" Background="{DynamicResource NavRailBg}"
                 BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
             <DockPanel>
                 <!-- brand -->
@@ -194,6 +207,7 @@
                     <ProgressBar IsIndeterminate="True" Width="240" Margin="0,18,0,0" Height="4" />
                 </StackPanel>
             </Border>
+        </Grid>
         </Grid>
     </Grid>
 </Window>

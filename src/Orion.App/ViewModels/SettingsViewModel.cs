@@ -17,6 +17,17 @@ public sealed class SettingsViewModel : ObservableObject
     private DownloadSource _source = DownloadSource.Official;
     private string _proxyUrl = "";
     private string _theme = "Dark";
+    private string _accent = "Blue";
+
+    /// <summary>Accent swatches shown in settings (colour is only for the preview dot).</summary>
+    public IReadOnlyList<AccentOption> Accents { get; } =
+    [
+        new("Blue", "经典蓝", "#FF4C8DFF"),
+        new("Violet", "紫罗兰", "#FF8B5CF6"),
+        new("Teal", "青绿", "#FF14B8A6"),
+        new("Amber", "琥珀", "#FFF59E0B"),
+        new("Rose", "玫瑰", "#FFF43F5E"),
+    ];
     private bool _forceUtf8Console = true;
     private string _microsoftClientId = "";
     private string _status = "设置会立即保存到数据目录。";
@@ -98,7 +109,18 @@ public sealed class SettingsViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _theme, value)) return;
-            App.ApplyTheme(value);
+            App.ApplyTheme(value, _accent);
+        }
+    }
+
+    /// <summary>Accent colour scheme (Blue / Violet / Teal / Amber / Rose).</summary>
+    public string Accent
+    {
+        get => _accent;
+        set
+        {
+            if (!SetProperty(ref _accent, value)) return;
+            App.ApplyTheme(_theme, value);
         }
     }
 
@@ -131,6 +153,7 @@ public sealed class SettingsViewModel : ObservableObject
         Source = settings.Source;
         ProxyUrl = settings.ProxyUrl ?? "";
         Theme = settings.Theme;
+        Accent = settings.Accent;
         ForceUtf8Console = settings.ForceUtf8Console;
         MicrosoftClientId = settings.MicrosoftClientId ?? "";
 
@@ -148,6 +171,7 @@ public sealed class SettingsViewModel : ObservableObject
         settings.Source = Source;
         settings.ProxyUrl = string.IsNullOrWhiteSpace(ProxyUrl) ? null : ProxyUrl.Trim();
         settings.Theme = Theme;
+        settings.Accent = Accent;
         settings.ForceUtf8Console = ForceUtf8Console;
         settings.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();
 
@@ -189,6 +213,13 @@ public sealed class SettingsViewModel : ObservableObject
         Directory.CreateDirectory(directory);
         Process.Start(new ProcessStartInfo("explorer.exe", $"\"{directory}\"") { UseShellExecute = true });
     }
+}
+
+public sealed class AccentOption(string key, string name, string color)
+{
+    public string Key { get; } = key;
+    public string Name { get; } = name;
+    public System.Windows.Media.Color Color { get; } = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color)!;
 }
 
 public sealed class ThemeOption(string key, string name)
