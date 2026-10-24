@@ -159,8 +159,7 @@ public sealed class MainViewModel : ObservableObject
         NavItems.AddRange(
         [
             new NavItem("home", "首页", "\uE80F"),
-            new NavItem("versions", "游戏下载", "\uE896"),
-            new NavItem("catalog", "资源下载", "\uE719"),
+            new NavItem("catalog", "下载中心", "\uE896"),
             new NavItem("instances", "版本管理", "\uE8F1"),
             new NavItem("mods", "Mod 管理", "\uE7B8"),
             new NavItem("downloads", "下载管理", "\uE81C"),
@@ -405,7 +404,7 @@ public sealed class MainViewModel : ObservableObject
         NavKey = item.Key;
         CurrentPage = item.Key switch
         {
-            "versions" => VersionsPage,
+            "versions" => CatalogPage,   // legacy route: versions now live in the download centre
             "catalog" => CatalogPage,
             "instances" => InstancesPage,
             "mods" => ModsPage,

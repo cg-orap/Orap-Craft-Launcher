@@ -7,7 +7,7 @@
              d:DesignHeight="700" d:DesignWidth="960">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="26,22,26,22">
+        <Grid Margin="20,16,20,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
@@ -17,7 +17,8 @@
             <StackPanel Grid.Column="0" Margin="0,0,10,0">
                 <TextBlock Text="设置" Style="{StaticResource TitleText}" />
                 <TextBlock Text="所有设置保存在数据目录中，不会修改系统环境变量。"
-                           Style="{StaticResource CaptionText}" Margin="0,6,0,16" />
+                           Style="{StaticResource CaptionText}" Margin="0,6,0,12" />
+                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
 
                 <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                     <StackPanel>

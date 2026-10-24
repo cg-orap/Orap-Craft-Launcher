@@ -40,6 +40,9 @@
 | 设备代码流 / 回环回调登录 | ✅ 已实现并测试（需自备 Azure 应用 ID） | 真实端点验证请求形状；轮询状态机与本地回调监听端到端测试 |
 | **内嵌浏览器登录（②③ 免配置）** | ✅ 已验证 | 发布版 EXE 内嵌 WebView2 打开真实微软登录页并成功导航（截图见文档） |
 | Xbox Live 失败分诊 | ✅ 已验证（真实 401 复现） | 401=旧版流程缺 Xbox 作用域、400=账号侧问题，分别给出处理路径 |
+| 下载中心（5 个子界面） | ✅ 已实测 | 游戏版本 / 整合包 / 模组 / 光影 / 材质包；每页 20 条、分页、分类筛选、图标加载 |
+| 详情页与版本选择 | ✅ 已实测 | 完整介绍 + 全部历史版本（实测 478 个版本，可按任意版本安装） |
+| 拖入整合包安装 | ✅ 已实现 | 拖入 `.mrpack` / `.zip` 到下载中心即安装为新版本（未做 OLE 拖拽自动化，逻辑复用已实测的 mrpack 安装器） |
 | 资源下载（整合包 / 模组） | ✅ 已实测 | Modrinth 实时搜索（18,917 个整合包 / 35 个匹配模组），安装模组实测落地 `sodium-neoforge-0.8.13+mc1.21.1.jar` |
 | 主题色 / 半透明侧栏 / 背景图 | ✅ 已验证 | 5 套主题色可热切换；背景图片铺满全窗口、侧栏半透明；右键菜单文字已按主题配色修复 |
 | 登录与主界面（0.1.1） | ✅ 已验证（UI 自动化） | 登录整合为独立窗口（左侧账户列表 + 内嵌微软登录页）；主界面仅保留居中的启动按钮；背景图可自定义；侧栏账户头像取皮肤头部（本地裁剪 + 缓存） |
@@ -68,8 +71,9 @@
 
 | ![首页](docs/images/page-home.png) | ![主界面右键菜单](docs/images/home-context-menu.png) |
 | --- | --- |
-| ![资源下载（整合包）](docs/images/page-catalog.png) | ![资源下载（模组）](docs/images/page-catalog-mods.png) |
-| ![登录窗口](docs/images/login-window.png) | ![游戏下载](docs/images/page-versions.png) |
+| ![下载中心：游戏版本](docs/images/page-download-versions.png) | ![下载中心：整合包](docs/images/page-catalog.png) |
+| ![整合包详情页](docs/images/catalog-details.png) | ![资源下载（模组）](docs/images/page-catalog-mods.png) |
+| ![登录窗口](docs/images/login-window.png) | ![版本管理](docs/images/page-instances.png) |
 
 | 实例管理 | Mod 管理 |
 | --- | --- |

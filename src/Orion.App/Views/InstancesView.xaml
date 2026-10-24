@@ -6,7 +6,7 @@
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="960">
 
-    <Grid Margin="26,22,26,22">
+    <Grid Margin="20,16,20,20">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="330" />
             <ColumnDefinition Width="*" />
@@ -23,7 +23,8 @@
             <StackPanel Grid.Row="0">
                 <TextBlock Text="版本管理" Style="{StaticResource TitleText}" />
                 <TextBlock Text="每个版本拥有独立的游戏目录（存档、Mod、配置互不影响）。"
-                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,16" />
+                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,12" />
+                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
             </StackPanel>
 
             <Border Grid.Row="1" Style="{StaticResource Card}" Padding="8">

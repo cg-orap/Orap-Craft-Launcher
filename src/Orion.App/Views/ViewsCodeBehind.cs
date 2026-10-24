@@ -51,7 +51,4 @@ public partial class LogsView : UserControl
     public LogsView() => InitializeComponent();
 }
 
-public partial class CatalogView : UserControl
-{
-    public CatalogView() => InitializeComponent();
-}
+

@@ -6,7 +6,7 @@
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="960">
 
-    <Grid Margin="26,22,26,22">
+    <Grid Margin="20,16,20,20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -16,7 +16,8 @@
         <StackPanel Grid.Row="0">
             <TextBlock Text="下载管理" Style="{StaticResource TitleText}" />
             <TextBlock Text="安装、下载与启动任务的实时进度；失败任务会同时写入日志目录下的 JSON 报告。"
-                       Style="{StaticResource CaptionText}" Margin="0,6,0,16" />
+                       Style="{StaticResource CaptionText}" Margin="0,6,0,12" />
+                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
         </StackPanel>
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,16">

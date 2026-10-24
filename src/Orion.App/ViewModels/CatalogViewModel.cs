@@ -1,15 +1,33 @@
 using System.IO;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Orion.App.Mvvm;
 using Orion.Core.Diagnostics;
 using Orion.Core.Mods;
 
 namespace Orion.App.ViewModels;
 
-/// <summary>One search hit in the resource catalogue (modpack or mod).</summary>
-public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, string kind)
+/// <summary>One catalogue tab: Minecraft versions plus the four Modrinth project kinds.</summary>
+public sealed class CatalogKindOption(string key, string name, string? projectType)
 {
+    public string Key { get; } = key;
+    public string Name { get; } = name;
+
+    /// <summary>Modrinth <c>project_type</c>; null for the built-in "Minecraft versions" tab.</summary>
+    public string? ProjectType { get; } = projectType;
+
+    public override string ToString() => Name;
+}
+
+/// <summary>A Modrinth search hit shown in the catalogue list.</summary>
+public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, CatalogKindOption kind) : ObservableObject
+{
+    private ImageSource? _icon;
+
     public ModrinthProject Project { get; } = project;
+
+    public CatalogKindOption Kind { get; } = kind;
 
     public string Title => string.IsNullOrWhiteSpace(Project.Title) ? Project.Slug : Project.Title;
 
@@ -19,85 +37,148 @@ public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, 
 
     public string DownloadsText => Project.Downloads > 0 ? $"{Project.Downloads:N0} 次下载" : "";
 
-    public string Kind => kind;
+    public string KindLabel => Kind.Name;
 
-    public string KindLabel => kind == CatalogViewModel.ModpackKind ? "整合包" : "模组";
+    public string CategoryText => Project.Categories.Count == 0
+        ? ""
+        : string.Join(" · ", Project.Categories.Take(3));
 
-    public ICommand InstallCommand => new AsyncRelayCommand(() => owner.InstallAsync(this));
+    /// <summary>Project icon from Modrinth (downloaded and cached in memory).</summary>
+    public ImageSource? Icon
+    {
+        get => _icon;
+        set
+        {
+            if (SetProperty(ref _icon, value)) OnPropertyChanged(nameof(HasIcon));
+        }
+    }
+
+    public bool HasIcon => _icon is not null;
+
+    public ICommand InstallCommand => new AsyncRelayCommand(() => owner.InstallLatestAsync(this));
+
+    public ICommand ShowDetailsCommand => new AsyncRelayCommand(() => owner.ShowDetailsAsync(this));
 }
 
 /// <summary>
-/// 资源下载: browse and install Modrinth modpacks and mods.
+/// 下载中心: Minecraft versions (hosted view) plus Modrinth modpacks, mods, shaders and resource packs.
 ///
-/// Modpacks are installed through <see cref="MrPackInstaller"/> (which creates a new version from the
-/// pack's own loader dependencies); mods are downloaded straight into the selected version's
-/// <c>mods</c> directory after Modrinth filtering by that version's game version and loader.
+/// Features: paging, category filter, project icons, a detail window with the full description and a
+/// version picker (so older/newer releases can be installed), and drag-and-drop of a pack file.
 /// </summary>
 public sealed class CatalogViewModel : ObservableObject
 {
-    public const string ModpackKind = "modpack";
-    public const string ModKind = "mod";
+    public const int PageSize = 20;
 
     private readonly MainViewModel _main;
+    private readonly Dictionary<string, ImageSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
 
-    private string _kind = ModpackKind;
+    private CatalogKindOption _kind;
     private string _searchText = "";
     private string _status = "";
     private bool _busy;
+    private int _page;
+    private int _totalHits;
+    private string? _category;
+    private string _targetInfo = "";
+    private bool _dropActive;
 
     public CatalogViewModel(MainViewModel main)
     {
         _main = main;
 
-        SearchCommand = new AsyncRelayCommand(() => SearchAsync(), () => !_busy);
-        SearchModpacksCommand = new AsyncRelayCommand(() => SwitchKindAsync(ModpackKind), () => !_busy);
-        SearchModsCommand = new AsyncRelayCommand(() => SwitchKindAsync(ModKind), () => !_busy);
+        Kinds =
+        [
+            new("versions", "游戏版本", null),
+            new("modpack", "整合包", "modpack"),
+            new("mod", "模组", "mod"),
+            new("shader", "光影", "shader"),
+            new("resourcepack", "材质包", "resourcepack"),
+        ];
+
+        _kind = Kinds[0];
+
+        SearchCommand = new AsyncRelayCommand(() => SearchAsync(0), () => !_busy);
+        NextPageCommand = new AsyncRelayCommand(() => SearchAsync(_page + 1), () => !_busy && HasNextPage);
+        PreviousPageCommand = new AsyncRelayCommand(() => SearchAsync(_page - 1), () => !_busy && HasPreviousPage);
+        RefreshCommand = new AsyncRelayCommand(() => SearchAsync(_page), () => !_busy);
     }
 
+    public IReadOnlyList<CatalogKindOption> Kinds { get; }
+
+    public IReadOnlyList<string> Categories => _kind.Key switch
+    {
+        "modpack" => ["", "adventure", "combat", "optimization", "technology", "magic", "quests"],
+        "mod" => ["", "optimization", "technology", "magic", "storage", "decoration", "library", "adventure", "mobs"],
+        "resourcepack" => ["", "combat", "themed", "tweaks", "fonts"],
+        _ => [""],
+    };
+
     public AsyncRelayCommand SearchCommand { get; }
-    public AsyncRelayCommand SearchModpacksCommand { get; }
-    public AsyncRelayCommand SearchModsCommand { get; }
+    public AsyncRelayCommand NextPageCommand { get; }
+    public AsyncRelayCommand PreviousPageCommand { get; }
+    public AsyncRelayCommand RefreshCommand { get; }
 
     public ObservableList<CatalogRow> Results { get; } = [];
 
-    public string Kind
+    /// <summary>The Minecraft version list page is hosted inside the download centre.</summary>
+    public VersionsViewModel VersionsPage => _main.VersionsPage;
+
+    public CatalogKindOption Kind
     {
         get => _kind;
-        private set
+        set
         {
-            if (!SetProperty(ref _kind, value)) return;
-            OnPropertyChanged(nameof(IsModpackTab));
-            OnPropertyChanged(nameof(IsModTab));
+            if (value is null || ReferenceEquals(_kind, value)) return;
+
+            _kind = value;
+            _category = null;
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsVersionsTab));
+            OnPropertyChanged(nameof(IsCatalogueTab));
+            OnPropertyChanged(nameof(Categories));
             OnPropertyChanged(nameof(KindHint));
+            OnPropertyChanged(nameof(SelectedCategory));
+
+            Results.Clear();
+            _page = 0;
+            _totalHits = 0;
+            RaisePaging();
+            UpdateTargetInfo();
+
+            if (IsCatalogueTab) _ = SearchAsync(0);
         }
     }
 
-    public bool IsModpackTab
+    public bool IsVersionsTab => _kind.ProjectType is null;
+    public bool IsCatalogueTab => _kind.ProjectType is not null;
+
+    public string KindHint => _kind.Key switch
     {
-        get => _kind == ModpackKind;
-        set
-        {
-            if (value && _kind != ModpackKind) _ = SwitchKindAsync(ModpackKind);
-        }
-    }
-
-    public bool IsModTab
-    {
-        get => _kind == ModKind;
-        set
-        {
-            if (value && _kind != ModKind) _ = SwitchKindAsync(ModKind);
-        }
-    }
-
-    public string KindHint => _kind == ModpackKind
-        ? "整合包会安装为一个新的版本（含它自带的加载器与模组），不会影响现有版本。"
-        : "模组会安装到当前选中版本的 mods 目录；Modrinth 结果已按该版本的 Minecraft 版本与加载器过滤。";
+        "versions" => "下载 Minecraft 原版与 Mod 加载器，安装后会创建独立的版本目录。",
+        "modpack" => "整合包会安装为一个新的版本（含它自带的加载器与模组），不会影响现有版本。",
+        "mod" => "模组会安装到当前选中版本的 mods 目录；结果已按该版本的 Minecraft 版本与加载器过滤。",
+        "shader" => "光影会安装到当前选中版本的 shaderpacks 目录（需要 Iris / OptiFine 之类的光影支持）。",
+        "resourcepack" => "材质包会安装到当前选中版本的 resourcepacks 目录。",
+        _ => "",
+    };
 
     public string SearchText
     {
         get => _searchText;
         set => SetProperty(ref _searchText, value);
+    }
+
+    public string? SelectedCategory
+    {
+        get => _category;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value;
+            if (!SetProperty(ref _category, normalized)) return;
+            _ = SearchAsync(0);
+        }
     }
 
     public string Status
@@ -113,63 +194,83 @@ public sealed class CatalogViewModel : ObservableObject
         {
             if (!SetProperty(ref _busy, value)) return;
             SearchCommand.RaiseCanExecuteChanged();
-            SearchModpacksCommand.RaiseCanExecuteChanged();
-            SearchModsCommand.RaiseCanExecuteChanged();
+            NextPageCommand.RaiseCanExecuteChanged();
+            PreviousPageCommand.RaiseCanExecuteChanged();
+            RefreshCommand.RaiseCanExecuteChanged();
         }
     }
 
-    public string TargetVersionName => _main.CurrentInstance?.Name ?? "（未选择版本）";
+    public string PageText => _totalHits == 0 ? "" : $"第 {_page + 1} / {TotalPages} 页 · 共 {_totalHits:N0} 个";
+
+    public int TotalPages => _totalHits == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_totalHits / (double)PageSize));
+
+    public bool HasNextPage => _page + 1 < TotalPages;
+    public bool HasPreviousPage => _page > 0;
+
+    public string TargetInfo
+    {
+        get => _targetInfo;
+        private set => SetProperty(ref _targetInfo, value);
+    }
+
+    /// <summary>True while a pack file is dragged over the window.</summary>
+    public bool DropActive
+    {
+        get => _dropActive;
+        set => SetProperty(ref _dropActive, value);
+    }
 
     public async Task InitializeAsync()
     {
-        if (Results.Count == 0) await SearchAsync().ConfigureAwait(true);
+        UpdateTargetInfo();
+
+        if (IsCatalogueTab && Results.Count == 0) await SearchAsync(0).ConfigureAwait(true);
     }
 
-    private async Task SwitchKindAsync(string kind)
+    /// <summary>Runs a Modrinth search for the active tab and page.</summary>
+    public async Task SearchAsync(int page)
     {
-        if (_kind == kind) return;
+        if (_busy || IsVersionsTab) return;
 
-        Kind = kind;
-        Results.Clear();
-        await SearchAsync().ConfigureAwait(true);
-    }
-
-    /// <summary>Runs a Modrinth search for the active category.</summary>
-    public async Task SearchAsync()
-    {
-        if (_busy) return;
+        page = Math.Clamp(page, 0, Math.Max(0, TotalPages - 1));
 
         Busy = true;
         Results.Clear();
-        Status = _kind == ModpackKind ? "正在搜索整合包…" : "正在搜索模组…";
+        Status = $"正在搜索{_kind.Name}…";
+        UpdateTargetInfo();
 
         try
         {
             var query = new ModrinthSearchQuery
             {
                 Query = SearchText.Trim(),
-                ProjectType = _kind,
-                Limit = 24,
+                ProjectType = _kind.ProjectType!,
+                Category = _category,
+                Limit = PageSize,
+                Offset = page * PageSize,
                 SortBy = string.IsNullOrWhiteSpace(SearchText) ? "downloads" : "relevance",
             };
 
-            // Mods must match the selected version, otherwise the install would be useless.
-            if (_kind == ModKind && _main.CurrentInstance is { } instance)
+            // Mods, shaders and packs must match the selected version to be usable at all.
+            if (_kind.Key != "modpack" && _main.CurrentInstance is { } instance)
             {
-                query.GameVersion = string.IsNullOrWhiteSpace(instance.GameVersion) ? null : instance.GameVersion;
+                if (!string.IsNullOrWhiteSpace(instance.GameVersion)) query.GameVersion = instance.GameVersion;
                 if (instance.Loader != Core.Instances.LoaderKind.Vanilla) query.Loader = instance.Loader;
             }
 
             var result = await _main.Context.Modrinth.SearchAsync(query).ConfigureAwait(true);
 
+            _page = page;
+            _totalHits = (int)result.TotalHits;
+            RaisePaging();
+
             foreach (var project in result.Hits) Results.Add(new CatalogRow(project, this, _kind));
 
             Status = Results.Count == 0
-                ? "没有找到结果，换个关键词试试。"
-                : $"共 {result.TotalHits:N0} 个结果，显示前 {Results.Count} 个。";
+                ? "没有找到结果，换个关键词或分类试试。"
+                : $"共 {_totalHits:N0} 个结果，本页显示 {Results.Count} 个（每页 {PageSize} 个）。";
 
-            OnPropertyChanged(nameof(TargetVersionName));
-            OnPropertyChanged(nameof(KindHint));
+            await LoadIconsAsync(Results).ConfigureAwait(true);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
@@ -182,65 +283,97 @@ public sealed class CatalogViewModel : ObservableObject
         }
     }
 
-    /// <summary>Installs one hit: a modpack as a new version, or a mod into the current version.</summary>
-    public async Task InstallAsync(CatalogRow row)
+    /// <summary>Downloads and caches project icons; failures simply keep the placeholder.</summary>
+    private async Task LoadIconsAsync(IEnumerable<CatalogRow> rows)
     {
-        if (row.Kind == ModpackKind) await InstallModpackAsync(row).ConfigureAwait(true);
-        else await InstallModAsync(row).ConfigureAwait(true);
+        foreach (var row in rows.ToList())
+        {
+            var url = row.Project.IconUrl;
+            if (string.IsNullOrWhiteSpace(url)) continue;
+
+            if (_iconCache.TryGetValue(url, out var cached))
+            {
+                row.Icon = cached;
+                continue;
+            }
+
+            try
+            {
+                var bytes = await _main.Context.Http.GetByteArrayAsync(url).ConfigureAwait(true);
+                row.Icon = DecodeIcon(bytes);
+                _iconCache[url] = row.Icon;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException
+                                           or NotSupportedException)
+            {
+                _iconCache[url] = null;
+                AppLog.Debug("catalog", "icon-failed", ("error", ex.Message));
+            }
+        }
     }
 
-    private async Task InstallModpackAsync(CatalogRow row)
+    private static ImageSource? DecodeIcon(byte[] bytes)
     {
-        Busy = true;
+        using var stream = new MemoryStream(bytes);
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.StreamSource = stream;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
 
+    private void RaisePaging()
+    {
+        OnPropertyChanged(nameof(PageText));
+        OnPropertyChanged(nameof(TotalPages));
+        OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(HasPreviousPage));
+        NextPageCommand.RaiseCanExecuteChanged();
+        PreviousPageCommand.RaiseCanExecuteChanged();
+    }
+
+    private void UpdateTargetInfo()
+    {
+        var instance = _main.CurrentInstance;
+
+        TargetInfo = _kind.Key switch
+        {
+            "versions" => "",
+            "modpack" => "整合包不依赖当前版本，会安装为新的版本。",
+            _ when instance is null => "当前未选择版本，请先在「版本管理」中创建或选择一个版本。",
+            _ => $"目标版本：{instance.Name}（{instance.GameVersion} · {instance.DisplayLoader}）",
+        };
+    }
+
+    /// <summary>Opens the detail window: full description plus every published version.</summary>
+    public async Task ShowDetailsAsync(CatalogRow row)
+    {
         try
         {
-            Status = $"正在获取整合包 {row.Title} 的版本列表…";
+            Busy = true;
+            Status = $"正在读取 {row.Title} 的详情…";
 
-            var versions = await _main.Context.Modrinth.GetVersionsAsync(row.Project.Identifier).ConfigureAwait(true);
-            var version = versions.FirstOrDefault(v => v.PrimaryFile is not null);
+            var project = await _main.Context.Modrinth.GetProjectAsync(row.Project.Identifier).ConfigureAwait(true)
+                          ?? row.Project;
 
-            if (version?.PrimaryFile is null)
+            var versions = await _main.Context.Modrinth.GetVersionsAsync(project.Identifier).ConfigureAwait(true);
+
+            Status = string.Empty;
+
+            var window = new Views.CatalogDetailWindow(
+                new CatalogDetailViewModel(_main, this, project, row.Kind, versions, row.Icon))
             {
-                Status = "该整合包没有可下载的文件。";
-                return;
-            }
+                Owner = System.Windows.Application.Current?.MainWindow,
+            };
 
-            Status = $"正在下载 {version.PrimaryFile.Filename}…";
-
-            var temp = Path.Combine(_main.Context.Paths.CacheDir, "packs");
-            Directory.CreateDirectory(temp);
-            var target = Path.Combine(temp, version.PrimaryFile.Filename);
-
-            if (!File.Exists(target))
-            {
-                using var http = new HttpClient();
-                var bytes = await http.GetByteArrayAsync(version.PrimaryFile.Url).ConfigureAwait(true);
-                await File.WriteAllBytesAsync(target, bytes).ConfigureAwait(true);
-            }
-
-            Status = "正在安装整合包（会创建新版本）…";
-            var activity = _main.Activities.Begin($"安装整合包 {row.Title}", version.PrimaryFile.Filename);
-            var progress = new Progress<string>(line => Status = line);
-
-            var result = await _main.Context.ModPacks
-                .InstallAsync(target, row.Title, null, progress)
-                .ConfigureAwait(true);
-
-            _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
-            await _main.ReloadInstancesAsync().ConfigureAwait(true);
-
-            Status = result.Success
-                ? $"整合包已安装：{row.Title}（版本 {result.VersionId}，下载 {result.FilesDownloaded} 个文件）。"
-                : "整合包安装失败：" + (result.Error ?? "未知错误");
-
-            _main.LogsPage.AppendSystem(Status);
+            window.ShowDialog();
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException
-                                       or TaskCanceledException or System.Text.Json.JsonException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
-            Status = "整合包安装失败：" + ex.Message;
-            AppLog.Warn("catalog", "modpack-install-failed", ("error", ex.Message));
+            Status = "无法读取详情：" + ex.Message;
+            AppLog.Warn("catalog", "details-failed", ("error", ex.Message));
         }
         finally
         {
@@ -248,50 +381,157 @@ public sealed class CatalogViewModel : ObservableObject
         }
     }
 
-    private async Task InstallModAsync(CatalogRow row)
+    /// <summary>Installs the newest matching file of a project (quick install button).</summary>
+    public async Task InstallLatestAsync(CatalogRow row)
     {
-        if (_main.CurrentInstance is not { } instance)
-        {
-            Status = "请先在「版本管理」中创建或选择一个版本，再安装模组。";
-            return;
-        }
-
         Busy = true;
 
         try
         {
             Status = $"正在获取 {row.Title} 的版本列表…";
 
+            var instance = _main.CurrentInstance;
             var versions = await _main.Context.Modrinth
-                .GetVersionsAsync(row.Project.Identifier, instance.GameVersion, instance.Loader)
+                .GetVersionsAsync(
+                    row.Project.Identifier,
+                    row.Kind.Key == "modpack" ? null : instance?.GameVersion,
+                    row.Kind.Key == "modpack" ? null : instance?.Loader)
                 .ConfigureAwait(true);
 
             var version = versions.FirstOrDefault(v => v.PrimaryFile is not null);
             if (version is null)
             {
-                Status = $"该模组没有适配 {instance.GameVersion} / {instance.DisplayLoader} 的文件。";
+                Status = "没有适用于当前版本的文件，请打开详情页选择其他版本。";
                 return;
             }
 
-            Status = $"正在下载 {version.PrimaryFile!.Filename}…";
-
-            var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
-            var installed = await _main.Context.Modrinth.InstallAsync(version, modsDirectory).ConfigureAwait(true);
-
-            Status = $"已安装到 {Path.GetFileName(installed)}（{instance.Name}）";
-            _main.LogsPage.AppendSystem($"已安装模组 {row.Title} → {installed}");
-
-            await _main.ModsPage.LoadModsAsync().ConfigureAwait(true);
+            await InstallVersionAsync(row.Project, row.Kind, version, row.Title).ConfigureAwait(true);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException
                                        or TaskCanceledException)
         {
-            Status = "模组安装失败：" + ex.Message;
-            AppLog.Warn("catalog", "mod-install-failed", ("error", ex.Message));
+            Status = "安装失败：" + ex.Message;
+            AppLog.Warn("catalog", "install-failed", ("error", ex.Message));
         }
         finally
         {
             Busy = false;
         }
+    }
+
+    /// <summary>
+    /// Installs one concrete file: modpacks become a new version, everything else goes into the
+    /// matching directory of the current version.
+    /// </summary>
+    public async Task InstallVersionAsync(
+        ModrinthProject project,
+        CatalogKindOption kind,
+        ModrinthVersion version,
+        string displayName,
+        CancellationToken ct = default)
+    {
+        if (kind.Key == "modpack")
+        {
+            await InstallModpackAsync(version, displayName, ct).ConfigureAwait(true);
+            return;
+        }
+
+        if (_main.CurrentInstance is not { } instance)
+        {
+            Status = "请先在「版本管理」中创建或选择一个版本。";
+            return;
+        }
+
+        var directory = kind.Key switch
+        {
+            "shader" => Path.Combine(instance.GameDirectory, "shaderpacks"),
+            "resourcepack" => Path.Combine(instance.GameDirectory, "resourcepacks"),
+            _ => Path.Combine(instance.GameDirectory, "mods"),
+        };
+
+        Status = $"正在下载 {version.PrimaryFile?.Filename ?? version.Name}…";
+        var installed = await _main.Context.Modrinth.InstallAsync(version, directory, ct).ConfigureAwait(true);
+
+        Status = $"已安装到{kind.Name}目录：{Path.GetFileName(installed)}（{instance.Name}）";
+        _main.LogsPage.AppendSystem($"已安装{kind.Name} {displayName} → {installed}");
+
+        if (kind.Key == "mod") await _main.ModsPage.LoadModsAsync().ConfigureAwait(true);
+    }
+
+    private async Task InstallModpackAsync(ModrinthVersion version, string displayName, CancellationToken ct)
+    {
+        if (version.PrimaryFile is null)
+        {
+            Status = "该版本没有可下载的文件。";
+            return;
+        }
+
+        Status = $"正在下载 {version.PrimaryFile.Filename}…";
+
+        var temp = Path.Combine(_main.Context.Paths.CacheDir, "packs");
+        Directory.CreateDirectory(temp);
+        var target = Path.Combine(temp, version.PrimaryFile.Filename);
+
+        if (!File.Exists(target))
+        {
+            var bytes = await _main.Context.Http.GetByteArrayAsync(version.PrimaryFile.Url, ct).ConfigureAwait(true);
+            await File.WriteAllBytesAsync(target, bytes, ct).ConfigureAwait(true);
+        }
+
+        await InstallPackFileAsync(target, displayName, ct).ConfigureAwait(true);
+    }
+
+    /// <summary>Installs a pack file from disk (<c>.mrpack</c> or a Modrinth <c>.zip</c> export).</summary>
+    public async Task InstallPackFileAsync(string path, string? name, CancellationToken ct = default)
+    {
+        var activity = _main.Activities.Begin($"安装整合包 {name ?? Path.GetFileName(path)}", path);
+
+        Busy = true;
+        Status = "正在安装整合包（会创建新版本）…";
+
+        try
+        {
+            var progress = new Progress<string>(line => Status = line);
+            var result = await _main.Context.ModPacks
+                .InstallAsync(path, name, null, progress, ct)
+                .ConfigureAwait(true);
+
+            _main.Activities.Finish(activity,
+                result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
+
+            await _main.ReloadInstancesAsync().ConfigureAwait(true);
+
+            Status = result.Success
+                ? $"整合包已安装：{name ?? Path.GetFileName(path)}（版本 {result.VersionId}，{result.FilesDownloaded} 个文件）"
+                : "整合包安装失败：" + (result.Error ?? "未知错误");
+
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException
+                                       or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            Status = "整合包安装失败：" + ex.Message;
+            AppLog.Warn("catalog", "pack-install-failed", ("error", ex.Message));
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>Handles a file dropped on the window: packs are installed, other files are ignored.</summary>
+    public async Task HandleDroppedFileAsync(string path)
+    {
+        var extension = Path.GetExtension(path);
+        var isPack = extension.Equals(".mrpack", StringComparison.OrdinalIgnoreCase)
+                     || extension.Equals(".zip", StringComparison.OrdinalIgnoreCase);
+
+        if (!isPack)
+        {
+            Status = "只支持拖入 .mrpack 或 Modrinth 整合包 .zip 文件。";
+            return;
+        }
+
+        await InstallPackFileAsync(path, Path.GetFileNameWithoutExtension(path)).ConfigureAwait(true);
     }
 }

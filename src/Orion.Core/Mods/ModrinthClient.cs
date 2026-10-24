@@ -24,6 +24,9 @@ public sealed class ModrinthSearchQuery
     public int Offset { get; set; }
     public string SortBy { get; set; } = "relevance";
 
+    /// <summary>Modrinth category slug (e.g. <c>optimization</c>); null means no category filter.</summary>
+    public string? Category { get; set; }
+
     internal string BuildFacets()
     {
         var facets = new List<string> { $"[\"project_type:{ProjectType}\"]" };
@@ -33,6 +36,13 @@ public sealed class ModrinthSearchQuery
 
         if (Loader is { } loader && LoaderCategory(loader) is { } category)
             facets.Add($"[\"categories:{category}\"]");
+
+        // A user picked category is a second, independent facet (Modrinth ANDs facets).
+        if (!string.IsNullOrWhiteSpace(Category) &&
+            !facets.Any(f => f.Contains($":{Category}\"", StringComparison.OrdinalIgnoreCase)))
+        {
+            facets.Add($"[\"categories:{Category}\"]");
+        }
 
         return "[" + string.Join(",", facets) + "]";
     }
@@ -68,6 +78,9 @@ public sealed class ModrinthProject
     [JsonPropertyName("categories")] public List<string> Categories { get; set; } = [];
     [JsonPropertyName("versions")] public List<string> Versions { get; set; } = [];
     [JsonPropertyName("project_type")] public string? ProjectType { get; set; }
+
+    /// <summary>Full description (markdown) - only returned by the single-project endpoint.</summary>
+    [JsonPropertyName("body")] public string? Body { get; set; }
 
     public string Identifier => string.IsNullOrWhiteSpace(Slug) ? ProjectId : Slug;
 }
