@@ -9,7 +9,12 @@
 | --- | --- | --- | --- |
 | .NET Runtime（`Microsoft.NETCore.App`） | 10.x | MIT | 应用运行时（self-contained 打包进单文件 EXE） |
 | Windows Desktop Runtime（`Microsoft.WindowsDesktop.App`，WPF） | 10.x | MIT | 桌面 UI 运行时 |
+| **Microsoft.Web.WebView2 SDK** | 1.0.4314.35 | Microsoft Software License Terms（可免费用于应用并随应用分发 SDK 二进制） | 内嵌浏览器，用于微软账户登录 |
 | Windows `crypt32.dll`（DPAPI） | 操作系统组件 | 随 Windows 授权 | 账户令牌加密 |
+
+**关于 WebView2 运行时**：SDK 只包含接口层；实际的浏览器运行时（Evergreen Runtime）由
+Windows / Microsoft Edge 提供，本项目**不打包、不重分发**运行时本体。若目标机器缺少该运行时，
+启动器会给出提示并允许改用设备代码登录。
 
 .NET 的许可证文本：<https://github.com/dotnet/runtime/blob/main/LICENSE.TXT>
 （MIT）。使用 self-contained 发布时这些运行时以二进制形式随 EXE 一起分发，

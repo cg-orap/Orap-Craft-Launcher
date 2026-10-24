@@ -252,6 +252,36 @@ POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
 界面侧：首页新增「设备代码登录」「浏览器自动回调登录」，未配置客户端 ID 时直接给出
 可操作提示而不是抛错（UI 自动化实测按钮存在且提示正确）。
 
+### 3.13 内嵌浏览器登录（与 HMCL / PCL 一致的免配置方式）
+
+在启动器内嵌入 **Microsoft Edge WebView2**，打开微软授权页；当页面跳转到
+`https://login.live.com/oauth20_desktop.srf?code=…` 时在 `NavigationStarting` 中取消跳转并取出授权码，
+因此**用户无需注册 Azure 应用、无需复制任何链接**，选择账户并同意即自动登录。
+
+实测记录（发布版单文件 EXE，未设置 `DOTNET_ROOT`）：
+
+```
+[auth] webview2-runtime version=155.0.4283.62
+[auth] webview2-navigating host=login.live.com
+[auth] webview2-navigation-ok
+```
+
+| 检查项 | 结果 |
+| --- | --- |
+| 本机 WebView2 运行时 | 已安装 `155.0.4283.62`（Windows 11 自带） |
+| 内嵌窗口能否打开真实登录页 | ✅ 截图为微软官方「登录 / 继续使用 Minecraft」页面 |
+| 单文件发布是否包含 WebView2 依赖 | ✅ `dist/win-x64` 只有一个 `OrionLauncher.exe`（59.6 MB），原生加载器随单文件自解压 |
+| 发布版 EXE 实测 | ✅ 窗口打开并成功导航（日志见上） |
+| 重定向拦截逻辑 | ✅ 单元测试覆盖 `IsRedirectTo` 的正例/反例（同域不同路径、仿冒路径、大小写、尾斜杠） |
+
+修复的问题：首版把 WebView2 控件初始设为 `Collapsed`，导致 `EnsureCoreWebView2Async`
+拿不到窗口句柄而卡住；改为控件常驻可见、用遮罩层显示加载状态后正常。
+
+同时补强了 **Xbox Live 环节的诊断**：实测日志显示曾有真实尝试通过令牌交换却在 XBL 被拒
+（`xbl_failed`，微软返回 `400` 且响应体通常为空）。现在会把状态码与响应体（截断、无凭据）
+写入日志与错误说明，并给出按序排查步骤（先到 xbox.com 创建 Xbox 档案、检查地区、家庭批准、
+新档案生效延迟），同时有单元测试锁定该行为。
+
 
 
 ---

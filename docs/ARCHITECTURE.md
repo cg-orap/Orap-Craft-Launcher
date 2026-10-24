@@ -178,20 +178,23 @@ installer 还要求目标目录「看起来像一个 Minecraft 安装」，否�
 
 ## 6. 账户与安全
 
-- **三种微软登录方式**（详见 [`MICROSOFT-LOGIN.md`](MICROSOFT-LOGIN.md)）：
-  - **设备代码流（推荐）**：`POST /oauth2/v2.0/devicecode` 取短代码 → 用户在任意浏览器授权 →
-    启动器按 RFC 8628 轮询 `/oauth2/v2.0/token`（正确处理 `authorization_pending`、
-    `slow_down`、`expired_token`、`authorization_declined`）。**无需复制任何链接**，
-    因此不存在“授权码过期”。
-  - **回环回调**：本地 `TcpListener` 监听 `http://localhost:<随机端口>`，浏览器登录后
-    自动回调；校验 `state` 防 CSRF，收到 `code` 立即换令牌。
-  - **旧版粘贴（备用）**：`login.live.com` 授权码 + 剪贴板自动侦测；授权码会被本地记忆，
-    拒绝复用，并对「解码/原始」两种形态各尝试一次。
-  - 两条现代流程需要一个用户自行注册的**公共客户端**应用 ID（不冒用他人注册），
-    因此在未配置时 UI 直接给出注册指引而不是抛错；`AADSTS700016`（应用不存在）、
-    `AADSTS7000218`（未允许公共客户端流）等错误会被翻译成具体修复步骤。
-- **令牌链**：三种方式拿到微软访问令牌后统一走 Xbox Live → XSTS → Minecraft → profile；
+- **四种微软登录方式**（详见 [`MICROSOFT-LOGIN.md`](MICROSOFT-LOGIN.md)）：
+  - **内嵌浏览器（默认）**：WPF 内嵌 `Microsoft.Web.WebView2`，打开微软授权页；在
+    `NavigationStarting` 中匹配 `redirect_uri` 并取消跳转，直接从 URL 取出授权码。
+    与 HMCL/PCL 同一思路，**用户无需注册 Azure 应用、无需复制链接**。内嵌控件的 Cookie
+    存放在 `<数据根>/cache/webview2`。
+  - **设备代码流**：`POST /oauth2/v2.0/devicecode` 取短代码 → 用户在任意浏览器授权 →
+    按 RFC 8628 轮询 `/oauth2/v2.0/token`（正确处理 `authorization_pending`、`slow_down`、
+    `expired_token`、`authorization_declined`）。
+  - **回环回调**：本地 `TcpListener` 监听 `http://localhost:<随机端口>`，校验 `state` 防 CSRF。
+  - **旧版粘贴（备用）**：`login.live.com` 授权码 + 剪贴板自动侦测；本地记忆已用授权码，
+    并对「解码/原始」两种形态各尝试一次。
+  - 后两种现代流程需要用户自行注册的**公共客户端**应用 ID（不冒用他人注册），未配置时 UI
+    直接给出注册指引；`AADSTS700016`、`AADSTS7000218` 等错误会被翻译成具体修复步骤。
+- **令牌链**：四种方式拿到微软访问令牌后统一走 Xbox Live → XSTS → Minecraft → profile；
   XSTS 的 `XErr` 错误码翻译成可操作提示（无 Xbox 档案、地区不支持、需要成人验证、儿童账户）。
+  XBL/XSTS 被拒时会把 HTTP 状态与响应体（截断、无凭据）写入日志与异常说明——
+  微软对无效 RPS 票据通常返回 `400` 且响应体为空，没有这一步就无法诊断。
 - **令牌落盘加密**：`Auth/AccountStore.cs` 用 Windows **DPAPI**（当前用户范围）加密
   access/refresh token，并在密文前加 `ORION1` 魔数避免把明文误当密文。
   测试会断言磁盘文件里**不包含**明文令牌。

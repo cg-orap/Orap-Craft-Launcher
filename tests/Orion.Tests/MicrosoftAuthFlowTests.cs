@@ -230,4 +230,40 @@ public sealed class MicrosoftAuthFlowTests
         var codeException = new MicrosoftAuthException("x", "invalid_grant", "The code has expired.");
         Assert.True(codeException.IsAuthorizationCodeRejected);
     }
+
+    [Fact]
+    public async Task XboxLiveRejectionKeepsTheProviderDetailAndExplainsTheCauses()
+    {
+        // Xbox Live answers a rejected ticket with 400 and usually an empty body; whatever detail
+        // exists must reach the exception (and the log) instead of being dropped.
+        var stub = new AuthStub();
+        stub.PathOverrides["/xbl"] = (HttpStatusCode.BadRequest, """{"Identity":"0","XErr":2148916233}""");
+
+        var service = new MicrosoftAuthService(new HttpClient(stub), StubOptions());
+        var exception = await Assert.ThrowsAsync<MicrosoftAuthException>(() => service.AuthenticateWithCodeAsync("code"));
+
+        Assert.Equal("xbl_failed", exception.ErrorCode);
+        Assert.Contains("2148916233", exception.ErrorDescription!, StringComparison.Ordinal);
+
+        var message = MicrosoftAuthMessages.Describe(exception);
+        Assert.Contains("xbox.com", message, StringComparison.Ordinal);
+        Assert.Contains("Xbox 档案", message, StringComparison.Ordinal);
+        Assert.Contains("2148916233", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task XboxLiveRejectionWithEmptyBodyStillExplainsTheCauses()
+    {
+        var stub = new AuthStub();
+        stub.PathOverrides["/xbl"] = (HttpStatusCode.BadRequest, "");
+
+        var service = new MicrosoftAuthService(new HttpClient(stub), StubOptions());
+        var exception = await Assert.ThrowsAsync<MicrosoftAuthException>(() => service.AuthenticateWithCodeAsync("code"));
+
+        Assert.Equal("xbl_failed", exception.ErrorCode);
+        Assert.Null(exception.ErrorDescription);
+
+        var message = MicrosoftAuthMessages.Describe(exception);
+        Assert.Contains("Xbox 档案", message, StringComparison.Ordinal);
+    }
 }

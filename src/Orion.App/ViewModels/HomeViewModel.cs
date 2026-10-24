@@ -69,6 +69,7 @@ public sealed class HomeViewModel : ObservableObject
         ClearCallbackCommand = new RelayCommand(ClearCallback);
 
         LoginWithDeviceCodeCommand = new AsyncRelayCommand(LoginWithDeviceCodeAsync, () => !MicrosoftLoginBusy);
+        LoginInBrowserCommand = new AsyncRelayCommand(LoginInBrowserAsync, () => !MicrosoftLoginBusy);
         LoginWithLoopbackCommand = new AsyncRelayCommand(LoginWithLoopbackAsync, () => !MicrosoftLoginBusy);
         CancelMicrosoftLoginCommand = new RelayCommand(CancelMicrosoftLogin, () => MicrosoftLoginBusy);
         CopyDeviceCodeCommand = new RelayCommand(CopyDeviceCode, () => DeviceCodeText.Length > 0);
@@ -94,6 +95,7 @@ public sealed class HomeViewModel : ObservableObject
     public ICommand LoginFromClipboardCommand { get; }
     public ICommand ClearCallbackCommand { get; }
     public ICommand LoginWithDeviceCodeCommand { get; }
+    public ICommand LoginInBrowserCommand { get; }
     public ICommand LoginWithLoopbackCommand { get; }
     public ICommand CancelMicrosoftLoginCommand { get; }
     public ICommand CopyDeviceCodeCommand { get; }
@@ -609,6 +611,70 @@ public sealed class HomeViewModel : ObservableObject
     }
 
     #region Modern Microsoft sign-in (device code / loopback)
+
+    /// <summary>
+    /// In-app browser sign-in: a real browser surface is embedded in the launcher, the user picks an
+    /// account and consents, and the launcher intercepts the OAuth redirect itself.
+    ///
+    /// This is what mainstream launchers do and it needs neither an Azure app registration nor any
+    /// copy/paste, so it is the recommended path.
+    /// </summary>
+    private async Task LoginInBrowserAsync()
+    {
+        MicrosoftLoginBusy = true;
+        MicrosoftStatus = "正在打开登录窗口…";
+
+        try
+        {
+            var window = new Views.MicrosoftLoginWindow(
+                _main.Context.Auth,
+                Path.Combine(_main.Context.Paths.CacheDir, "webview2"))
+            {
+                Owner = Application.Current?.MainWindow,
+            };
+
+            var accepted = window.ShowDialog() == true;
+
+            if (window.SwitchToDeviceCode)
+            {
+                MicrosoftLoginBusy = false;
+                await LoginWithDeviceCodeAsync().ConfigureAwait(true);
+                return;
+            }
+
+            if (!accepted || window.AuthorizationCode is null)
+            {
+                MicrosoftStatus = window.AuthorizationError is not null
+                    ? "登录未完成：" + window.AuthorizationError
+                    : "已取消登录。";
+                return;
+            }
+
+            MicrosoftStatus = "已获得授权，正在与微软服务交换令牌…";
+
+            var account = await _main.Context.Auth
+                .AuthenticateWithCodeAsync(window.AuthorizationCode)
+                .ConfigureAwait(true);
+
+            await SaveLoggedInAccountAsync(account).ConfigureAwait(true);
+            MicrosoftStatus = $"登录成功：{account.Username}";
+            MicrosoftCodeHint = "";
+        }
+        catch (MicrosoftAuthException ex)
+        {
+            MicrosoftStatus = MicrosoftAuthMessages.Describe(ex);
+            AppLog.Warn("auth", "browser-login-rejected", ("code", ex.ErrorCode ?? "unknown"));
+        }
+        catch (Exception ex)
+        {
+            MicrosoftStatus = "浏览器登录失败：" + ex.Message;
+            AppLog.Error("ui", "browser-login-failed", ex);
+        }
+        finally
+        {
+            MicrosoftLoginBusy = false;
+        }
+    }
 
     private void BeginLoginOperation()
     {

@@ -120,4 +120,45 @@ public sealed class MicrosoftCallbackParsingTests
         Assert.Contains("redirect_uri=https%3A%2F%2Flogin.live.com%2Foauth20_desktop.srf", text, StringComparison.Ordinal);
         Assert.Contains("state=orion", text, StringComparison.Ordinal);
     }
+
+    [Theory]
+    // exactly the redirect target
+    [InlineData("https://login.live.com/oauth20_desktop.srf", true)]
+    [InlineData("https://login.live.com/oauth20_desktop.srf?code=abc&lc=2052", true)]
+    [InlineData("https://login.live.com/oauth20_desktop.srf?error=access_denied", true)]
+    // scheme / trailing slash differences must still match
+    [InlineData("HTTPS://LOGIN.LIVE.COM/oauth20_desktop.srf?code=abc", true)]
+    // a different page on the same host, or a lookalike path, must not match
+    [InlineData("https://login.live.com/oauth20_authorize.srf?client_id=x", false)]
+    [InlineData("https://login.live.com/oauth20_desktop.srfevil?code=abc", false)]
+    [InlineData("https://login.live.com/oauth20_desktop.srf.example.com/?code=abc", false)]
+    [InlineData("https://account.live.com/", false)]
+    public void RedirectDetectionInterceptsOnlyTheCallback(string url, bool expected)
+    {
+        const string redirect = "https://login.live.com/oauth20_desktop.srf";
+        Assert.Equal(expected, MicrosoftAuthService.IsRedirectTo(url, redirect));
+    }
+
+    [Fact]
+    public void RedirectDetectionToleratesTrailingSlashAndEmptyInput()
+    {
+        Assert.True(MicrosoftAuthService.IsRedirectTo("https://login.live.com/oauth20_desktop.srf/?code=a",
+            "https://login.live.com/oauth20_desktop.srf/"));
+
+        Assert.False(MicrosoftAuthService.IsRedirectTo(null, "https://login.live.com/oauth20_desktop.srf"));
+        Assert.False(MicrosoftAuthService.IsRedirectTo("", "https://login.live.com/oauth20_desktop.srf"));
+        Assert.False(MicrosoftAuthService.IsRedirectTo("https://login.live.com/oauth20_desktop.srf", ""));
+    }
+
+    [Fact]
+    public void EmbeddedBrowserCanExtractTheCodeFromTheInterceptedRedirect()
+    {
+        // Mirrors what MicrosoftLoginWindow does when NavigationStarting fires.
+        var redirectUrl = $"https://login.live.com/oauth20_desktop.srf?code={Code}&lc=2052&state=orion";
+        const string expectedRedirect = "https://login.live.com/oauth20_desktop.srf";
+
+        Assert.True(MicrosoftAuthService.IsRedirectTo(redirectUrl, expectedRedirect));
+        Assert.Null(MicrosoftAuthService.TryGetAuthorizationError(redirectUrl));
+        Assert.Equal(Code, MicrosoftAuthService.TryExtractCode(redirectUrl));
+    }
 }

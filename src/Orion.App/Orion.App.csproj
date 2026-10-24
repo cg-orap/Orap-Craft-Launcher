@@ -15,6 +15,14 @@
     <ProjectReference Include="..\Orion.Core\Orion.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Embedded browser for the in-app Microsoft sign-in (same approach as mainstream
+         launchers): the user picks an account in a real browser surface, the launcher intercepts
+         the OAuth redirect and no Azure app registration or copy/paste is needed.
+         The WebView2 *runtime* is Evergreen and provided by Windows, not shipped by us. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+  </ItemGroup>
+
   <!-- Self-contained single-file publish profile (see build/build.ps1). -->
   <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
     <SelfContained>true</SelfContained>

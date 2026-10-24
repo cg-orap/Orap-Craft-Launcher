@@ -122,15 +122,43 @@ public static class MicrosoftAuthMessages
 
             "no_refresh_token" => "该账户没有可用的刷新令牌，需要重新登录一次。",
 
-            "xbl_failed" or "xbl_invalid" or "xsts_invalid" =>
-                "Xbox Live 认证未通过。请确认该微软账户已创建 Xbox 档案（可在 xbox.com 登录一次），"
-                + "并检查账户地区与年龄限制。",
+            "xbl_failed" or "xbl_invalid" => DescribeXboxLiveProblem(exception),
+
+            "xsts_invalid" => DescribeXboxLiveProblem(exception),
 
             "profile_failed" or "profile_invalid" =>
                 "已取得令牌，但读取 Minecraft 档案失败，请稍后重试。",
 
             _ => exception.Message,
         };
+    }
+
+    /// <summary>
+    /// Explains an Xbox Live rejection.
+    ///
+    /// Xbox Live answers a rejected RPS ticket with <c>400</c> and usually an empty body, which is
+    /// the single most common failure after a successful Microsoft sign-in. The realistic causes
+    /// are all account-side, so the message lists them in the order they should be checked.
+    /// </summary>
+    private static string DescribeXboxLiveProblem(MicrosoftAuthException exception)
+    {
+        var detail = exception.ErrorDescription;
+
+        var lines = new List<string>
+        {
+            "微软账户已登录，但 Xbox Live 拒绝了该账户的令牌。这通常不是启动器的问题，请按顺序排查：",
+            "1) 该微软账户还没有 Xbox 档案 —— 打开 https://www.xbox.com 用同一账户登录一次（创建档案）后重试；",
+            "2) 账户所在国家/地区不支持 Xbox Live（可在微软账户页面修改地区）；",
+            "3) 未成年人账户需要先加入 Microsoft 家庭并由成人批准；",
+            "4) 若刚登录成功不久，请稍等 1–2 分钟再重试（新档案生效有延迟）。",
+        };
+
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            lines.Add("微软返回的详细信息：" + detail);
+        }
+
+        return string.Join("\n", lines);
     }
 
     /// <summary>Turns Azure AD error codes (AADSTS…) into concrete configuration instructions.</summary>
@@ -202,6 +230,30 @@ public sealed partial class MicrosoftAuthService
         if (!string.IsNullOrEmpty(state)) query.Append("&state=").Append(Uri.EscapeDataString(state));
 
         return new Uri(_options.AuthorizeEndpoint + "?" + query);
+    }
+
+    /// <summary>
+    /// True when <paramref name="url"/> is the configured redirect target, i.e. the navigation the
+    /// embedded browser must intercept to capture the authorization code.
+    ///
+    /// Comparison ignores the scheme case and a trailing slash, because Microsoft returns
+    /// <c>https://login.live.com/oauth20_desktop.srf?</c> without the slash used in the request.
+    /// </summary>
+    public static bool IsRedirectTo(string? url, string redirectUri)
+    {
+        if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(redirectUri)) return false;
+
+        var trimmedUrl = url.Trim();
+        var trimmedRedirect = redirectUri.Trim().TrimEnd('/');
+
+        if (!trimmedUrl.StartsWith(trimmedRedirect, StringComparison.OrdinalIgnoreCase)) return false;
+
+        // The next character must end the path (query/fragment) so ".../srf" cannot match
+        // ".../srfevil".
+        if (trimmedUrl.Length == trimmedRedirect.Length) return true;
+
+        var next = trimmedUrl[trimmedRedirect.Length];
+        return next is '?' or '#' or '/';
     }
 
     /// <summary>
@@ -509,16 +561,38 @@ public sealed partial class MicrosoftAuthService
         var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
-            throw new MicrosoftAuthException($"Xbox Live 认证失败 (HTTP {(int)response.StatusCode})。", "xbl_failed");
+        {
+            // Xbox Live answers a rejected ticket with 400 and (usually) an empty body, so the
+            // status plus whatever detail exists is all the diagnosis we can get. Log it: without
+            // this the user only sees "Xbox Live 认证失败" with no way to report the cause.
+            var detail = SummarizeBody(body);
+            AppLog.Warn("auth", "xbl-rejected",
+                ("status", (int)response.StatusCode),
+                ("detail", detail ?? "empty"));
+
+            throw new MicrosoftAuthException(
+                $"Xbox Live 认证失败 (HTTP {(int)response.StatusCode})",
+                "xbl_failed",
+                detail);
+        }
 
         var parsed = JsonSerializer.Deserialize<XboxTokenResponse>(body);
         var token = parsed?.Token;
         var uhs = parsed?.DisplayClaims?.Xui?.FirstOrDefault()?.UserHash;
 
         if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(uhs))
-            throw new MicrosoftAuthException("Xbox Live 返回的令牌无效。", "xbl_invalid");
+            throw new MicrosoftAuthException("Xbox Live 返回的令牌无效。", "xbl_invalid", SummarizeBody(body));
 
         return (token, uhs);
+    }
+
+    /// <summary>Short, log-safe summary of a response body (never contains credentials).</summary>
+    private static string? SummarizeBody(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return null;
+
+        var trimmed = body.Trim();
+        return trimmed.Length <= 400 ? trimmed : trimmed[..400] + "…";
     }
 
     private async Task<(string Token, string? UserHash)> RequestXstsTokenAsync(string xblToken, CancellationToken ct)
