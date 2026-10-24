@@ -78,3 +78,40 @@ public sealed class InitialConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;
 }
+
+/// <summary>
+/// Visible when the bound value equals the ConverterParameter (pass "invert" to flip).
+/// Used to show a page's section only while its sub-tab is selected.
+/// </summary>
+public sealed class EqualsToVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var expected = parameter as string;
+        var equal = string.Equals(value?.ToString(), expected, StringComparison.OrdinalIgnoreCase);
+
+        if (value is bool flag && expected is not null)
+        {
+            equal = flag == expected.Equals("true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return equal ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>Inverse of <see cref="EqualsToVisibilityConverter"/>.</summary>
+public sealed class NotEqualsToVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var expected = parameter as string;
+        var equal = string.Equals(value?.ToString(), expected, StringComparison.OrdinalIgnoreCase);
+        return equal ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}

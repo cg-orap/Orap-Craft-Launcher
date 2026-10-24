@@ -84,6 +84,9 @@ public sealed class LauncherContext : IAsyncDisposable
     public IntegrityService Integrity { get; }
     public MrPackInstaller ModPacks { get; }
 
+    /// <summary>CurseForge / plain-zip modpack importer (drag &amp; drop).</summary>
+    public PackArchiveInstaller PackArchives { get; }
+
     /// <summary>Set once <see cref="InitializeAsync"/> has run.</summary>
     public bool IsInitialized { get; private set; }
 

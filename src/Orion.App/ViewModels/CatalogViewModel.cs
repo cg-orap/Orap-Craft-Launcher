@@ -82,6 +82,8 @@ public sealed class CatalogViewModel : ObservableObject
     private string? _category;
     private string _targetInfo = "";
     private bool _dropActive;
+    private CatalogDetailViewModel? _detail;
+    private bool _detailOpen;
 
     public CatalogViewModel(MainViewModel main)
     {
@@ -102,6 +104,36 @@ public sealed class CatalogViewModel : ObservableObject
         NextPageCommand = new AsyncRelayCommand(() => SearchAsync(_page + 1), () => !_busy && HasNextPage);
         PreviousPageCommand = new AsyncRelayCommand(() => SearchAsync(_page - 1), () => !_busy && HasPreviousPage);
         RefreshCommand = new AsyncRelayCommand(() => SearchAsync(_page), () => !_busy);
+        CloseDetailCommand = new RelayCommand(CloseDetail);
+    }
+
+    public RelayCommand CloseDetailCommand { get; }
+
+    /// <summary>Detail of the selected project; shown inside the download centre.</summary>
+    public CatalogDetailViewModel? Detail
+    {
+        get => _detail;
+        private set => SetProperty(ref _detail, value);
+    }
+
+    public bool IsDetailOpen
+    {
+        get => _detailOpen;
+        private set
+        {
+            if (!SetProperty(ref _detailOpen, value)) return;
+            OnPropertyChanged(nameof(IsListOpen));
+        }
+    }
+
+    public bool IsListOpen => !_detailOpen;
+
+    /// <summary>Returns from the detail view to the list.</summary>
+    public void CloseDetail()
+    {
+        IsDetailOpen = false;
+        Detail = null;
+        Status = string.Empty;
     }
 
     public IReadOnlyList<CatalogKindOption> Kinds { get; }
@@ -133,6 +165,7 @@ public sealed class CatalogViewModel : ObservableObject
 
             _kind = value;
             _category = null;
+            CloseDetail();
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsVersionsTab));
@@ -251,11 +284,17 @@ public sealed class CatalogViewModel : ObservableObject
                 SortBy = string.IsNullOrWhiteSpace(SearchText) ? "downloads" : "relevance",
             };
 
-            // Mods, shaders and packs must match the selected version to be usable at all.
-            if (_kind.Key != "modpack" && _main.CurrentInstance is { } instance)
+            // Mods must match the selected version *and* loader; shaders and resource packs have no
+            // loader category on Modrinth (filtering by one returns nothing), so only the Minecraft
+            // version is applied there. Modpacks carry their own loader, so they are unfiltered.
+            if (_kind.Key is "mod" or "shader" or "resourcepack" && _main.CurrentInstance is { } instance)
             {
                 if (!string.IsNullOrWhiteSpace(instance.GameVersion)) query.GameVersion = instance.GameVersion;
-                if (instance.Loader != Core.Instances.LoaderKind.Vanilla) query.Loader = instance.Loader;
+
+                if (_kind.Key == "mod" && instance.Loader != Core.Instances.LoaderKind.Vanilla)
+                {
+                    query.Loader = instance.Loader;
+                }
             }
 
             var result = await _main.Context.Modrinth.SearchAsync(query).ConfigureAwait(true);
@@ -347,7 +386,7 @@ public sealed class CatalogViewModel : ObservableObject
         };
     }
 
-    /// <summary>Opens the detail window: full description plus every published version.</summary>
+    /// <summary>Opens the in-window detail view: full description plus every published version.</summary>
     public async Task ShowDetailsAsync(CatalogRow row)
     {
         try
@@ -362,13 +401,9 @@ public sealed class CatalogViewModel : ObservableObject
 
             Status = string.Empty;
 
-            var window = new Views.CatalogDetailWindow(
-                new CatalogDetailViewModel(_main, this, project, row.Kind, versions, row.Icon))
-            {
-                Owner = System.Windows.Application.Current?.MainWindow,
-            };
-
-            window.ShowDialog();
+            // Navigation stays inside the launcher window (only the login flow is a separate window).
+            Detail = new CatalogDetailViewModel(_main, this, project, row.Kind, versions, row.Icon);
+            IsDetailOpen = true;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
@@ -519,19 +554,116 @@ public sealed class CatalogViewModel : ObservableObject
         }
     }
 
-    /// <summary>Handles a file dropped on the window: packs are installed, other files are ignored.</summary>
+    /// <summary>
+    /// Handles a dropped archive: Modrinth .mrpack, CurseForge zip (manifest.json) or a plain
+    /// Minecraft zip (domestic launcher export). Unknown archives are reported, never guessed at.
+    /// </summary>
     public async Task HandleDroppedFileAsync(string path)
     {
-        var extension = Path.GetExtension(path);
-        var isPack = extension.Equals(".mrpack", StringComparison.OrdinalIgnoreCase)
-                     || extension.Equals(".zip", StringComparison.OrdinalIgnoreCase);
-
-        if (!isPack)
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        if (extension is not (".mrpack" or ".zip"))
         {
-            Status = "只支持拖入 .mrpack 或 Modrinth 整合包 .zip 文件。";
+            Status = "只支持整合包压缩包（.mrpack / CurseForge .zip / .minecraft .zip）。";
             return;
         }
 
-        await InstallPackFileAsync(path, Path.GetFileNameWithoutExtension(path)).ConfigureAwait(true);
+        var info = PackArchiveInstaller.Inspect(path);
+        AppLog.Info("catalog", "pack-detected", ("kind", info.Kind.ToString()), ("name", info.Name));
+
+        switch (info.Kind)
+        {
+            case PackArchiveKind.Modrinth:
+                await InstallPackFileAsync(path, info.Name).ConfigureAwait(true);
+                return;
+
+            case PackArchiveKind.CurseForge:
+                await InstallCurseForgeAsync(path, info).ConfigureAwait(true);
+                return;
+
+            case PackArchiveKind.MinecraftZip:
+                await InstallMinecraftZipAsync(path, info).ConfigureAwait(true);
+                return;
+
+            default:
+                Status = "无法识别该压缩包：" + (info.Note ?? "缺少 manifest.json / modrinth.index.json / .minecraft");
+                return;
+        }
+    }
+
+    private async Task InstallCurseForgeAsync(string path, PackArchiveInfo info)
+    {
+        var activity = _main.Activities.Begin($"安装 CurseForge 整合包 {info.Name}", path);
+        Busy = true;
+        Status = $"识别到 CurseForge 整合包：{info.Name}（MC {info.MinecraftVersion}）";
+
+        try
+        {
+            var progress = new Progress<string>(line => Status = line);
+            var result = await _main.Context.PackArchives
+                .InstallCurseForgeAsync(path, info.Name, null, progress)
+                .ConfigureAwait(true);
+
+            _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
+            await _main.ReloadInstancesAsync().ConfigureAwait(true);
+
+            Status = result.Success
+                ? $"CurseForge 整合包已安装：{info.Name}（{result.FilesDownloaded} 个模组，{result.OverridesCopied} 个配置）"
+                  + (result.Warnings.Count > 0 ? $"；有 {result.Warnings.Count} 条提示见日志" : "")
+                : "CurseForge 整合包安装失败：" + (result.Error ?? "未知错误");
+
+            foreach (var warning in result.Warnings) _main.LogsPage.AppendSystem("整合包提示: " + warning);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException
+                                       or TaskCanceledException)
+        {
+            Status = "CurseForge 整合包安装失败：" + ex.Message;
+            AppLog.Warn("catalog", "curseforge-failed", ("error", ex.Message));
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task InstallMinecraftZipAsync(string path, PackArchiveInfo info)
+    {
+        var baseInstance = _main.CurrentInstance;
+
+        if (info.MinecraftVersion is null && baseInstance is null)
+        {
+            Status = "该压缩包没有 .minecraft 目录，请先在「版本管理」选择一个版本作为基础，再拖入。";
+            return;
+        }
+
+        var activity = _main.Activities.Begin($"导入整合包 {info.Name}", path);
+        Busy = true;
+        Status = $"识别到压缩包整合包：{info.Name}";
+
+        try
+        {
+            var result = await _main.Context.PackArchives
+                .InstallMinecraftZipAsync(path, info.Name, baseInstance?.VersionId, baseInstance?.GameVersion)
+                .ConfigureAwait(true);
+
+            _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
+            await _main.ReloadInstancesAsync().ConfigureAwait(true);
+
+            Status = result.Success
+                ? $"整合包已导入：{info.Name}（{result.OverridesCopied} 个文件）"
+                : "整合包导入失败：" + (result.Error ?? "未知错误");
+
+            foreach (var warning in result.Warnings) _main.LogsPage.AppendSystem("整合包提示: " + warning);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            Status = "整合包导入失败：" + ex.Message;
+            AppLog.Warn("catalog", "zip-import-failed", ("error", ex.Message));
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 }

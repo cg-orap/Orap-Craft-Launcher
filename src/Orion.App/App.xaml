@@ -17,6 +17,8 @@
             <conv:BytesConverter x:Key="Bytes" />
             <conv:StringToVisibilityConverter x:Key="StringToVisibility" />
             <conv:InitialConverter x:Key="Initial" />
+            <conv:EqualsToVisibilityConverter x:Key="EqualsToVisibility" />
+            <conv:NotEqualsToVisibilityConverter x:Key="NotEqualsToVisibility" />
 
             <!-- Implicit templates map view models onto views, so navigation stays pure MVVM. -->
             <DataTemplate DataType="{x:Type vm:HomeViewModel}">
@@ -42,6 +44,9 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:CatalogViewModel}">
                 <views:CatalogView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:VersionPickerViewModel}">
+                <views:VersionPickerView />
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>

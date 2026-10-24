@@ -43,9 +43,14 @@
             <views:VersionsView DataContext="{Binding VersionsPage}" />
         </Grid>
 
+        <!-- in-window project details (only the login flow uses a separate window) -->
+        <Grid Grid.Row="1" Visibility="{Binding IsDetailOpen, Converter={StaticResource BoolToVisibility}}">
+            <views:CatalogDetailView DataContext="{Binding Detail}" />
+        </Grid>
+
         <!-- resource catalogue -->
         <Grid Grid.Row="1" Margin="20,14,20,14"
-              Visibility="{Binding IsCatalogueTab, Converter={StaticResource BoolToVisibility}}">
+              Visibility="{Binding IsListOpen, Converter={StaticResource BoolToVisibility}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />

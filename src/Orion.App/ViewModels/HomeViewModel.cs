@@ -44,6 +44,7 @@ public sealed class HomeViewModel : ObservableObject
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         ChooseBackgroundCommand = new RelayCommand(ChooseBackground);
         ClearBackgroundCommand = new RelayCommand(ClearBackground, () => HasBackgroundImage);
+        OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("version-picker"));
 
         ReloadBackground();
     }
@@ -53,6 +54,7 @@ public sealed class HomeViewModel : ObservableObject
     public ICommand RefreshCommand { get; }
     public ICommand ChooseBackgroundCommand { get; }
     public ICommand ClearBackgroundCommand { get; }
+    public ICommand OpenVersionPickerCommand { get; }
 
     public Instance? SelectedInstance => _main.CurrentInstance;
 

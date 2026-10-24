@@ -59,6 +59,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Orientation="Horizontal">
@@ -77,8 +78,9 @@
 
                             <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Detail}" Style="{StaticResource CaptionText}"
                                        TextWrapping="Wrap" Margin="0,6,0,0" />
-                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Error}" Style="{StaticResource CaptionText}"
-                                       Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                            <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding Error}" Style="{StaticResource CaptionText}"
+                                       Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       AutomationProperties.AutomationId="DownloadError"
                                        Visibility="{Binding Error, Converter={StaticResource StringToVisibility}}" />
                         </Grid>
                     </DataTemplate>

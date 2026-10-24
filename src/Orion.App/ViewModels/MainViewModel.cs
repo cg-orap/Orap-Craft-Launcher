@@ -146,6 +146,7 @@ public sealed class MainViewModel : ObservableObject
         VersionsPage = new VersionsViewModel(this);
         InstancesPage = new InstancesViewModel(this);
         CatalogPage = new CatalogViewModel(this);
+        VersionPickerPage = new VersionPickerViewModel(this);
         ModsPage = new ModsViewModel(this);
         DownloadsPage = new DownloadsViewModel(this);
         SettingsPage = new SettingsViewModel(this);
@@ -185,6 +186,7 @@ public sealed class MainViewModel : ObservableObject
     public VersionsViewModel VersionsPage { get; }
     public InstancesViewModel InstancesPage { get; }
     public CatalogViewModel CatalogPage { get; }
+    public VersionPickerViewModel VersionPickerPage { get; }
     public ModsViewModel ModsPage { get; }
     public DownloadsViewModel DownloadsPage { get; }
     public SettingsViewModel SettingsPage { get; }
@@ -406,6 +408,7 @@ public sealed class MainViewModel : ObservableObject
         {
             "versions" => CatalogPage,   // legacy route: versions now live in the download centre
             "catalog" => CatalogPage,
+            "version-picker" => VersionPickerPage,
             "instances" => InstancesPage,
             "mods" => ModsPage,
             "downloads" => DownloadsPage,
@@ -415,6 +418,7 @@ public sealed class MainViewModel : ObservableObject
         };
 
         if (item.Key == "catalog") _ = CatalogPage.InitializeAsync();
+        if (item.Key == "version-picker") VersionPickerPage.Refresh();
         if (item.Key == "instances") _ = InstancesPage.LoadAsync();
         if (item.Key == "mods") _ = ModsPage.LoadModsAsync();
         if (item.Key == "home") _ = Home.RefreshAsync();

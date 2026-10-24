@@ -58,22 +58,21 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="0.55*" />
+                <RowDefinition Height="1.15*" />
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">
-            <!-- version picker: choose which game to start, right on the home page -->
-            <ComboBox Width="320" HorizontalAlignment="Center"
-                      ItemsSource="{Binding Instances}"
-                      SelectedItem="{Binding SelectedLaunchInstance, Mode=TwoWay}"
-                      AutomationProperties.AutomationId="VersionPicker"
-                      ToolTip="选择要启动的版本">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
+            <!-- which version will start, and a button that opens the version chooser sub-page -->
+            <TextBlock Text="{Binding InstanceTitle}" HorizontalAlignment="Center"
+                       FontSize="14" FontWeight="SemiBold" Margin="0,0,0,2"
+                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxWidth="420"
+                       AutomationProperties.AutomationId="HomeVersionTitle" />
+
+            <Button Content="版本选择" Style="{StaticResource SecondaryButton}"
+                    Command="{Binding OpenVersionPickerCommand}" Margin="0,0,0,12"
+                    HorizontalAlignment="Center" Padding="22,8"
+                    AutomationProperties.AutomationId="VersionPickerButton"
+                    ToolTip="打开版本选择页，挑一个已安装的版本" />
 
             <Button Content="{Binding LaunchButtonText}" Style="{StaticResource LaunchHeroButton}"
                     Command="{Binding LaunchCommand}" Margin="0,14,0,0"

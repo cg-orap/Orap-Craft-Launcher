@@ -18,6 +18,31 @@ public sealed class SettingsViewModel : ObservableObject
     private string _proxyUrl = "";
     private string _theme = "Dark";
     private string _accent = "Blue";
+    private string _section = "general";
+
+    /// <summary>Active sub-tab: general (appearance, data, Java, memory) or network (download, account, logs).</summary>
+    public string Section
+    {
+        get => _section;
+        set
+        {
+            if (!SetProperty(ref _section, value)) return;
+            OnPropertyChanged(nameof(IsGeneralSection));
+            OnPropertyChanged(nameof(IsNetworkSection));
+        }
+    }
+
+    public bool IsGeneralSection
+    {
+        get => _section == "general";
+        set { if (value) Section = "general"; }
+    }
+
+    public bool IsNetworkSection
+    {
+        get => _section == "network";
+        set { if (value) Section = "network"; }
+    }
 
     /// <summary>Accent swatches shown in settings (colour is only for the preview dot).</summary>
     public IReadOnlyList<AccentOption> Accents { get; } =

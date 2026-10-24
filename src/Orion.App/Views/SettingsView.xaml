@@ -12,14 +12,34 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <!-- ===================== left column ===================== -->
-            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+            <!-- settings sub-tabs: two sub-pages instead of one long list -->
+            <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2">
                 <TextBlock Text="设置" Style="{StaticResource TitleText}" />
                 <TextBlock Text="所有设置保存在数据目录中，不会修改系统环境变量。"
                            Style="{StaticResource CaptionText}" Margin="0,6,0,12" />
-                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
 
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                    <RadioButton Content="常规与外观" GroupName="SettingsSection"
+                                 IsChecked="{Binding IsGeneralSection, Mode=TwoWay}"
+                                 Style="{StaticResource TabRadio}" Margin="0,0,8,0"
+                                 AutomationProperties.AutomationId="SettingsTabGeneral" />
+                    <RadioButton Content="下载、账户与日志" GroupName="SettingsSection"
+                                 IsChecked="{Binding IsNetworkSection, Mode=TwoWay}"
+                                 Style="{StaticResource TabRadio}"
+                                 AutomationProperties.AutomationId="SettingsTabNetwork" />
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
+            </StackPanel>
+
+            <!-- sub-page 1: general -->
+            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,0"
+                        Visibility="{Binding IsGeneralSection, Converter={StaticResource BoolToVisibility}}">
                 <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                     <StackPanel>
                         <TextBlock Text="主界面外观" Style="{StaticResource SectionTitle}" />
@@ -108,7 +128,9 @@
             </StackPanel>
 
             <!-- ===================== right column ===================== -->
-            <StackPanel Grid.Column="1" Margin="10,52,0,0">
+                        <!-- sub-page 2: downloads, account and logs -->
+            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,10,0"
+                        Visibility="{Binding IsNetworkSection, Converter={StaticResource BoolToVisibility}}">
                 <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                     <StackPanel>
                         <TextBlock Text="下载" Style="{StaticResource SectionTitle}" />
