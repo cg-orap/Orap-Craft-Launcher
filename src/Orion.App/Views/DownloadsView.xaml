@@ -40,7 +40,8 @@
                     <Button Content="清除已完成" Style="{StaticResource GhostButton}" Command="{Binding ClearFinishedCommand}" />
                 </StackPanel>
 
-                <TextBlock Grid.Column="4" Text="{Binding Status}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                <TextBlock Grid.Column="4" Text="{Binding DataContext.Activities.Status, RelativeSource={RelativeSource AncestorType=Window}}"
+                           Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
             </Grid>
         </Border>
 

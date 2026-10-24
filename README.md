@@ -40,6 +40,22 @@
 未能在本环境验证的项目（Microsoft 登录、CurseForge 等）在
 [TEST-REPORT.md](docs/TEST-REPORT.md#5-未验证项) 中如实标注为「未验证」。
 
+### 界面截图（真实数据）
+
+| 首页 | 游戏下载 |
+| --- | --- |
+| ![首页](docs/images/page-home.png) | ![游戏下载](docs/images/page-versions.png) |
+
+| 实例管理 | Mod 管理 |
+| --- | --- |
+| ![实例管理](docs/images/page-instances.png) | ![Mod 管理](docs/images/page-mods.png) |
+
+| 下载管理 | 设置 |
+| --- | --- |
+| ![下载管理](docs/images/page-downloads.png) | ![设置](docs/images/page-settings.png) |
+
+![日志与诊断](docs/images/page-logs.png)
+
 ---
 
 ## 2. 快速开始
