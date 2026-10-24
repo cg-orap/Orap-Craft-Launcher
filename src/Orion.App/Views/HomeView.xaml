@@ -56,9 +56,9 @@
         <!-- Centre-bottom placement: the block is pushed below the vertical centre on purpose. -->
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
+                <RowDefinition Height="3.6*" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="1.7*" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">

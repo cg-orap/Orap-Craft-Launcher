@@ -126,7 +126,11 @@ public sealed class CatalogViewModel : ObservableObject
         }
     }
 
-    public bool IsListOpen => !_detailOpen;
+    /// <summary>
+    /// The catalogue list is only shown on a resource tab with no detail open. Without the tab
+    /// condition its search bar and result card covered the hosted Minecraft version page.
+    /// </summary>
+    public bool IsListOpen => !_detailOpen && IsCatalogueTab;
 
     /// <summary>Returns from the detail view to the list.</summary>
     public void CloseDetail()
@@ -170,6 +174,7 @@ public sealed class CatalogViewModel : ObservableObject
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsVersionsTab));
             OnPropertyChanged(nameof(IsCatalogueTab));
+            OnPropertyChanged(nameof(IsListOpen));
             OnPropertyChanged(nameof(Categories));
             OnPropertyChanged(nameof(KindHint));
             OnPropertyChanged(nameof(SelectedCategory));
