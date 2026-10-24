@@ -135,7 +135,8 @@
                         <TextBlock Text="微软正版账户" Style="{StaticResource CaptionText}" />
 
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <Button Content="在浏览器中登录" Style="{StaticResource SecondaryButton}" Command="{Binding BeginMicrosoftLoginCommand}" />
+                            <Button Content="在浏览器中登录" Style="{StaticResource SecondaryButton}" Command="{Binding BeginMicrosoftLoginCommand}"
+                                    AutomationProperties.AutomationId="BeginMicrosoftLoginButton" />
                             <Button Content="复制登录链接" Style="{StaticResource GhostButton}" Command="{Binding CopyLoginLinkCommand}" Margin="6,0,0,0"
                                     Visibility="{Binding HasMicrosoftLoginUrl, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="刷新令牌" Style="{StaticResource GhostButton}" Command="{Binding RefreshTokenCommand}" Margin="6,0,0,0" />
@@ -151,7 +152,7 @@
                                  ToolTip="选中后按 Ctrl+C 可复制；下方“粘贴回调链接”用于粘贴登录结果" />
 
                         <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0"
-                                   Text="登录完成后浏览器会跳转到一个可能显示“无法访问”的页面，这是正常的：请把地址栏里的整段链接（或页面中给出的授权码）复制回来，粘贴到下面的输入框。" />
+                                   Text="登录完成后，把地址栏里的整段链接（或回调页给出的授权码）复制下来即可——启动器会自动读取剪贴板并完成登录。授权码只有几分钟有效期且只能用一次，若提示已过期请重新登录。" />
 
                         <!-- 粘贴框始终可用：右键有粘贴菜单，也可用下方按钮直接从剪贴板读取。 -->
                         <TextBox Margin="0,6,0,0" Height="64" TextWrapping="Wrap" AcceptsReturn="False"
@@ -165,18 +166,23 @@
                         </TextBox>
 
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="粘贴回调链接" Style="{StaticResource SecondaryButton}" Command="{Binding PasteCallbackCommand}"
+                            <Button Content="从剪贴板登录" Style="{StaticResource PrimaryButton}" Command="{Binding LoginFromClipboardCommand}"
+                                    AutomationProperties.AutomationId="LoginFromClipboardButton"
+                                    ToolTip="读取剪贴板里的回调链接并立即登录（最快，推荐）" />
+                            <Button Content="完成登录" Style="{StaticResource SecondaryButton}" Command="{Binding CompleteMicrosoftLoginCommand}" Margin="8,0,0,0" />
+                            <Button Content="粘贴" Style="{StaticResource GhostButton}" Command="{Binding PasteCallbackCommand}" Margin="4,0,0,0"
                                     AutomationProperties.AutomationId="PasteCallbackButton" />
-                            <Button Content="完成登录" Style="{StaticResource PrimaryButton}" Command="{Binding CompleteMicrosoftLoginCommand}" Margin="8,0,0,0" />
                             <Button Content="清空" Style="{StaticResource GhostButton}" Command="{Binding ClearCallbackCommand}" Margin="4,0,0,0" />
                         </StackPanel>
 
                         <TextBlock Text="{Binding MicrosoftCodeHint}" Style="{StaticResource CaptionText}"
                                    TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource AccentBrush}"
+                                   AutomationProperties.AutomationId="MicrosoftCodeHintText"
                                    Visibility="{Binding MicrosoftCodeHint, Converter={StaticResource StringToVisibility}}" />
 
                         <TextBlock Text="{Binding MicrosoftStatus}" Style="{StaticResource CaptionText}"
                                    TextWrapping="Wrap" Margin="0,8,0,0"
+                                   AutomationProperties.AutomationId="MicrosoftStatusText"
                                    Visibility="{Binding MicrosoftStatus, Converter={StaticResource StringToVisibility}}" />
                     </StackPanel>
                 </Border>

@@ -34,10 +34,81 @@ public sealed class MicrosoftAuthOptions
     public TimeSpan ExpirySafetyMargin { get; set; } = TimeSpan.FromMinutes(2);
 }
 
-public sealed class MicrosoftAuthException(string message, string? errorCode = null, Exception? inner = null)
-    : Exception(message, inner)
+/// <summary>
+/// Authentication failure carrying the OAuth error identifier so callers can react correctly
+/// (for example "the authorization code expired, a retry with the same code can never work").
+/// </summary>
+public sealed class MicrosoftAuthException(
+    string message,
+    string? errorCode = null,
+    string? errorDescription = null,
+    Exception? inner = null) : Exception(message, inner)
 {
+    /// <summary>OAuth error identifier such as <c>invalid_grant</c>, or an internal marker.</summary>
     public string? ErrorCode { get; } = errorCode;
+
+    /// <summary>Provider supplied description, already decoded and safe to show.</summary>
+    public string? ErrorDescription { get; } = errorDescription;
+
+    /// <summary>
+    /// True when the provider rejected the authorization code itself (expired, already used or
+    /// malformed). Retrying with the same code is pointless — the user must log in again.
+    /// </summary>
+    public bool IsAuthorizationCodeRejected =>
+        string.Equals(ErrorCode, "invalid_grant", StringComparison.OrdinalIgnoreCase)
+        && (ErrorDescription ?? string.Empty).Contains("code", StringComparison.OrdinalIgnoreCase);
+}
+
+/// <summary>
+/// Turns an authentication failure into an actionable message.
+///
+/// The important case is <c>invalid_grant</c> on the authorization code: an OAuth code is
+/// single use and expires within minutes, so a retry with the same code can never succeed. The
+/// user must be told to log in again instead of clicking "finish" repeatedly.
+/// </summary>
+public static class MicrosoftAuthMessages
+{
+    public static string Describe(MicrosoftAuthException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        if (exception.IsAuthorizationCodeRejected)
+        {
+            return "登录已超时：授权码只能使用一次且只有几分钟有效期。\n"
+                   + "请重新点击「在浏览器中登录」，登录完成后立刻点「从剪贴板登录」（或在输入框里粘贴回调链接）。";
+        }
+
+        return exception.ErrorCode?.ToLowerInvariant() switch
+        {
+            "invalid_client" =>
+                "微软不接受当前应用标识（invalid_client）。\n"
+                + "如果你在「设置 → 微软登录」里填过自定义客户端 ID，请确认它允许此类登录流程，或清空后重试。",
+
+            "invalid_request" =>
+                "登录请求被微软拒绝（invalid_request）：通常是回调地址或权限范围不匹配。\n"
+                + "请清空「设置 → 微软登录」中的自定义客户端 ID 后重试。",
+
+            "unauthorized_client" =>
+                "该应用未被授权使用此登录方式（unauthorized_client）。\n"
+                + "请使用默认客户端 ID，或在 Azure 中为你的应用启用对应的重定向地址。",
+
+            "temporarily_unavailable" or "http_429" or "http_500" or "http_502" or "http_503" or "http_504" =>
+                "微软登录服务暂时不可用，请稍等片刻后重试。",
+
+            "not_entitled" => "该 Microsoft 账户未拥有 Minecraft: Java Edition，无法启动正版游戏。",
+
+            "no_refresh_token" => "该账户没有可用的刷新令牌，需要重新登录一次。",
+
+            "xbl_failed" or "xbl_invalid" or "xsts_invalid" =>
+                "Xbox Live 认证未通过。请确认该微软账户已创建 Xbox 档案（可在 xbox.com 登录一次），"
+                + "并检查账户地区与年龄限制。",
+
+            "profile_failed" or "profile_invalid" =>
+                "已取得令牌，但读取 Minecraft 档案失败，请稍后重试。",
+
+            _ => exception.Message,
+        };
+    }
 }
 
 /// <summary>
@@ -266,10 +337,13 @@ public sealed class MicrosoftAuthService
 
         if (!response.IsSuccessStatusCode)
         {
-            var error = TryReadError(body);
+            var (error, description) = ReadErrorParts(body);
+            var detail = string.IsNullOrWhiteSpace(description) ? error : $"{error}: {description}";
+
             throw new MicrosoftAuthException(
-                $"微软登录失败: {error ?? $"HTTP {(int)response.StatusCode}"}",
-                error,
+                $"微软登录失败: {detail ?? $"HTTP {(int)response.StatusCode}"}",
+                error ?? $"http_{(int)response.StatusCode}",
+                description,
                 new HttpRequestException($"HTTP {(int)response.StatusCode}"));
         }
 
@@ -421,20 +495,30 @@ public sealed class MicrosoftAuthService
 
     private static string? TryReadError(string body)
     {
+        var (error, description) = ReadErrorParts(body);
+        if (error is null) return null;
+
+        return string.IsNullOrWhiteSpace(description) ? error : $"{error}: {description}";
+    }
+
+    /// <summary>Splits an OAuth error body into its identifier and human readable description.</summary>
+    private static (string? Error, string? Description) ReadErrorParts(string body)
+    {
         try
         {
             using var document = JsonDocument.Parse(body);
-            if (document.RootElement.TryGetProperty("error", out var error))
-            {
-                var description = document.RootElement.TryGetProperty("error_description", out var d) ? d.GetString() : null;
-                return string.IsNullOrWhiteSpace(description) ? error.ToString() : $"{error}: {description}";
-            }
+            if (!document.RootElement.TryGetProperty("error", out var error)) return (null, null);
+
+            var description = document.RootElement.TryGetProperty("error_description", out var d)
+                ? d.GetString()?.Replace('+', ' ')
+                : null;
+
+            return (error.ToString(), description);
         }
         catch (JsonException)
         {
+            return (null, null);
         }
-
-        return null;
     }
 
     private static long? TryReadXerr(string body)

@@ -181,6 +181,12 @@ installer 还要求目标目录「看起来像一个 Minecraft 安装」，否�
 - **微软登录**：OAuth 2.0 授权码 → Xbox Live 用户令牌 → XSTS → Minecraft 服务令牌 → 档案。
   XSTS 的 `XErr` 错误码会翻译成可操作的中文提示（无 Xbox 档案、地区不支持、需要成人验证、儿童账户）；
   refresh token 可换取新的成套令牌。
+- **授权码时效处理**：OAuth 授权码**只能用一次且有效期只有几分钟**。因此：
+  - 点击「在浏览器中登录」后，UI 每秒侦测剪贴板（最长 4 分钟），一发现回调链接就立即提交；
+  - 同时提供一键「从剪贴板登录」，把「读取 + 提交」合并为一次点击；
+  - 已提交过的授权码会被本地记住，重复提交直接拒绝，而不是让微软回一个 `invalid_grant`；
+  - `invalid_grant`（过期/已用）会清空失效输入并提示重新登录，其它 OAuth 错误
+    （`invalid_client`、`temporarily_unavailable`、`not_entitled`…）各有专门文案。
 - **令牌落盘加密**：`Auth/AccountStore.cs` 用 Windows **DPAPI**（当前用户范围）加密
   access/refresh token，并在密文前加 `ORION1` 魔数避免把明文误当密文。
   测试会断言磁盘文件里**不包含**明文令牌。

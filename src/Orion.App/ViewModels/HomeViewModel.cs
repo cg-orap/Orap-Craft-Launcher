@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Orion.App.Mvvm;
 using Orion.Core.Auth;
 using Orion.Core.Diagnostics;
@@ -28,6 +29,17 @@ public sealed class HomeViewModel : ObservableObject
     private string _microsoftCodeHint = "";
     private GameSession? _session;
 
+    /// <summary>
+    /// OAuth authorization codes are single use and short lived. Remembering the ones we already
+    /// sent lets us refuse a pointless retry (which always fails with "code has expired") and
+    /// tell the user to log in again instead.
+    /// </summary>
+    private readonly HashSet<string> _consumedCodes = new(StringComparer.Ordinal);
+
+    /// <summary>Polls the clipboard while a login is in progress so the code is used immediately.</summary>
+    private DispatcherTimer? _clipboardWatch;
+    private DateTimeOffset _clipboardWatchDeadline;
+
     public HomeViewModel(MainViewModel main)
     {
         _main = main;
@@ -42,6 +54,11 @@ public sealed class HomeViewModel : ObservableObject
             () => MicrosoftAuthService.TryExtractCode(MicrosoftCallback) is not null);
         CopyLoginLinkCommand = new RelayCommand(CopyLoginLink, () => MicrosoftLoginUrl.Length > 0);
         PasteCallbackCommand = new RelayCommand(PasteCallbackFromClipboard);
+
+        // Deliberately no CanExecute predicate: the availability depends on clipboard content,
+        // which we cannot observe, so a disabled button would stay disabled forever. The command
+        // explains the problem itself when there is nothing usable in the clipboard.
+        LoginFromClipboardCommand = new AsyncRelayCommand(LoginFromClipboardAsync);
         ClearCallbackCommand = new RelayCommand(ClearCallback);
         RefreshTokenCommand = new AsyncRelayCommand(RefreshTokenAsync, () => _main.CurrentAccount?.Type == AccountType.Microsoft);
         OpenGameFolderCommand = new RelayCommand(OpenGameFolder);
@@ -56,6 +73,7 @@ public sealed class HomeViewModel : ObservableObject
     public ICommand CompleteMicrosoftLoginCommand { get; }
     public ICommand CopyLoginLinkCommand { get; }
     public ICommand PasteCallbackCommand { get; }
+    public ICommand LoginFromClipboardCommand { get; }
     public ICommand ClearCallbackCommand { get; }
     public ICommand RefreshTokenCommand { get; }
     public ICommand OpenGameFolderCommand { get; }
@@ -439,18 +457,73 @@ public sealed class HomeViewModel : ObservableObject
         try
         {
             Process.Start(new ProcessStartInfo(MicrosoftLoginUrl) { UseShellExecute = true });
-            MicrosoftStatus = "已在浏览器中打开微软登录页。登录后浏览器会跳转到一个（可能显示“无法访问”的）页面，"
-                              + "请把地址栏里的整段链接复制下来，粘贴到下方输入框。";
+            MicrosoftStatus = "已在浏览器中打开微软登录页。登录完成后**自动**读取剪贴板即可——"
+                              + "请把浏览器地址栏里的整段链接复制下来（或在回调页复制授权码），启动器会立即尝试登录。";
         }
         catch (Exception ex)
         {
             // Keep the link available: the user can copy it into any browser manually.
             MicrosoftStatus = $"无法自动打开浏览器（{ex.Message}）。\n"
-                              + "请点击“复制登录链接”，粘贴到浏览器地址栏打开；登录完成后，再把回调链接粘贴回来。";
+                              + "请点击“复制登录链接”，粘贴到浏览器地址栏打开；登录完成后，再把回调链接复制回来。";
             AppLog.Warn("auth", "browser-launch-failed", ("error", ex.Message));
         }
 
+        // Authorization codes live for a few minutes only: watch the clipboard so the code is
+        // used the moment the user copies it, instead of waiting for another click.
+        StartClipboardWatch();
         UpdateCodeHint();
+    }
+
+    /// <summary>Polls the clipboard (on the UI thread, which owns the STA clipboard) after a login starts.</summary>
+    private void StartClipboardWatch()
+    {
+        StopClipboardWatch();
+
+        _clipboardWatchDeadline = DateTimeOffset.UtcNow.AddMinutes(4);
+        _clipboardWatch = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _clipboardWatch.Tick += OnClipboardWatchTick;
+        _clipboardWatch.Start();
+    }
+
+    private void StopClipboardWatch()
+    {
+        if (_clipboardWatch is null) return;
+
+        _clipboardWatch.Stop();
+        _clipboardWatch.Tick -= OnClipboardWatchTick;
+        _clipboardWatch = null;
+    }
+
+    private void OnClipboardWatchTick(object? sender, EventArgs e)
+    {
+        if (DateTimeOffset.UtcNow > _clipboardWatchDeadline)
+        {
+            StopClipboardWatch();
+            return;
+        }
+
+        // While the token exchange runs we must not start a second one.
+        if (IsMicrosoftLoginBusy) return;
+
+        var text = TryGetClipboardText();
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var trimmed = text.Trim();
+
+        // Ignore our own "copy login link" content and plain error callbacks.
+        if (string.Equals(trimmed, MicrosoftLoginUrl, StringComparison.Ordinal)) return;
+        if (MicrosoftAuthService.TryGetAuthorizationError(trimmed) is not null) return;
+
+        var code = MicrosoftAuthService.TryExtractCode(trimmed);
+        if (code is null || _consumedCodes.Contains(code)) return;
+
+        if (!string.Equals(MicrosoftCallback, trimmed, StringComparison.Ordinal))
+            MicrosoftCallback = trimmed;
+
+        MicrosoftStatus = "已从剪贴板检测到登录回调，正在自动完成登录…";
+        StopClipboardWatch();
+
+        if (CompleteMicrosoftLoginCommand.CanExecute(null)) CompleteMicrosoftLoginCommand.Execute(null);
     }
 
     private void CopyLoginLink()
@@ -479,9 +552,30 @@ public sealed class HomeViewModel : ObservableObject
 
         MicrosoftCallback = text.Trim();
         MicrosoftStatus = MicrosoftAuthService.TryExtractCode(MicrosoftCallback) is not null
-            ? "已从剪贴板读取回调链接，点击“完成登录”继续。"
+            ? "已从剪贴板读取回调链接，点击“完成登录”继续（授权码仅几分钟有效，请尽快完成）。"
             : "已读取剪贴板内容，但没有识别到授权码，请确认复制的是登录后的完整回调链接。";
     }
+
+    /// <summary>One click: read the clipboard, then immediately exchange the code.</summary>
+    private async Task LoginFromClipboardAsync()
+    {
+        var text = TryGetClipboardText();
+
+        if (!string.IsNullOrWhiteSpace(text) && MicrosoftAuthService.TryExtractCode(text) is not null)
+        {
+            MicrosoftCallback = text.Trim();
+        }
+        else if (MicrosoftAuthService.TryExtractCode(MicrosoftCallback) is null)
+        {
+            MicrosoftStatus = "剪贴板里没有可用的登录回调。请先在浏览器完成登录，再复制地址栏里的整段链接。";
+            return;
+        }
+
+        StopClipboardWatch();
+        await CompleteMicrosoftLoginAsync().ConfigureAwait(true);
+    }
+
+    private bool IsMicrosoftLoginBusy => CompleteMicrosoftLoginCommand is AsyncRelayCommand { IsRunning: true };
 
     private void ClearCallback()
     {
@@ -509,7 +603,9 @@ public sealed class HomeViewModel : ObservableObject
         if (code is not null)
         {
             var preview = code.Length <= 14 ? code : code[..14] + "…";
-            MicrosoftCodeHint = $"已识别授权码：{preview}（共 {code.Length} 个字符），可以完成登录。";
+            MicrosoftCodeHint = _consumedCodes.Contains(code)
+                ? "该授权码已经使用过或已过期（授权码只能使用一次），请重新登录。"
+                : $"已识别授权码：{preview}（共 {code.Length} 个字符）。授权码仅几分钟有效，请立即完成登录。";
             return;
         }
 
@@ -568,6 +664,16 @@ public sealed class HomeViewModel : ObservableObject
             return;
         }
 
+        // An OAuth code works exactly once. Resending a used or expired one would only produce
+        // "invalid_grant ... The code has expired", so refuse early with a clear instruction.
+        if (!_consumedCodes.Add(code))
+        {
+            MicrosoftStatus = "这个授权码已经尝试过了。授权码只能使用一次，请重新点击“在浏览器中登录”。";
+            MicrosoftCallback = "";
+            UpdateCodeHint();
+            return;
+        }
+
         MicrosoftStatus = "正在与微软账户服务交换令牌…";
 
         try
@@ -583,18 +689,38 @@ public sealed class HomeViewModel : ObservableObject
             await _main.ReloadAccountsAsync().ConfigureAwait(true);
             _main.CurrentAccount = _main.Accounts.FirstOrDefault(a => string.Equals(a.Uuid, account.Uuid, StringComparison.OrdinalIgnoreCase));
 
+            StopClipboardWatch();
             MicrosoftCallback = "";
             MicrosoftLoginUrl = "";
             MicrosoftStatus = $"登录成功: {account.Username}";
+            MicrosoftCodeHint = "";
             LaunchStatus = $"微软账户 {account.Username} 已登录。";
+            _main.LogsPage.AppendSystem($"微软账户 {account.Username} 登录成功");
         }
         catch (MicrosoftAuthException ex)
         {
-            MicrosoftStatus = ex.Message;
+            AppLog.Warn("auth", "microsoft-login-rejected",
+                ("code", ex.ErrorCode ?? "unknown"),
+                ("description", ex.ErrorDescription ?? "none"));
+
+            MicrosoftStatus = MicrosoftAuthMessages.Describe(ex);
+
+            // When the code itself was rejected it can never be reused; clear it so the next
+            // attempt starts from a fresh login instead of failing again.
+            if (ex.IsAuthorizationCodeRejected)
+            {
+                StopClipboardWatch();
+                MicrosoftCallback = "";
+                MicrosoftLoginUrl = "";
+                MicrosoftCodeHint = "";
+            }
         }
         catch (Exception ex)
         {
-            MicrosoftStatus = "登录失败: " + ex.Message;
+            // Network problems are retryable, but the code is still single use: keep it visible
+            // and tell the user to log in again rather than promise a retry.
+            MicrosoftStatus = "登录过程中出现错误: " + ex.Message
+                              + "\n如果授权码还没有被微软处理过，可以立即重试；否则请重新登录。";
             AppLog.Error("ui", "microsoft-login-failed", ex);
         }
     }
