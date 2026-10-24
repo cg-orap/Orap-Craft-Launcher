@@ -1,0 +1,109 @@
+<UserControl x:Class="Orion.App.Views.VersionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="960">
+
+    <Grid Margin="26,22,26,22">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="340" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== version list ===================== -->
+        <Grid Grid.Column="0" Margin="0,0,20,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0">
+                <TextBlock Text="游戏下载" Style="{StaticResource TitleText}" />
+                <TextBlock Text="选择 Minecraft 版本与 Mod 加载器，安装完成后会自动创建独立实例。"
+                           Style="{StaticResource CaptionText}" Margin="0,6,0,16" />
+            </StackPanel>
+
+            <Grid Grid.Row="1" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" DisplayMemberPath="Name" />
+                <TextBox Grid.Column="1" Margin="8,0,0,0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="按版本号搜索，例如 1.21" />
+                <Button Grid.Column="2" Content="刷新清单" Style="{StaticResource SecondaryButton}"
+                        Command="{Binding RefreshCommand}" Margin="8,0,0,0" />
+            </Grid>
+
+            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="8">
+                <ListBox ItemsSource="{Binding FilteredVersions}" SelectedItem="{Binding SelectedVersion}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="10,7">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Id}" FontSize="14" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Style="{StaticResource Chip}" Margin="8,0">
+                                    <TextBlock Text="{Binding TypeLabel}" FontSize="11"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                </Border>
+                                <TextBlock Grid.Column="2" Text="{Binding ReleaseDate}" Style="{StaticResource CaptionText}"
+                                           VerticalAlignment="Center" MinWidth="76" TextAlignment="Right" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </Grid>
+
+        <!-- ===================== install panel ===================== -->
+        <StackPanel Grid.Column="1">
+            <Border Style="{StaticResource Card}" Margin="0,52,0,16">
+                <StackPanel>
+                    <TextBlock Text="安装选项" Style="{StaticResource SectionTitle}" />
+
+                    <TextBlock Text="Mod 加载器" Style="{StaticResource CaptionText}" />
+                    <ComboBox ItemsSource="{Binding Loaders}" SelectedItem="{Binding SelectedLoader}"
+                              DisplayMemberPath="Name" Margin="0,6,0,12" />
+
+                    <StackPanel Visibility="{Binding SupportsLoaderVersions, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="加载器版本" Style="{StaticResource CaptionText}" />
+                        <ComboBox ItemsSource="{Binding LoaderVersions}" SelectedItem="{Binding SelectedLoaderVersion}"
+                                  DisplayMemberPath="Version" Margin="0,6,0,12" />
+                    </StackPanel>
+
+                    <TextBlock Text="新实例名称" Style="{StaticResource CaptionText}" />
+                    <TextBox Text="{Binding InstanceName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,16" />
+
+                    <Button Content="开始安装" Style="{StaticResource PrimaryButton}" Command="{Binding InstallCommand}" Padding="18,10" />
+                    <Button Content="取消安装" Style="{StaticResource GhostButton}" Command="{Binding CancelCommand}" Margin="0,6,0,0" />
+
+                    <ProgressBar Value="{Binding Fraction, Mode=OneWay}" Maximum="1" Margin="0,14,0,0" />
+                    <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="安装说明" Style="{StaticResource SectionTitle}" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}"
+                               Text="· 原版：下载客户端 JAR、依赖库、资源文件与日志配置。" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}" Margin="0,6,0,0"
+                               Text="· Fabric / Quilt：写入加载器官方发布的版本配置，并下载其依赖。" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}" Margin="0,6,0,0"
+                               Text="· NeoForge / Forge：运行官方安装器，校验其生成的版本配置后才算安装成功。" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}" Margin="0,6,0,0"
+                               Text="· 所有下载均按元数据中的 SHA-1 校验，并支持断点续传。" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+dist/
+publish/
+*.user
+*.suo
+
+# Test / coverage output
+TestResults/
+coverage*.xml
+coverage*.json
+
+# Local run artefacts
+data/
+portable.txt
+*.mrpack
+screenshots/
+
+# Reference repositories and toolchain are kept outside the repo; never commit them
+.nuget/
+.vs/

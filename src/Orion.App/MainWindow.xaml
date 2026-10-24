@@ -1,0 +1,103 @@
+<Window x:Class="Orion.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Orion Launcher — Minecraft Java 版启动器"
+        Height="760" Width="1180" MinHeight="560" MinWidth="900"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBg}"
+        TextOptions.TextFormattingMode="Ideal"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <Grid Background="{DynamicResource WindowBg}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="212" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ======================= navigation rail ======================= -->
+        <Border Grid.Column="0" Background="{DynamicResource SurfaceBg}"
+                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="20,24,18,20">
+                    <TextBlock Text="Orion Launcher" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="Minecraft Java 版" Style="{StaticResource CaptionText}" Margin="0,4,0,0" />
+                </StackPanel>
+
+                <Border DockPanel.Dock="Bottom" Margin="12,8,12,14" Padding="12"
+                        Background="{DynamicResource SurfaceAltBg}" CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock Text="{Binding AccountDisplay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding AccountDetail}" Style="{StaticResource CaptionText}"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <ListBox ItemsSource="{Binding NavItems}"
+                         SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
+                         Background="Transparent" BorderThickness="0" Margin="8,0,8,0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}" Margin="12,7" FontSize="13.5" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- ======================= page host ======================= -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <ContentControl Grid.Row="0" Content="{Binding CurrentPage}" />
+
+            <!-- status bar -->
+            <Border Grid.Row="1" Background="{DynamicResource SurfaceBg}"
+                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
+                    Padding="18,9">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Activities.IsBusy}" Value="True">
+                                            <Setter Property="Fill" Value="{DynamicResource WarningBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Text="{Binding Activities.Status}" Style="{StaticResource CaptionText}" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1" Text="{Binding VersionStatus}" Style="{StaticResource CaptionText}" />
+                </Grid>
+            </Border>
+
+            <!-- initialisation overlay -->
+            <Border Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource WindowBg}"
+                    Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="Orion Launcher" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="正在初始化…" Style="{StaticResource CaptionText}" Margin="0,10,0,0" HorizontalAlignment="Center" />
+                    <ProgressBar IsIndeterminate="True" Width="240" Margin="0,18,0,0" Height="4" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

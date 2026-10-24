@@ -1,0 +1,134 @@
+using System.Windows;
+using System.Windows.Threading;
+using Orion.App.ViewModels;
+using Orion.Core;
+using Orion.Core.Diagnostics;
+
+namespace Orion.App;
+
+/// <summary>
+/// Application entry point.
+///
+/// Startup is explicit (no <c>StartupUri</c>) because the launcher has to build its core
+/// context and load accounts and instances before the first window is useful.
+/// </summary>
+public partial class App : Application
+{
+    private LauncherContext? _context;
+
+    public static MainViewModel? Shell { get; private set; }
+
+    protected override async void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+
+        try
+        {
+            // "--root <dir>" lets a user (or a test) pin the data directory explicitly.
+            var rootIndex = Array.FindIndex(e.Args, a => a.Equals("--root", StringComparison.OrdinalIgnoreCase));
+            var rootOverride = rootIndex >= 0 && rootIndex + 1 < e.Args.Length ? e.Args[rootIndex + 1] : null;
+
+            _context = LauncherContext.Create(rootOverride);
+
+            var window = new MainWindow();
+            MainWindow = window;
+            Services.WindowPlacement.FitToMonitor(window);
+
+            var viewModel = new MainViewModel(_context);
+            Shell = viewModel;
+
+            ApplyTheme(_context.Settings.Theme);
+
+            window.DataContext = viewModel;
+            window.Show();
+
+            await viewModel.InitializeAsync().ConfigureAwait(true);
+
+            // Deep link: "OrionLauncher.exe --page versions" opens a page directly.
+            var pageIndex = Array.FindIndex(e.Args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
+            if (pageIndex >= 0 && pageIndex + 1 < e.Args.Length)
+            {
+                viewModel.Navigate(e.Args[pageIndex + 1]);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("app", "startup-failed", ex);
+            MessageBox.Show($"启动器初始化失败：{ex.Message}\n\n详细信息已写入日志。",
+                "Orion Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// Fits the window into the current monitor's work area.
+    ///
+    /// The default size is expressed in device independent pixels, so on a 150% scaled small
+    /// screen it can be wider than the desktop. The check is repeated once the window is loaded
+    /// because <see cref="SystemParameters.WorkArea"/> is only DPI-correct after the window has
+    /// a monitor/DPI context.
+    /// </summary>
+    private static void ClampToWorkingArea(Window window)
+    {
+        static void Fit(Window w)
+        {
+            var area = SystemParameters.WorkArea;
+            var maxWidth = Math.Max(720, area.Width - 16);
+            var maxHeight = Math.Max(520, area.Height - 16);
+
+            if (w.Width > maxWidth) w.Width = maxWidth;
+            if (w.Height > maxHeight) w.Height = maxHeight;
+
+            w.MinWidth = Math.Min(w.MinWidth, maxWidth);
+            w.MinHeight = Math.Min(w.MinHeight, maxHeight);
+
+            // Re-centre: a window that was centred while still too large can sit off-screen.
+            if (w.Left + w.Width > area.Right) w.Left = Math.Max(area.Left, area.Right - w.Width);
+            if (w.Top + w.Height > area.Bottom) w.Top = Math.Max(area.Top, area.Bottom - w.Height);
+            if (w.Left < area.Left) w.Left = area.Left;
+            if (w.Top < area.Top) w.Top = area.Top;
+        }
+
+        Fit(window);
+        window.Loaded += (_, _) => Fit(window);
+    }
+
+    /// <summary>Swaps the palette resource dictionary at runtime (dark / light).</summary>
+    public static void ApplyTheme(string theme)
+    {
+        var app = Current;
+        if (app is null) return;
+
+        var fileName = string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase) ? "Light.xaml" : "Dark.xaml";
+        var dictionaries = app.Resources.MergedDictionaries;
+
+        var palette = dictionaries.FirstOrDefault(d =>
+            d.Source is not null &&
+            (d.Source.OriginalString.EndsWith("Dark.xaml", StringComparison.OrdinalIgnoreCase) ||
+             d.Source.OriginalString.EndsWith("Light.xaml", StringComparison.OrdinalIgnoreCase)));
+
+        if (palette?.Source is not null && palette.Source.OriginalString.EndsWith(fileName, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var replacement = new ResourceDictionary { Source = new Uri("Themes/" + fileName, UriKind.Relative) };
+
+        if (palette is not null) dictionaries[dictionaries.IndexOf(palette)] = replacement;
+        else dictionaries.Insert(0, replacement);
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        AppLog.Error("app", "unhandled-ui-exception", e.Exception);
+        MessageBox.Show($"发生未处理的错误：{e.Exception.Message}\n\n日志目录: {AppLog.LogDirectory}",
+            "Orion Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
+        e.Handled = true;
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _context?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        base.OnExit(e);
+    }
+}
