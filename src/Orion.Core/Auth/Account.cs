@@ -117,7 +117,7 @@ public static class ProtectedData
         try
         {
             input = DataBlob.FromBytes(data);
-            if (!CryptProtectData(ref input, "Orion Launcher credentials", IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, ref output))
+            if (!CryptProtectData(ref input, "Orap Craft Launcher credentials", IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, ref output))
                 throw new CryptographicException(Marshal.GetLastWin32Error());
 
             return output.ToBytes();

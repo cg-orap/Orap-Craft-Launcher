@@ -140,14 +140,14 @@ public sealed class LoopbackAuthListener : IAsyncDisposable
         var ok = parameters.ContainsKey("code");
         var title = ok ? "登录成功" : "登录未完成";
         var detail = ok
-            ? "授权信息已发送给 Orion Launcher，请返回启动器窗口。"
+            ? "授权信息已发送给 Orap Craft Launcher，请返回启动器窗口。"
             : parameters.TryGetValue("error_description", out var description)
                 ? description
                 : "没有收到授权码，请回到启动器重试。";
 
         var html = $$"""
             <!doctype html>
-            <html lang="zh-CN"><head><meta charset="utf-8"><title>Orion Launcher · {{title}}</title>
+            <html lang="zh-CN"><head><meta charset="utf-8"><title>Orap Craft Launcher · {{title}}</title>
             <style>
               body { font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; background:#10131a; color:#e9edf5;
                      display:flex; align-items:center; justify-content:center; height:100vh; margin:0 }

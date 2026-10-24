@@ -21,8 +21,8 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0">
-                <TextBlock Text="实例管理" Style="{StaticResource TitleText}" />
-                <TextBlock Text="每个实例拥有独立的游戏目录（存档、Mod、配置互不影响）。"
+                <TextBlock Text="版本管理" Style="{StaticResource TitleText}" />
+                <TextBlock Text="每个版本拥有独立的游戏目录（存档、Mod、配置互不影响）。"
                            Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,16" />
             </StackPanel>
 
@@ -42,11 +42,11 @@
 
             <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,14,0,0">
                 <StackPanel>
-                    <TextBlock Text="新建实例" Style="{StaticResource SectionTitle}" />
-                    <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" ToolTip="实例名称（可留空）" />
+                    <TextBlock Text="新建版本" Style="{StaticResource SectionTitle}" />
+                    <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" ToolTip="版本名称（可留空）" />
                     <ComboBox ItemsSource="{Binding VersionOptions}" SelectedItem="{Binding NewVersion}" Margin="0,8,0,0" />
                     <Button Content="创建" Style="{StaticResource PrimaryButton}" Command="{Binding CreateCommand}" Margin="0,10,0,0" />
-                    <Button Content="导入 .minecraft / Prism 实例…" Style="{StaticResource SecondaryButton}" Command="{Binding ImportCommand}" Margin="0,8,0,0" />
+                    <Button Content="导入 .minecraft / Prism 版本…" Style="{StaticResource SecondaryButton}" Command="{Binding ImportCommand}" Margin="0,8,0,0" />
                     <Button Content="导入 Modrinth 整合包 (.mrpack)…" Style="{StaticResource SecondaryButton}" Command="{Binding ImportPackCommand}" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>
@@ -57,7 +57,7 @@
             <StackPanel>
                 <Border Style="{StaticResource Card}" Margin="0,52,0,16">
                     <StackPanel>
-                        <TextBlock Text="实例设置" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="版本设置" Style="{StaticResource SectionTitle}" />
                         <TextBlock Text="{Binding SelectionDetail}" Style="{StaticResource CaptionText}"
                                    TextWrapping="Wrap" Margin="0,0,0,14" />
 
@@ -111,7 +111,7 @@
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <Button Content="打开版本目录" Style="{StaticResource GhostButton}" Command="{Binding OpenVersionFolderCommand}" />
                             <Button Content="导出整合包" Style="{StaticResource SecondaryButton}" Command="{Binding ExportPackCommand}" Margin="8,0,0,0" />
-                            <Button Content="移除实例" Style="{StaticResource DangerButton}" Command="{Binding DeleteCommand}" Margin="8,0,0,0" />
+                            <Button Content="移除版本" Style="{StaticResource DangerButton}" Command="{Binding DeleteCommand}" Margin="8,0,0,0" />
                         </StackPanel>
 
                         <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,12,0,0" />
@@ -122,7 +122,7 @@
                     <StackPanel>
                         <TextBlock Text="移除策略" Style="{StaticResource SectionTitle}" />
                         <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}"
-                                   Text="移除实例时不会永久删除文件：整个实例目录会被移动到数据目录下的 trash 文件夹，可随时手动恢复。外部导入的实例只会解除注册，绝不修改原目录。" />
+                                   Text="移除版本时不会永久删除文件：整个版本目录会被移动到数据目录下的 trash 文件夹，可随时手动恢复。外部导入的版本只会解除注册，绝不修改原目录。" />
                     </StackPanel>
                 </Border>
             </StackPanel>

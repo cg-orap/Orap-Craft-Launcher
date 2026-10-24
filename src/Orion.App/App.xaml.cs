@@ -46,7 +46,7 @@ public partial class App : Application
 
             await viewModel.InitializeAsync().ConfigureAwait(true);
 
-            // Deep link: "OrionLauncher.exe --page versions" opens a page directly.
+            // Deep link: "OrapCraftLauncher.exe --page versions" opens a page directly.
             var pageIndex = Array.FindIndex(e.Args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
             if (pageIndex >= 0 && pageIndex + 1 < e.Args.Length)
             {
@@ -57,7 +57,7 @@ public partial class App : Application
         {
             AppLog.Error("app", "startup-failed", ex);
             MessageBox.Show($"启动器初始化失败：{ex.Message}\n\n详细信息已写入日志。",
-                "Orion Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
+                "Orap Craft Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }
@@ -122,7 +122,7 @@ public partial class App : Application
     {
         AppLog.Error("app", "unhandled-ui-exception", e.Exception);
         MessageBox.Show($"发生未处理的错误：{e.Exception.Message}\n\n日志目录: {AppLog.LogDirectory}",
-            "Orion Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
+            "Orap Craft Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }
 

@@ -101,7 +101,7 @@
                                 Command="{Binding SearchCommand}" Margin="8,0,0,0" />
                     </Grid>
 
-                    <TextBlock Text="搜索会按当前实例的 Minecraft 版本与加载器过滤。"
+                    <TextBlock Text="搜索会按当前版本的 Minecraft 版本与加载器过滤。"
                                Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
 
                     <ProgressBar IsIndeterminate="True" Height="3" Margin="0,10,0,0"

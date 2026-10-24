@@ -202,7 +202,7 @@ public partial class MicrosoftLoginWindow : Window
         try
         {
             var title = Browser.CoreWebView2?.DocumentTitle;
-            if (!string.IsNullOrWhiteSpace(title)) Title = $"{title} — Orion Launcher";
+            if (!string.IsNullOrWhiteSpace(title)) Title = $"{title} — Orap Craft Launcher";
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {

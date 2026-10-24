@@ -32,7 +32,7 @@ public sealed class LaunchRequest
     public string? ServerAddress { get; init; }
     public int? ServerPort { get; init; }
 
-    public string LauncherName { get; init; } = "OrionLauncher";
+    public string LauncherName { get; init; } = "OrapCraftLauncher";
     public string LauncherVersion { get; init; } = "0.1.0";
 
     public IReadOnlyDictionary<string, bool>? ExtraFeatures { get; init; }

@@ -5,7 +5,8 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <RootNamespace>Orion.App</RootNamespace>
-    <AssemblyName>OrionLauncher</AssemblyName>
+    <AssemblyName>OrapCraftLauncher</AssemblyName>
+    <Product>Orap Craft Launcher</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SatelliteResourceLanguages>en;zh-Hans</SatelliteResourceLanguages>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>

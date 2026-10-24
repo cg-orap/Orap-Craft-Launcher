@@ -61,3 +61,20 @@ public sealed class StringToVisibilityConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;
 }
+
+/// <summary>Account name → single initial used by the avatar badge.</summary>
+public sealed class InitialConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var text = (value as string ?? "").Trim();
+        if (text.Length == 0) return "?";
+
+        // Latin names look best upper-cased; CJK characters stay as they are.
+        var first = text[0];
+        return char.IsAsciiLetter(first) ? char.ToUpperInvariant(first).ToString() : first.ToString();
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}

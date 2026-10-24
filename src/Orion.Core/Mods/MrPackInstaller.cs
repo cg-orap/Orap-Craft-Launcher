@@ -331,7 +331,7 @@ public static class MrPackExporter
                 FormatVersion = 1,
                 Name = string.IsNullOrWhiteSpace(options.Name) ? instance.Name : options.Name,
                 VersionId = options.VersionId,
-                Summary = options.Summary ?? $"{instance.Name} — 由 Orion Launcher 导出",
+                Summary = options.Summary ?? $"{instance.Name} — 由 Orap Craft Launcher 导出",
                 Dependencies = { ["minecraft"] = instance.GameVersion },
             };
 

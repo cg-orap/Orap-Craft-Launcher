@@ -128,7 +128,14 @@ public sealed class LauncherContext : IAsyncDisposable
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         if (string.IsNullOrWhiteSpace(appData)) appData = baseDirectory;
 
-        return Path.Combine(appData, "OrionLauncher");
+        var current = Path.Combine(appData, "OrapCraftLauncher");
+
+        // The launcher used to be called Orion; keep reading an existing data directory so a rename
+        // never logs the user out or hides their versions. Nothing is moved or deleted.
+        var legacy = Path.Combine(appData, "OrionLauncher");
+        if (!Directory.Exists(current) && Directory.Exists(legacy)) return legacy;
+
+        return current;
     }
 
     /// <summary>Registers version roots of imported instances so their versions can be launched.</summary>

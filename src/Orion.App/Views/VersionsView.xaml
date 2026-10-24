@@ -22,7 +22,7 @@
 
             <StackPanel Grid.Row="0">
                 <TextBlock Text="游戏下载" Style="{StaticResource TitleText}" />
-                <TextBlock Text="选择 Minecraft 版本与 Mod 加载器，安装完成后会自动创建独立实例。"
+                <TextBlock Text="选择 Minecraft 版本与 Mod 加载器，安装完成后会自动创建独立版本。"
                            Style="{StaticResource CaptionText}" Margin="0,6,0,16" />
             </StackPanel>
 
@@ -80,7 +80,7 @@
                                   DisplayMemberPath="Version" Margin="0,6,0,12" />
                     </StackPanel>
 
-                    <TextBlock Text="新实例名称" Style="{StaticResource CaptionText}" />
+                    <TextBlock Text="新版本名称" Style="{StaticResource CaptionText}" />
                     <TextBox Text="{Binding InstanceName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,16" />
 
                     <Button Content="开始安装" Style="{StaticResource PrimaryButton}" Command="{Binding InstallCommand}" Padding="18,10" />

@@ -154,13 +154,13 @@ public sealed class MainViewModel : ObservableObject
 
         NavItems.AddRange(
         [
-            new NavItem("home", "首页"),
-            new NavItem("versions", "游戏下载"),
-            new NavItem("instances", "实例管理"),
-            new NavItem("mods", "Mod 管理"),
-            new NavItem("downloads", "下载管理"),
-            new NavItem("settings", "设置"),
-            new NavItem("logs", "日志"),
+            new NavItem("home", "首页", "\uE80F"),
+            new NavItem("versions", "游戏下载", "\uE896"),
+            new NavItem("instances", "版本管理", "\uE8F1"),
+            new NavItem("mods", "Mod 管理", "\uE7B8"),
+            new NavItem("downloads", "下载管理", "\uE81C"),
+            new NavItem("settings", "设置", "\uE713"),
+            new NavItem("logs", "日志", "\uE8A5"),
         ]);
 
         _selectedNavItem = NavItems[0];
@@ -273,9 +273,9 @@ public sealed class MainViewModel : ObservableObject
         _ => "离线账户（仅单机 / 局域网）",
     };
 
-    public string InstanceDisplay => CurrentInstance?.Name ?? "未选择实例";
+    public string InstanceDisplay => CurrentInstance?.Name ?? "未选择版本";
     public string InstanceDetail => CurrentInstance is null
-        ? "在实例页创建或导入一个实例"
+        ? "在版本页创建或导入一个版本"
         : $"{CurrentInstance.Subtitle} · 内存 {CurrentInstance.EffectiveMemory} MB";
 
     public string VersionStatus
@@ -373,8 +373,11 @@ public sealed class MainViewModel : ObservableObject
 }
 
 /// <summary>One entry of the left navigation rail.</summary>
-public sealed class NavItem(string key, string title)
+public sealed class NavItem(string key, string title, string glyph = "")
 {
     public string Key { get; } = key;
     public string Title { get; } = title;
+
+    /// <summary>Segoe Fluent Icons / Segoe MDL2 Assets glyph shown before the label.</summary>
+    public string Glyph { get; } = glyph;
 }

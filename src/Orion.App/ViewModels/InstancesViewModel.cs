@@ -13,7 +13,7 @@ public sealed class InstancesViewModel : ObservableObject
     private Instance? _selectedInstance;
     private string _newName = "";
     private string _newVersion = "";
-    private string _status = "选择一个实例以查看详情。";
+    private string _status = "选择一个版本以查看详情。";
     private bool _isBusy;
 
     private int _memoryMb = 4096;
@@ -76,9 +76,9 @@ public sealed class InstancesViewModel : ObservableObject
     public bool HasSelection => SelectedInstance is not null;
 
     public string SelectionDetail => SelectedInstance is null
-        ? "尚未选择实例"
+        ? "尚未选择版本"
         : $"{SelectedInstance.Subtitle}\n游戏目录: {SelectedInstance.GameDirectory}"
-          + (SelectedInstance.IsExternal ? "\n外部导入实例：不会修改或删除原目录内容。" : "");
+          + (SelectedInstance.IsExternal ? "\n外部导入版本：不会修改或删除原目录内容。" : "");
 
     public string NewName
     {
@@ -175,7 +175,7 @@ public sealed class InstancesViewModel : ObservableObject
             SelectedInstance = _main.Instances.FirstOrDefault(i => i.Id == created.Id);
             _main.CurrentInstance = SelectedInstance;
 
-            Status = $"已创建实例「{created.Name}」，游戏目录 {created.GameDirectory}";
+            Status = $"已创建版本「{created.Name}」，游戏目录 {created.GameDirectory}";
             NewName = "";
         }
         finally
@@ -191,10 +191,10 @@ public sealed class InstancesViewModel : ObservableObject
 
         var hasData = InstanceManager.HasUserData(instance.GameDirectory);
         var message = hasData
-            ? $"实例「{instance.Name}」包含存档或 Mod。\n\n删除时不会永久删除文件，而是移动到回收目录（trash），你可以手动恢复。\n\n是否继续？"
-            : $"确定要移除实例「{instance.Name}」吗？\n\n文件会被移动到回收目录，而不是永久删除。";
+            ? $"版本「{instance.Name}」包含存档或 Mod。\n\n删除时不会永久删除文件，而是移动到回收目录（trash），你可以手动恢复。\n\n是否继续？"
+            : $"确定要移除版本「{instance.Name}」吗？\n\n文件会被移动到回收目录，而不是永久删除。";
 
-        if (System.Windows.MessageBox.Show(message, "移除实例", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning)
+        if (System.Windows.MessageBox.Show(message, "移除版本", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning)
             != System.Windows.MessageBoxResult.OK)
         {
             return;
@@ -208,8 +208,8 @@ public sealed class InstancesViewModel : ObservableObject
             SelectedInstance = _main.Instances.FirstOrDefault();
 
             Status = trashPath is null
-                ? $"已移除实例「{instance.Name}」的注册信息。"
-                : $"已移除实例「{instance.Name}」，文件已移动到 {trashPath}";
+                ? $"已移除版本「{instance.Name}」的注册信息。"
+                : $"已移除版本「{instance.Name}」，文件已移动到 {trashPath}";
         }
         catch (IOException ex)
         {
@@ -238,7 +238,7 @@ public sealed class InstancesViewModel : ObservableObject
         await _main.ReloadInstancesAsync().ConfigureAwait(true);
 
         SelectedInstance = _main.Instances.FirstOrDefault(i => i.Id == instance.Id);
-        Status = "实例设置已保存。";
+        Status = "版本设置已保存。";
     }
 
     private void OpenFolder()
@@ -437,7 +437,7 @@ public sealed class InstancesViewModel : ObservableObject
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "选择要导入的 .minecraft 目录，或 Prism / MultiMC 实例目录",
+            Title = "选择要导入的 .minecraft 目录，或 Prism / MultiMC 版本目录",
             Multiselect = false,
         };
 
@@ -460,7 +460,7 @@ public sealed class InstancesViewModel : ObservableObject
             SelectedInstance = _main.Instances.FirstOrDefault(i => result.Instances.Any(r => r.Id == i.Id));
             _main.CurrentInstance = SelectedInstance;
 
-            Status = $"已从「{result.DetectedSource}」导入 {result.Instances.Count} 个实例（外部实例，不会修改原目录）。";
+            Status = $"已从「{result.DetectedSource}」导入 {result.Instances.Count} 个版本（外部版本，不会修改原目录）。";
             foreach (var warning in result.Warnings.Take(3)) Status += " " + warning;
         }
         catch (Exception ex)

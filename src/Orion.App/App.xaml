@@ -16,6 +16,7 @@
             <conv:PercentConverter x:Key="Percent" />
             <conv:BytesConverter x:Key="Bytes" />
             <conv:StringToVisibilityConverter x:Key="StringToVisibility" />
+            <conv:InitialConverter x:Key="Initial" />
 
             <!-- Implicit templates map view models onto views, so navigation stays pure MVVM. -->
             <DataTemplate DataType="{x:Type vm:HomeViewModel}">

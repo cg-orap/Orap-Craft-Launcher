@@ -82,9 +82,9 @@ public static class Program
     private static void PrintHelp()
     {
         Console.WriteLine("""
-            Orion Launcher — 命令行工具
+            Orap Craft Launcher — 命令行工具
 
-            用法: orion <命令> [选项]
+            用法: orap <命令> [选项]
 
             命令:
               java                              列出检测到的 Java 运行时
@@ -97,7 +97,7 @@ public static class Program
               selftest                          运行离线自检
 
             通用选项:
-              --root <目录>      数据根目录（默认 %APPDATA%\OrionLauncher 或 portable.txt 旁的 data）
+              --root <目录>      数据根目录（默认 %APPDATA%\OrapCraftLauncher 或 portable.txt 旁的 data）
               --mirror           使用 BMCLAPI 镜像
               --concurrency <n>  下载并发数
               --proxy <url>      代理，例如 http://127.0.0.1:7890
@@ -194,7 +194,7 @@ public static class Program
         var versionId = options.Positional.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(versionId))
         {
-            Console.Error.WriteLine("用法: orion install <版本>");
+            Console.Error.WriteLine("用法: orap install <版本>");
             return 2;
         }
 
@@ -245,7 +245,7 @@ public static class Program
         var target = options.Positional.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(target))
         {
-            Console.Error.WriteLine("用法: orion launch <版本|实例ID> [--offline 名称]");
+            Console.Error.WriteLine("用法: orap launch <版本|实例ID> [--offline 名称]");
             return 2;
         }
 
@@ -439,7 +439,7 @@ public static class Program
             var version = options.Positional.FirstOrDefault();
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version))
             {
-                Console.Error.WriteLine("用法: orion instances --create <名称> <版本>");
+                Console.Error.WriteLine("用法: orap instances --create <名称> <版本>");
                 return 2;
             }
 
@@ -490,7 +490,7 @@ public static class Program
         var path = options.Positional.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(path))
         {
-            Console.Error.WriteLine("用法: orion import <目录>");
+            Console.Error.WriteLine("用法: orap import <目录>");
             return 2;
         }
 
@@ -571,7 +571,7 @@ public static class Program
 
         if (kind is null or LoaderKind.Vanilla)
         {
-            Console.Error.WriteLine("用法: orion loaders <neoforge|forge|fabric|quilt> <Minecraft版本>");
+            Console.Error.WriteLine("用法: orap loaders <neoforge|forge|fabric|quilt> <Minecraft版本>");
             return 2;
         }
 
@@ -604,7 +604,7 @@ public static class Program
 
         if (kind is null or LoaderKind.Vanilla)
         {
-            Console.Error.WriteLine("用法: orion install-loader <neoforge|forge|fabric|quilt> <Minecraft版本> [--loader 版本] [--name 实例名]");
+            Console.Error.WriteLine("用法: orap install-loader <neoforge|forge|fabric|quilt> <Minecraft版本> [--loader 版本] [--name 实例名]");
             return 2;
         }
 
@@ -668,7 +668,7 @@ public static class Program
         var target = options.Positional.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(target))
         {
-            Console.Error.WriteLine("用法: orion mods <实例ID|游戏目录>");
+            Console.Error.WriteLine("用法: orap mods <实例ID|游戏目录>");
             return 2;
         }
 
@@ -736,7 +736,7 @@ public static class Program
         var target = options.Positional.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(target))
         {
-            Console.Error.WriteLine("用法: orion verify <版本|实例ID> [--repair]");
+            Console.Error.WriteLine("用法: orap verify <版本|实例ID> [--repair]");
             return 2;
         }
 
@@ -777,7 +777,7 @@ public static class Program
         var path = options.Positional.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
-            Console.Error.WriteLine("用法: orion pack-import <文件.mrpack> [--name 实例名]");
+            Console.Error.WriteLine("用法: orap pack-import <文件.mrpack> [--name 实例名]");
             return 2;
         }
 
@@ -813,7 +813,7 @@ public static class Program
 
         if (string.IsNullOrWhiteSpace(instanceId))
         {
-            Console.Error.WriteLine("用法: orion pack-export <实例ID> <输出.mrpack> [--saves]");
+            Console.Error.WriteLine("用法: orap pack-export <实例ID> <输出.mrpack> [--saves]");
             return 2;
         }
 

@@ -5,7 +5,7 @@ namespace Orion.Core.Net;
 /// <summary>User configurable network settings.</summary>
 public sealed class NetworkOptions
 {
-    public const string DefaultUserAgent = "OrionLauncher/0.1.0 (Minecraft: Java Edition launcher; +https://example.invalid/orion)";
+    public const string DefaultUserAgent = "OrapCraftLauncher/0.1.0 (Minecraft: Java Edition launcher; +https://example.invalid/orion)";
 
     public string UserAgent { get; set; } = DefaultUserAgent;
 

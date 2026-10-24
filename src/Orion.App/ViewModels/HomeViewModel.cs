@@ -165,10 +165,10 @@ public sealed class HomeViewModel : ObservableObject
 
     public Instance? SelectedInstance => _main.CurrentInstance;
 
-    public string InstanceTitle => _main.CurrentInstance?.Name ?? "尚未选择实例";
+    public string InstanceTitle => _main.CurrentInstance?.Name ?? "尚未选择版本";
 
     public string InstanceSubtitle => _main.CurrentInstance is null
-        ? "前往「实例管理」创建或导入一个实例"
+        ? "前往「版本管理」创建或导入一个版本"
         : $"{_main.CurrentInstance.Subtitle} · {_main.CurrentInstance.GameDirectory}";
 
     public bool IsLaunching
@@ -265,8 +265,8 @@ public sealed class HomeViewModel : ObservableObject
 
         if (instance is null)
         {
-            JavaStatus = "未选择实例";
-            InstanceStatus = "请先创建实例";
+            JavaStatus = "未选择版本";
+            InstanceStatus = "请先创建版本";
             return;
         }
 
@@ -315,7 +315,7 @@ public sealed class HomeViewModel : ObservableObject
         var instance = _main.CurrentInstance;
         if (instance is null)
         {
-            LaunchStatus = "请先在「实例管理」中创建或选择一个实例。";
+            LaunchStatus = "请先在「版本管理」中创建或选择一个版本。";
             _main.Navigate("instances");
             return;
         }

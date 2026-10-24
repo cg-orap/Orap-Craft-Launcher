@@ -1,12 +1,12 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    Reproducible build for Orion Launcher.
+    Reproducible build for Orap Craft Launcher.
 
 .DESCRIPTION
     Restores, builds, tests and publishes the launcher:
-      * GUI  -> dist\win-x64\OrionLauncher.exe        (self-contained, single file)
-      * CLI  -> dist\win-x64\cli\orion.exe            (self-contained, single file)
+      * GUI  -> dist\win-x64\OrapCraftLauncher.exe        (self-contained, single file)
+      * CLI  -> dist\win-x64\cli\orap.exe            (self-contained, single file)
 
     The script only touches this repository and a local artifact folder. It never modifies
     machine-wide configuration and never installs anything system-wide.
@@ -78,7 +78,7 @@ function Invoke-Dotnet {
 
 $script:Dotnet = Resolve-Dotnet
 $sdkVersion = & $script:Dotnet --version
-Write-Host "Orion Launcher 构建" -ForegroundColor Green
+Write-Host "Orap Craft Launcher 构建" -ForegroundColor Green
 Write-Host "  仓库:   $script:RepoRoot"
 Write-Host "  SDK:    $sdkVersion ($script:Dotnet)"
 Write-Host "  配置:   $Configuration"
@@ -124,6 +124,6 @@ $elapsed = (Get-Date) - $started
 Write-Host ''
 Write-Host ("构建完成，用时 {0:0.0} 秒。" -f $elapsed.TotalSeconds) -ForegroundColor Green
 if (-not $NoPublish) {
-    Write-Host "直接运行: $script:DistRoot\OrionLauncher.exe" -ForegroundColor Green
-    Write-Host "命令行:   $script:DistRoot\cli\orion.exe help" -ForegroundColor Green
+    Write-Host "直接运行: $script:DistRoot\OrapCraftLauncher.exe" -ForegroundColor Green
+    Write-Host "命令行:   $script:DistRoot\cli\orap.exe help" -ForegroundColor Green
 }

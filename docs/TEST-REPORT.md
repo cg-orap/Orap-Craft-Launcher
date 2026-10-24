@@ -62,7 +62,7 @@
 ### 3.2 原版 1.21.1 启动（离线账户）
 
 ```
-> orion launch 1.21.1 --offline Tester --memory 2048 --kill-after 45
+> orap launch 1.21.1 --offline Tester --memory 2048 --kill-after 45
 ```
 游戏日志（已由 log4j 格式化）关键行：
 ```
@@ -100,7 +100,7 @@
 ### 3.4 NeoForge 1.21.1 启动
 
 ```
-> orion launch neoforge-21.1.264 --offline Tester --memory 3072 --kill-after 75
+> orap launch neoforge-21.1.264 --offline Tester --memory 3072 --kill-after 75
 ```
 关键日志：
 ```
@@ -155,8 +155,8 @@ Java 21 → C:\Program Files\Java\jdk-21
 ### 3.8 发布产物
 
 ```
-dist/win-x64/OrionLauncher.exe   59.05 MB   self-contained, single-file
-dist/win-x64/cli/orion.exe        self-contained, single-file
+dist/win-x64/OrapCraftLauncher.exe   59.05 MB   self-contained, single-file
+dist/win-x64/cli/orap.exe        self-contained, single-file
 ```
 验证方式：**清空 `DOTNET_ROOT`/`DOTNET_MULTILEVEL_LOOKUP` 后直接双击运行**，
 进程正常启动、标题正确、并在空目录下自动创建完整数据目录结构
@@ -270,7 +270,7 @@ POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
 | --- | --- |
 | 本机 WebView2 运行时 | 已安装 `155.0.4283.62`（Windows 11 自带） |
 | 内嵌窗口能否打开真实登录页 | ✅ 截图为微软官方「登录 / 继续使用 Minecraft」页面 |
-| 单文件发布是否包含 WebView2 依赖 | ✅ `dist/win-x64` 只有一个 `OrionLauncher.exe`（59.6 MB），原生加载器随单文件自解压 |
+| 单文件发布是否包含 WebView2 依赖 | ✅ `dist/win-x64` 只有一个 `OrapCraftLauncher.exe`（59.6 MB），原生加载器随单文件自解压 |
 | 发布版 EXE 实测 | ✅ 窗口打开并成功导航（日志见上） |
 | 重定向拦截逻辑 | ✅ 单元测试覆盖 `IsRedirectTo` 的正例/反例（同域不同路径、仿冒路径、大小写、尾斜杠） |
 

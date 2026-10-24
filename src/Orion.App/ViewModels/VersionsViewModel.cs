@@ -364,7 +364,7 @@ public sealed class VersionsViewModel : ObservableObject
             await _main.ReloadInstancesAsync().ConfigureAwait(true);
             _main.CurrentInstance = _main.Instances.FirstOrDefault(i => i.Id == instance.Id);
 
-            Status += $" 已创建实例「{instance.Name}」，可以到首页启动。";
+            Status += $" 已创建版本「{instance.Name}」，可以到首页启动。";
             InstanceName = "";
         }
         catch (OperationCanceledException)

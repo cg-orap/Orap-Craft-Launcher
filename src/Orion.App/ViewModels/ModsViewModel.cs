@@ -64,7 +64,7 @@ public sealed class ModsViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
 
-    private string _status = "选择一个实例以管理 Mod。";
+    private string _status = "选择一个版本以管理 Mod。";
     private string _searchText = "";
     private bool _isBusy;
     private bool _isSearching;
@@ -103,7 +103,7 @@ public sealed class ModsViewModel : ObservableObject
     }
 
     public string InstanceLabel => SelectedInstance is null
-        ? "未选择实例"
+        ? "未选择版本"
         : $"{SelectedInstance.Name} · {SelectedInstance.DisplayLoader} · MC {SelectedInstance.GameVersion}";
 
     public string Status
@@ -147,7 +147,7 @@ public sealed class ModsViewModel : ObservableObject
         if (instance is null)
         {
             Mods.Clear();
-            Status = "请先创建或选择一个实例。";
+            Status = "请先创建或选择一个版本。";
             return;
         }
 
@@ -163,7 +163,7 @@ public sealed class ModsViewModel : ObservableObject
             OnPropertyChanged(nameof(IncompatibleCount));
 
             Status = Mods.Count == 0
-                ? "该实例还没有安装 Mod。"
+                ? "该版本还没有安装 Mod。"
                 : $"共 {Mods.Count} 个 Mod，{EnabledCount} 个启用" +
                   (IncompatibleCount > 0 ? $"，{IncompatibleCount} 个与当前加载器不匹配" : "");
         }
@@ -253,7 +253,7 @@ public sealed class ModsViewModel : ObservableObject
         var instance = SelectedInstance;
         if (instance is null)
         {
-            Status = "请先选择一个实例。";
+            Status = "请先选择一个版本。";
             return;
         }
 

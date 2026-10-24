@@ -1,12 +1,12 @@
-# Orion Launcher
+# Orap Craft Launcher
 
 一款从零开发的 **Minecraft: Java Edition** 启动器，面向 Windows 10/11 x64。
 它使用 Mojang/Microsoft 公开的启动协议独立实现，能够完成
 **版本获取 → 下载安装 → 身份认证 → 生成启动参数 → 启动并诊断游戏** 的完整链路，
-并支持 NeoForge / Fabric / Forge / Quilt、多实例隔离、Mod 管理与 Modrinth 整合包。
+并支持 NeoForge / Fabric / Forge / Quilt、多版本隔离、Mod 管理与 Modrinth 整合包。
 
 - **技术栈**：C# / .NET 10 + WPF（Avalonia 备选，见 [架构决策](docs/ARCHITECTURE.md)）
-- **发布形态**：self-contained、single-file `OrionLauncher.exe`（无需安装 .NET）
+- **发布形态**：self-contained、single-file `OrapCraftLauncher.exe`（无需安装 .NET）
 - **许可证**：MIT（本项目代码）；详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 - **当前版本**：0.1.0
 
@@ -40,6 +40,11 @@
 | 设备代码流 / 回环回调登录 | ✅ 已实现并测试（需自备 Azure 应用 ID） | 真实端点验证请求形状；轮询状态机与本地回调监听端到端测试 |
 | **内嵌浏览器登录（②③ 免配置）** | ✅ 已验证 | 发布版 EXE 内嵌 WebView2 打开真实微软登录页并成功导航（截图见文档） |
 | Xbox Live 失败分诊 | ✅ 已验证（真实 401 复现） | 401=旧版流程缺 Xbox 作用域、400=账号侧问题，分别给出处理路径 |
+| 术语与外观更新 | ✅ 已复核 | 「实例」统一改为「版本」（与 PCL 一致）；启动器更名为 **Orap Craft Launcher**；重做导航栏与首页布局 |
+
+> **关于改名与术语**：原「Orion Launcher」已更名为 **Orap Craft Launcher**（EXE 为
+> `OrapCraftLauncher.exe`，命令行为 `orap.exe`）。旧数据目录 `%APPDATA%\OrionLauncher`
+> 仍会被自动沿用，不会导致账户或版本丢失。界面中的「实例」一词统一改为「版本」。
 | 自动化测试 | ✅ 138 项全部通过 | `dotnet test` |
 
 > **微软登录**：默认的「**用浏览器登录**」在启动器内嵌浏览器（WebView2）中打开微软登录页，
@@ -60,7 +65,7 @@
 
 | 实例管理 | Mod 管理 |
 | --- | --- |
-| ![实例管理](docs/images/page-instances.png) | ![Mod 管理](docs/images/page-mods.png) |
+| ![版本管理](docs/images/page-instances.png) | ![Mod 管理](docs/images/page-mods.png) |
 
 | 下载管理 | 设置 |
 | --- | --- |
@@ -75,32 +80,32 @@
 ### 2.1 直接运行（推荐）
 
 1. 解压发布包（或从 `dist/win-x64/` 取文件）。
-2. 双击 `OrionLauncher.exe`。
+2. 双击 `OrapCraftLauncher.exe`。
 3. 首页右侧「添加离线账户」输入一个名字即可开始单人游戏；
    安装版本请到「游戏下载」页选择版本的加载器后点击「开始安装」。
 
-数据默认保存在 `%APPDATA%\OrionLauncher`。
+数据默认保存在 `%APPDATA%\OrapCraftLauncher`（若检测到旧的 `%APPDATA%\OrionLauncher` 会继续沿用，不会丢数据）。
 若希望绿色便携（数据跟着 EXE 走），在 EXE 同目录新建 `portable.txt`，数据会存到 `.\data`。
 
 ### 2.2 用命令行操作（也便于排障）
 
-发布包内同样提供无界面命令（`orion.exe`，或在源码目录 `dotnet run --project src/Orion.Cli`）：
+发布包内同样提供无界面命令（`orap.exe`，或在源码目录 `dotnet run --project src/Orion.Cli`）：
 
 ```text
-orion help
-orion java                                   # 列出检测到的 Java
-orion manifest --limit 10                    # 官方版本清单
-orion install 1.21.1                         # 下载安装原版
-orion loaders neoforge 1.21.1                # 查看可用的 NeoForge 版本
-orion install-loader neoforge 1.21.1 --mirror # 安装 NeoForge 并自动建实例
-orion launch 1.21.1 --offline Steve          # 启动（缺文件会自动安装）
-orion launch <实例ID> --offline Steve --memory 4096
-orion verify 1.21.1 --repair                 # 完整性校验 / 修复
-orion instances --create 我的世界 1.21.1
-orion import "C:\Users\me\.minecraft"
-orion mods <实例ID> --search sodium          # Modrinth 搜索
-orion pack-import pack.mrpack                # 导入整合包
-orion pack-export <实例ID> out.mrpack        # 导出整合包
+orap help
+orap java                                   # 列出检测到的 Java
+orap manifest --limit 10                    # 官方版本清单
+orap install 1.21.1                         # 下载安装原版
+orap loaders neoforge 1.21.1                # 查看可用的 NeoForge 版本
+orap install-loader neoforge 1.21.1 --mirror # 安装 NeoForge 并自动建实例
+orap launch 1.21.1 --offline Steve          # 启动（缺文件会自动安装）
+orap launch <实例ID> --offline Steve --memory 4096
+orap verify 1.21.1 --repair                 # 完整性校验 / 修复
+orap instances --create 我的世界 1.21.1
+orap import "C:\Users\me\.minecraft"
+orap mods <实例ID> --search sodium          # Modrinth 搜索
+orap pack-import pack.mrpack                # 导入整合包
+orap pack-export <实例ID> out.mrpack        # 导出整合包
 ```
 
 ### 2.3 从源码构建
@@ -113,8 +118,8 @@ powershell -ExecutionPolicy Bypass -File build\build.ps1
 ```
 
 产物：
-- `dist/win-x64/OrionLauncher.exe` — 自包含单文件 GUI（约 59 MB）
-- `dist/win-x64/cli/orion.exe` — 自包含单文件命令行
+- `dist/win-x64/OrapCraftLauncher.exe` — 自包含单文件 GUI（约 59 MB）
+- `dist/win-x64/cli/orap.exe` — 自包含单文件命令行
 
 常用参数：
 
@@ -141,12 +146,12 @@ src/Orion.Core/     启动核心（无 UI 依赖，可单独复用）
   Java/             Java 检测与版本匹配
 src/Orion.App/      WPF 桌面界面（MVVM，7 个页面）
 src/Orion.Cli/      无界面命令行
-tests/Orion.Tests/  84 项自动化测试
+tests/Orion.Tests/  138 项自动化测试
 docs/               架构、许可证审计、测试报告、路线图
 build/              构建与验证脚本
 ```
 
-数据目录（默认 `%APPDATA%\OrionLauncher`）：
+数据目录（默认 `%APPDATA%\OrapCraftLauncher`）：
 
 ```text
 assets/       共享资源（objects/ indexes/ log_configs/）

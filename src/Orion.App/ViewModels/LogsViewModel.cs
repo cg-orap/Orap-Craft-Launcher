@@ -24,7 +24,7 @@ public sealed class LogsViewModel : ObservableObject
         OpenGameLogCommand = new RelayCommand(() => { if (!string.IsNullOrWhiteSpace(GameLogPath)) Open(Path.GetDirectoryName(GameLogPath)!); });
         CopyCommand = new RelayCommand(Copy);
 
-        LauncherLines.Add("Orion Launcher 日志面板");
+        LauncherLines.Add("Orap Craft Launcher 日志面板");
         LauncherLines.Add("========================");
     }
 
