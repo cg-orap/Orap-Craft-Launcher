@@ -161,7 +161,6 @@ public sealed class MainViewModel : ObservableObject
         [
             new NavItem("home", "首页", "\uE80F"),
             new NavItem("catalog", "下载中心", "\uE896"),
-            new NavItem("instances", "版本管理", "\uE8F1"),
             new NavItem("mods", "Mod 管理", "\uE7B8"),
             new NavItem("downloads", "下载管理", "\uE81C"),
             new NavItem("settings", "设置", "\uE713"),
@@ -399,15 +398,17 @@ public sealed class MainViewModel : ObservableObject
 
     private void NavigateCore(string key)
     {
-        var item = NavItems.FirstOrDefault(n => n.Key == key) ?? NavItems[0];
-        if (!ReferenceEquals(_selectedNavItem, item))
+        // Sub-pages such as "version-picker" are not entries of the rail: only move the highlight
+        // when the key really is a rail entry, otherwise the page would silently stay on 首页.
+        var item = NavItems.FirstOrDefault(n => n.Key == key);
+        if (item is not null && !ReferenceEquals(_selectedNavItem, item))
         {
             _selectedNavItem = item;
             OnPropertyChanged(nameof(SelectedNavItem));
         }
 
-        NavKey = item.Key;
-        CurrentPage = item.Key switch
+        NavKey = item?.Key ?? key;
+        CurrentPage = key switch
         {
             "versions" => CatalogPage,   // legacy route: versions now live in the download centre
             "catalog" => CatalogPage,
@@ -420,11 +421,11 @@ public sealed class MainViewModel : ObservableObject
             _ => Home,
         };
 
-        if (item.Key == "catalog") _ = CatalogPage.InitializeAsync();
-        if (item.Key == "version-picker") VersionPickerPage.Refresh();
-        if (item.Key == "instances") _ = InstancesPage.LoadAsync();
-        if (item.Key == "mods") _ = ModsPage.LoadModsAsync();
-        if (item.Key == "home") _ = Home.RefreshAsync();
+        if (key == "catalog") _ = CatalogPage.InitializeAsync();
+        if (key == "version-picker") VersionPickerPage.Refresh();
+        if (key == "instances") _ = InstancesPage.LoadAsync();
+        if (key == "mods") _ = ModsPage.LoadModsAsync();
+        if (key == "home") _ = Home.RefreshAsync();
     }
 
     /// <summary>Loads accounts, instances, Java runtimes and version metadata into the shell.</summary>

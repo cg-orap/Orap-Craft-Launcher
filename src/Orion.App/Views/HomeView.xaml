@@ -10,11 +10,11 @@
         <Style x:Key="LaunchHeroButton" TargetType="Button">
             <Setter Property="Foreground" Value="#FFFFFF" />
             <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
-            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontSize" Value="21" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="MinWidth" Value="264" />
-            <Setter Property="Padding" Value="46,20" />
+            <Setter Property="MinWidth" Value="280" />
+            <Setter Property="Padding" Value="40,14" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -58,19 +58,19 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="1.15*" />
+                <RowDefinition Height="1.7*" />
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">
             <!-- PCL-style launch button: the action in large text, the target version underneath -->
-            <Button Style="{StaticResource LaunchHeroButton}"
+            <Button Style="{StaticResource LaunchHeroButton}" Width="360" Height="88"
                     Command="{Binding LaunchCommand}"
                     AutomationProperties.AutomationId="LaunchButton">
                 <StackPanel HorizontalAlignment="Center">
                     <TextBlock Text="{Binding LaunchButtonText}" HorizontalAlignment="Center"
-                               FontSize="22" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                               FontSize="23" FontWeight="SemiBold" Foreground="#FFFFFF" />
                     <TextBlock Text="{Binding LaunchVersionLine}" HorizontalAlignment="Center"
-                               FontSize="12" Margin="0,5,0,0" MaxWidth="300"
+                               FontSize="12" Margin="0,6,0,0" MaxWidth="320"
                                Foreground="#D9FFFFFF"
                                TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
                                AutomationProperties.AutomationId="LaunchVersionLine" />
@@ -78,7 +78,7 @@
             </Button>
 
             <!-- secondary actions, side by side like the reference launcher -->
-            <Grid Margin="0,12,0,0" HorizontalAlignment="Center" Width="300">
+            <Grid Margin="0,12,0,0" HorizontalAlignment="Center" Width="360">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />

@@ -45,7 +45,7 @@ public sealed class HomeViewModel : ObservableObject
         ChooseBackgroundCommand = new RelayCommand(ChooseBackground);
         ClearBackgroundCommand = new RelayCommand(ClearBackground, () => HasBackgroundImage);
         OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("version-picker"));
-        OpenVersionSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));
+        OpenVersionSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));   // sub-page, not a rail entry
 
         ReloadBackground();
     }
