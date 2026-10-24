@@ -165,12 +165,11 @@
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                    <Button Content="详情" Style="{StaticResource SecondaryButton}"
-                                            Command="{Binding ShowDetailsCommand}" Padding="14,7"
-                                            HorizontalAlignment="Stretch" />
                                     <Button Content="安装" Style="{StaticResource PrimaryButton}"
-                                            Command="{Binding InstallCommand}" Padding="14,7" Margin="0,6,0,0"
+                                            Command="{Binding InstallCommand}" Padding="16,7"
                                             HorizontalAlignment="Stretch" />
+                                    <TextBlock Text="点击条目查看详情" Style="{StaticResource CaptionText}"
+                                               HorizontalAlignment="Center" Margin="0,6,0,0" FontSize="10.5" />
                                 </StackPanel>
                             </Grid>
                         </DataTemplate>

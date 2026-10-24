@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Controls;
 using Orion.App.ViewModels;
 
 namespace Orion.App.Views;
@@ -26,6 +28,22 @@ public partial class CatalogView : UserControl
     private CatalogViewModel? ViewModel => DataContext as CatalogViewModel;
 
     /// <summary>Keeps one radio checked without firing SearchAsync twice during construction.</summary>
+    /// <summary>
+    /// A left click anywhere on a result row opens its detail page (the row is the affordance, no
+    /// separate 详情 button). Clicks on the 安装 button are handled by the button and never bubble here.
+    /// </summary>
+    private async void OnResultClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel is not { } vm) return;
+        if (e.OriginalSource is not DependencyObject source) return;
+
+        var container = ItemsControl.ContainerFromElement((ItemsControl)sender, source) as ListBoxItem;
+        if (container?.DataContext is not CatalogRow row) return;
+
+        e.Handled = true;
+        await vm.ShowDetailsAsync(row).ConfigureAwait(true);
+    }
+
     private void OnKindChecked(object sender, RoutedEventArgs e)
     {
         if (sender is RadioButton { Tag: CatalogKindOption kind } && ViewModel is { } vm)

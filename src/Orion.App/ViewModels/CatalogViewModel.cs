@@ -85,6 +85,16 @@ public sealed class CatalogViewModel : ObservableObject
     private CatalogDetailViewModel? _detail;
     private bool _detailOpen;
 
+    // A search for the previous tab must never block the next one, and revisiting a tab should not
+    // hit the network again: cancel the in-flight request and reuse cached hits.
+    private CancellationTokenSource? _searchCts;
+    private int _searchSeq;
+    private readonly Dictionary<string, (IReadOnlyList<ModrinthProject> Hits, int TotalHits)> _resultCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private string CacheKey(int page) =>
+        $"{_kind.Key}|{_category}|{SearchText.Trim()}|{page}|{_main.CurrentInstance?.GameVersion}|{_main.CurrentInstance?.Loader}";
+
     public CatalogViewModel(MainViewModel main)
     {
         _main = main;
@@ -103,7 +113,7 @@ public sealed class CatalogViewModel : ObservableObject
         SearchCommand = new AsyncRelayCommand(() => SearchAsync(0), () => !_busy);
         NextPageCommand = new AsyncRelayCommand(() => SearchAsync(_page + 1), () => !_busy && HasNextPage);
         PreviousPageCommand = new AsyncRelayCommand(() => SearchAsync(_page - 1), () => !_busy && HasPreviousPage);
-        RefreshCommand = new AsyncRelayCommand(() => SearchAsync(_page), () => !_busy);
+        RefreshCommand = new AsyncRelayCommand(() => SearchAsync(_page, forceRefresh: true), () => !_busy);
         CloseDetailCommand = new RelayCommand(CloseDetail);
     }
 
@@ -265,17 +275,37 @@ public sealed class CatalogViewModel : ObservableObject
         if (IsCatalogueTab && Results.Count == 0) await SearchAsync(0).ConfigureAwait(true);
     }
 
-    /// <summary>Runs a Modrinth search for the active tab and page.</summary>
-    public async Task SearchAsync(int page)
+    /// <summary>
+    /// Runs a Modrinth search for the active tab and page.
+    ///
+    /// Previous behaviour returned early while another search was running, so switching tabs during
+    /// a request left the new tab permanently empty. Requests are now cancellable, and a tab that was
+    /// visited before renders from cache immediately (then refreshes in the background on demand).
+    /// </summary>
+    public async Task SearchAsync(int page, bool forceRefresh = false)
     {
-        if (_busy || IsVersionsTab) return;
+        if (IsVersionsTab) return;
 
         page = Math.Clamp(page, 0, Math.Max(0, TotalPages - 1));
+        UpdateTargetInfo();
+
+        var cacheKey = CacheKey(page);
+
+        if (!forceRefresh && _resultCache.TryGetValue(cacheKey, out var cached))
+        {
+            ApplyHits(cached.Hits, cached.TotalHits, page, fromCache: true);
+            return;
+        }
+
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+        var seq = ++_searchSeq;
 
         Busy = true;
         Results.Clear();
         Status = $"正在搜索{_kind.Name}…";
-        UpdateTargetInfo();
 
         try
         {
@@ -302,50 +332,72 @@ public sealed class CatalogViewModel : ObservableObject
                 }
             }
 
-            var result = await _main.Context.Modrinth.SearchAsync(query).ConfigureAwait(true);
+            var result = await _main.Context.Modrinth.SearchAsync(query, token).ConfigureAwait(true);
 
-            _page = page;
-            _totalHits = (int)result.TotalHits;
-            RaisePaging();
+            // A newer search started while this one was in flight: drop the stale answer.
+            if (seq != _searchSeq) return;
 
-            foreach (var project in result.Hits) Results.Add(new CatalogRow(project, this, _kind));
-
-            Status = Results.Count == 0
-                ? "没有找到结果，换个关键词或分类试试。"
-                : $"共 {_totalHits:N0} 个结果，本页显示 {Results.Count} 个（每页 {PageSize} 个）。";
+            _resultCache[cacheKey] = (result.Hits, (int)result.TotalHits);
+            ApplyHits(result.Hits, (int)result.TotalHits, page, fromCache: false);
 
             await LoadIconsAsync(Results).ConfigureAwait(true);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        catch (OperationCanceledException)
         {
+            // Superseded by a newer tab/search; nothing to report.
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            if (seq != _searchSeq) return;
+
             Status = "搜索失败：" + ex.Message;
             AppLog.Warn("catalog", "search-failed", ("error", ex.Message));
         }
         finally
         {
-            Busy = false;
+            if (seq == _searchSeq) Busy = false;
         }
+    }
+
+    /// <summary>Populates the list from a result set (fresh or cached).</summary>
+    private void ApplyHits(IReadOnlyList<ModrinthProject> hits, int totalHits, int page, bool fromCache)
+    {
+        _page = page;
+        _totalHits = totalHits;
+        RaisePaging();
+
+        Results.Clear();
+        foreach (var project in hits) Results.Add(new CatalogRow(project, this, _kind));
+
+        Status = Results.Count == 0
+            ? "没有找到结果，换个关键词或分类试试。"
+            : $"共 {_totalHits:N0} 个结果，本页显示 {Results.Count} 个（每页 {PageSize} 个）"
+              + (fromCache ? "（缓存）" : "");
     }
 
     /// <summary>Downloads and caches project icons; failures simply keep the placeholder.</summary>
     private async Task LoadIconsAsync(IEnumerable<CatalogRow> rows)
     {
-        foreach (var row in rows.ToList())
+        // Icons load concurrently behind the already visible list, so browsing never waits on them.
+        using var gate = new SemaphoreSlim(6);
+        var tasks = rows.ToList().Select(async row =>
         {
             var url = row.Project.IconUrl;
-            if (string.IsNullOrWhiteSpace(url)) continue;
+            if (string.IsNullOrWhiteSpace(url)) return;
 
             if (_iconCache.TryGetValue(url, out var cached))
             {
                 row.Icon = cached;
-                continue;
+                return;
             }
 
+            await gate.WaitAsync().ConfigureAwait(true);
             try
             {
                 var bytes = await _main.Context.Http.GetByteArrayAsync(url).ConfigureAwait(true);
-                row.Icon = DecodeIcon(bytes);
-                _iconCache[url] = row.Icon;
+                var icon = DecodeIcon(bytes);
+                _iconCache[url] = icon;
+                row.Icon = icon;
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException
                                            or NotSupportedException)
@@ -353,7 +405,13 @@ public sealed class CatalogViewModel : ObservableObject
                 _iconCache[url] = null;
                 AppLog.Debug("catalog", "icon-failed", ("error", ex.Message));
             }
-        }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks).ConfigureAwait(true);
     }
 
     private static ImageSource? DecodeIcon(byte[] bytes)
