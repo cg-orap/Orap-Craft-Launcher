@@ -35,6 +35,7 @@
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="10" Margin="18,14,18,10">
             <ListBox ItemsSource="{Binding Instances}" Background="Transparent" BorderThickness="0"
+                         PreviewMouseLeftButtonUp="OnVersionClick"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      AutomationProperties.AutomationId="VersionPickerList">
                 <ListBox.ItemContainerStyle>
@@ -82,7 +83,7 @@
                                     <TextBlock Text="{Binding DisplayLoader}" FontSize="11"
                                                Foreground="{DynamicResource MutedTextBrush}" />
                                 </Border>
-                                <Button Content="选择" Style="{StaticResource PrimaryButton}" Padding="18,7"
+                                <Button Content="双击或点击此行" Style="{StaticResource GhostButton}" Padding="12,6" FontSize="11"
                                         Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                             </StackPanel>

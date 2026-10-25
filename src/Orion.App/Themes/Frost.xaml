@@ -2,9 +2,9 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Light palette: identical keys to Dark.xaml. -->
-    <Color x:Key="WindowBgColor">#FFF4F6FA</Color>
-    <Color x:Key="SurfaceBgColor">#99FFFFFF</Color>
-    <Color x:Key="SurfaceAltBgColor">#FFF0F3F9</Color>
+    <Color x:Key="WindowBgColor">#8CF4F6FA</Color>
+    <Color x:Key="SurfaceBgColor">#73FFFFFF</Color>
+    <Color x:Key="SurfaceAltBgColor">#8CF0F3F9</Color>
     <Color x:Key="SurfaceHoverColor">#FFE4EAF4</Color>
     <Color x:Key="BorderColor">#FFD8DFEA</Color>
     <Color x:Key="AccentColor">#FF2F6FE4</Color>
@@ -33,7 +33,7 @@
     <SolidColorBrush x:Key="ChipBg" Color="{StaticResource ChipBgColor}" />
 
     <!-- translucent navigation rail so a custom wallpaper shows through -->
-    <Color x:Key="NavRailColor">#E6F7F9FC</Color>
+    <Color x:Key="NavRailColor">#59F7F9FC</Color>
     <SolidColorBrush x:Key="NavRailBg" Color="{StaticResource NavRailColor}" />
     <SolidColorBrush x:Key="NavRailHover" Color="#26000000" />
     <SolidColorBrush x:Key="ScrimBrush" Color="#59000000" />

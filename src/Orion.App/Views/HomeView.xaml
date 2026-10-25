@@ -59,7 +59,7 @@
         <!-- Centre-bottom placement: the block is pushed below the vertical centre on purpose. -->
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="3.6*" />
+                <RowDefinition Height="2.7*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
