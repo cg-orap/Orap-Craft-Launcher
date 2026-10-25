@@ -59,6 +59,10 @@ public sealed class LauncherContext : IAsyncDisposable
         Modrinth = new ModrinthClient(http, new Mods.ModrinthOptions(), DownloadEngine, mirrors);
         Integrity = new IntegrityService(paths, VersionRepository, VersionResolver, DownloadEngine, mirrors);
         ModPacks = new Mods.MrPackInstaller(paths, Instances, Loaders, DownloadEngine, mirrors, InstallService);
+
+        // Declared but never constructed: the CurseForge/zip dispatch threw a
+        // NullReferenceException the first time it ran.
+        PackArchives = new Mods.PackArchiveInstaller(paths, Instances, Loaders, Importer, http);
     }
 
     public GamePaths Paths { get; }
