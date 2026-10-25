@@ -191,7 +191,7 @@
                                 </StackPanel>
 
                                 <!-- second level: the five download tabs, unfolded by clicking 下载中心 -->
-                                <ItemsControl ItemsSource="{Binding SubItems}" Margin="16,4,0,2"
+                                <ItemsControl ItemsSource="{Binding SubItems}" Margin="6,4,0,2"
                                               Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>

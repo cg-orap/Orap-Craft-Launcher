@@ -178,7 +178,7 @@ public sealed class AppBehaviourTests : IDisposable
     }
 
     [Fact]
-    public async Task RemovingInstanceMovesFilesToTrashInsteadOfDeleting()
+    public async Task RemovingInstanceSendsFilesToTheRecycleBin()
     {
         var paths = new GamePaths(_root);
         paths.EnsureBaseDirectories();
@@ -191,13 +191,14 @@ public sealed class AppBehaviourTests : IDisposable
 
         Assert.True(InstanceManager.HasUserData(instance.GameDirectory));
 
-        var trash = manager.Remove(instance, out var trashPath);
+        var recycled = manager.Remove(instance, out var reported);
 
-        Assert.NotNull(trash);
-        Assert.NotNull(trashPath);
+        // The folder leaves its location (it now lives in the Recycle Bin), so 移除 stays
+        // reversible from Explorer instead of only from a launcher-owned trash folder.
+        Assert.NotNull(recycled);
+        Assert.NotNull(reported);
         Assert.False(Directory.Exists(paths.InstanceDir(instance.Id)));
-        Assert.True(File.Exists(Path.Combine(trashPath!, "minecraft", "saves", "world", "level.dat")),
-            "User data must survive an instance removal.");
+        Assert.False(Directory.Exists(reported!), "The instance folder must no longer be in place.");
     }
 
     [Fact]

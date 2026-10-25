@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using Orion.Core.Diagnostics;
 using Orion.Core.Util;
 
+using Orion.Core.Game;
+
 namespace Orion.Core.Instances;
 
 public enum LoaderKind
@@ -195,21 +197,19 @@ public sealed class InstanceManager
             return null;
         }
 
-        var trashRoot = Path.Combine(_paths.Root, "trash");
-        Directory.CreateDirectory(trashRoot);
-
-        var destination = Path.Combine(trashRoot, $"{Path.GetFileName(directory)}-{DateTime.Now:yyyyMMdd-HHmmss}");
         try
         {
-            Directory.Move(directory, destination);
-            trashPath = destination;
-            AppLog.Info("instances", "moved-to-trash", ("id", instance.Id), ("path", destination));
-            return destination;
+            // Send the whole folder to the Windows Recycle Bin so a mis-click stays reversible from
+            // Explorer, which is what users expect from 移除.
+            Game.RecycleBin.RemoveDirectory(directory);
+            trashPath = directory;   // reported to the UI: this folder now sits in the Recycle Bin
+            AppLog.Info("instances", "recycled", ("id", instance.Id), ("path", directory));
+            return directory;
         }
         catch (IOException ex)
         {
-            AppLog.Warn("instances", "trash-failed", ("id", instance.Id), ("error", ex.Message));
-            throw new IOException("无法移除实例（可能仍被占用）。请关闭游戏后重试，文件不会被删除。", ex);
+            AppLog.Warn("instances", "recycle-failed", ("id", instance.Id), ("error", ex.Message));
+            throw new IOException("无法移除版本（可能仍被占用）。请关闭游戏后重试，文件不会被删除。", ex);
         }
     }
 

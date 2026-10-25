@@ -99,24 +99,7 @@
             </Button>
 
             <!-- secondary actions, side by side like the reference launcher -->
-            <Grid Margin="0,12,0,0" HorizontalAlignment="Center" Width="360">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Button Grid.Column="0" Content="版本选择" Style="{StaticResource SecondaryButton}"
-                        Command="{Binding OpenVersionPickerCommand}" Margin="0,0,6,0"
-                        HorizontalAlignment="Stretch" Padding="0,9"
-                        AutomationProperties.AutomationId="VersionPickerButton"
-                        ToolTip="打开版本选择页，挑一个已安装的版本" />
-
-                <Button Grid.Column="1" Content="版本设置" Style="{StaticResource SecondaryButton}"
-                        Command="{Binding OpenVersionSettingsCommand}" Margin="6,0,0,0"
-                        HorizontalAlignment="Stretch" Padding="0,9"
-                        AutomationProperties.AutomationId="VersionSettingsButton"
-                        ToolTip="在「版本管理」中调整这个版本的内存、Java 与窗口设置" />
-            </Grid>
+            
 
 
 

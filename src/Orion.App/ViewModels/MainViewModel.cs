@@ -161,7 +161,9 @@ public sealed class MainViewModel : ObservableObject
         NavItems.AddRange(
         [
             new NavItem("home", "首页", "\uE80F", "游戏"),
-            new NavItem("catalog", "下载中心", "\uE896", "游戏")
+            new NavItem("version-picker", "版本选择", "\uE8B7", "游戏"),
+            new NavItem("instances", "版本设置", "\uE713", "游戏"),
+            new NavItem("catalog", "下载中心", "\uE896", "资源")
             {
                 SubItems =
                 {
@@ -172,7 +174,7 @@ public sealed class MainViewModel : ObservableObject
                     new NavSubItem("resourcepack", "材质包"),
                 },
             },
-            new NavItem("mods", "Mod 管理", "\uE7B8", "内容"),
+            new NavItem("mods", "Mod 管理", "\uE7B8", "资源"),
             new NavItem("downloads", "下载管理", "\uE81C", "任务"),
             new NavItem("settings", "设置", "\uE713", "系统"),
             new NavItem("logs", "日志", "\uE8A5", "系统"),

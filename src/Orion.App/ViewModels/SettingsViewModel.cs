@@ -83,6 +83,7 @@ public sealed class SettingsViewModel : ObservableObject
         new("Midnight", "午夜（玻璃·深紫）"),
         new("Dark", "深色"),
         new("Light", "浅色"),
+        new("Frost", "玻璃浅色"),
     ];
 
     public IReadOnlyList<SourceOption> SourceOptions { get; } =

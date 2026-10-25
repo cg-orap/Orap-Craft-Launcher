@@ -151,6 +151,7 @@ public partial class App : Application
                 var fileName = theme?.ToLowerInvariant() switch
         {
             "light" => "Light.xaml",
+            "frost" => "Frost.xaml",
             "midnight" => "Midnight.xaml",
             _ => "Dark.xaml",
         };
@@ -160,7 +161,8 @@ public partial class App : Application
             d.Source is not null &&
             (d.Source.OriginalString.EndsWith("Dark.xaml", StringComparison.OrdinalIgnoreCase) ||
              d.Source.OriginalString.EndsWith("Midnight.xaml", StringComparison.OrdinalIgnoreCase) ||
-             d.Source.OriginalString.EndsWith("Light.xaml", StringComparison.OrdinalIgnoreCase)));
+             d.Source.OriginalString.EndsWith("Light.xaml", StringComparison.OrdinalIgnoreCase)
+             || d.Source.OriginalString.EndsWith("Frost.xaml", StringComparison.OrdinalIgnoreCase)));
 
         if (palette?.Source is null ||
             !palette.Source.OriginalString.EndsWith(fileName, StringComparison.OrdinalIgnoreCase))
