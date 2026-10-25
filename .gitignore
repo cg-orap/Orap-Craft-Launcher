@@ -23,3 +23,7 @@ screenshots/
 
 # verify.ps1 smoke-test data root
 artifacts/
+
+# Installer scratch output (created next to a downloaded installer jar)
+*.jar.log
+*.csx
