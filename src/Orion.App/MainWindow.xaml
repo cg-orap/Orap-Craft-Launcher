@@ -135,12 +135,22 @@
                 </Button>
 
                 <!-- nav -->
-                <ListBox ItemsSource="{Binding NavItems}"
+                <ListBox ItemsSource="{Binding NavView}"
                          SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
                          Background="Transparent" BorderThickness="0" Margin="10,0,10,0"
                          ItemContainerStyle="{StaticResource NavItemStyle}"
                          PreviewMouseLeftButtonDown="OnNavClick"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" FontSize="10.5" Margin="14,10,0,4" Opacity="0.55"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <StackPanel>

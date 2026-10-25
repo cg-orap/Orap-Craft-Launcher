@@ -159,8 +159,8 @@ public sealed class MainViewModel : ObservableObject
 
         NavItems.AddRange(
         [
-            new NavItem("home", "首页", "\uE80F"),
-            new NavItem("catalog", "下载中心", "\uE896")
+            new NavItem("home", "首页", "\uE80F", "游戏"),
+            new NavItem("catalog", "下载中心", "\uE896", "游戏")
             {
                 SubItems =
                 {
@@ -171,11 +171,14 @@ public sealed class MainViewModel : ObservableObject
                     new NavSubItem("resourcepack", "材质包"),
                 },
             },
-            new NavItem("mods", "Mod 管理", "\uE7B8"),
-            new NavItem("downloads", "下载管理", "\uE81C"),
-            new NavItem("settings", "设置", "\uE713"),
-            new NavItem("logs", "日志", "\uE8A5"),
+            new NavItem("mods", "Mod 管理", "\uE7B8", "内容"),
+            new NavItem("downloads", "下载管理", "\uE81C", "任务"),
+            new NavItem("settings", "设置", "\uE713", "系统"),
+            new NavItem("logs", "日志", "\uE8A5", "系统"),
         ]);
+
+        NavView = System.Windows.Data.CollectionViewSource.GetDefaultView(NavItems);
+        NavView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription("Group"));
 
         OpenLoginCommand = new RelayCommand(OpenLogin);
         OpenCatalogKindCommand = new RelayCommand(OpenCatalogKind);
@@ -205,6 +208,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand NavigateCommand { get; }
 
     public ObservableList<NavItem> NavItems { get; } = [];
+
+    public System.ComponentModel.ICollectionView NavView { get; }
 
     public ICommand OpenLoginCommand { get; }
     public ICommand OpenCatalogKindCommand { get; }
@@ -533,7 +538,7 @@ public sealed class MainViewModel : ObservableObject
 }
 
 /// <summary>One entry of the left navigation rail.</summary>
-public sealed class NavItem(string key, string title, string glyph = "") : Mvvm.ObservableObject
+public sealed class NavItem(string key, string title, string glyph = "", string group = "") : Mvvm.ObservableObject
 {
     private bool _expanded;
 
@@ -549,6 +554,8 @@ public sealed class NavItem(string key, string title, string glyph = "") : Mvvm.
 
     /// <summary>Segoe Fluent Icons / Segoe MDL2 Assets glyph shown before the label.</summary>
     public string Glyph { get; } = glyph;
+
+    public string Group { get; } = group;
 
     /// <summary>Second level entries revealed while this item is selected (下载中心 has four).</summary>
     public List<NavSubItem> SubItems { get; } = [];

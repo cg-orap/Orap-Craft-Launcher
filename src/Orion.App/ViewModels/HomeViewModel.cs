@@ -134,6 +134,12 @@ public sealed class HomeViewModel : ObservableObject
 
     public string LaunchButtonText => IsLaunching ? "运行中…" : "启动游戏";
 
+    public string RuntimeText => string.IsNullOrWhiteSpace(JavaStatus) ? "自动选择" : JavaStatus;
+
+    public string MemoryText => ((_main.CurrentInstance?.MemoryMb ?? _main.Context.Settings.MemoryMb)).ToString() + " MB";
+
+    public string StateText => IsLaunching ? "运行中" : "就绪";
+
     /// <summary>Second line of the launch button (PCL style): which version will start.</summary>
     public string LaunchVersionLine => _main.CurrentInstance is { } instance
         ? $"{instance.Name} · {instance.Subtitle}"

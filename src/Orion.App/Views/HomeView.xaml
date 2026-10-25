@@ -57,6 +57,74 @@
             </ContextMenu>
         </Grid.ContextMenu>
 
+        <!-- 右侧：账户与皮肤卡片 -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,26,26,0" Width="250"
+                CornerRadius="16" Background="{DynamicResource SurfaceBg}" BorderBrush="{DynamicResource BorderBrushSoft}"
+                BorderThickness="1" Padding="16">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Grid Width="42" Height="42" Margin="0,0,10,0">
+                        <Border CornerRadius="8" Background="{DynamicResource SurfaceAltBg}"
+                                Visibility="{Binding DataContext.HasCurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+                            <TextBlock Text="{Binding DataContext.CurrentAccount.Username, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Initial}}"
+                                       FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border CornerRadius="8" ClipToBounds="True"
+                                Visibility="{Binding DataContext.HasCurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}">
+                            <Image Source="{Binding DataContext.CurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                        </Border>
+                    </Grid>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DataContext.AccountDisplay, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding DataContext.AccountDetail, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   Style="{StaticResource CaptionText}" Margin="0,2,0,0" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,12,0,10" />
+                <TextBlock Text="皮肤预览" Style="{StaticResource CaptionText}" />
+
+                <Border Margin="0,8,0,0" CornerRadius="12" Background="{DynamicResource SurfaceAltBg}" Padding="10">
+                    <Image Source="{Binding DataContext.CurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}}"
+                           Width="150" Height="150" Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                </Border>
+
+                <Button Content="切换账户" Style="{StaticResource GhostButton}" Margin="0,10,0,0"
+                        Command="{Binding DataContext.OpenLoginCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+            </StackPanel>
+        </Border>
+
+        <!-- 底部信息条：运行环境 / 内存分配 / 运行状态 -->
+        <Border VerticalAlignment="Bottom" Margin="20,0,20,18" CornerRadius="14" Padding="18,12"
+                Background="{DynamicResource SurfaceBg}" BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="运行环境" Style="{StaticResource CaptionText}" />
+                    <TextBlock Text="{Binding RuntimeText}" FontWeight="SemiBold" FontSize="13"
+                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,3,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                    <TextBlock Text="内存分配" Style="{StaticResource CaptionText}" />
+                    <TextBlock Text="{Binding MemoryText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Margin="16,0,0,0">
+                    <TextBlock Text="运行状态" Style="{StaticResource CaptionText}" />
+                    <TextBlock Text="{Binding StateText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
         <!-- Centre-bottom placement: the block is pushed below the vertical centre on purpose. -->
         <Grid>
             <Grid.RowDefinitions>
