@@ -141,7 +141,14 @@ public sealed class MrPackInstaller
 
             output?.Report($"下载整合包文件 ({index.Files.Count} 个)…");
             var requests = BuildRequests(index, instance, warnings);
-            var report = await _downloader.DownloadAsync(requests, null, ct).ConfigureAwait(false);
+            // Forward the engine progress: with a null sink this batch reported nothing, so the task sat
+        // on "下载整合包文件 (336 个)…" with a frozen bar while hundreds of files were fetched.
+        var downloadProgress = output is null
+            ? null
+            : new Progress<DownloadProgress>(p =>
+                output.Report($"下载整合包文件 {p.CompletedFiles + p.FailedFiles}/{Math.Max(1, p.TotalFiles)} · {p.BytesPerSecond / 1024:0} KB/s"));
+
+        var report = await _downloader.DownloadAsync(requests, downloadProgress, ct).ConfigureAwait(false);
 
             if (!report.Success) warnings.Add($"{report.FailedFiles} 个整合包文件下载失败。");
 

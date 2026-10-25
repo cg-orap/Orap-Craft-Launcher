@@ -645,8 +645,11 @@ public sealed class CatalogViewModel : ObservableObject
     private static readonly (string Keyword, double From, double To)[] PackPhases =
     [
         ("正在安装原版",       0.00, 0.55),
+        ("下载整合包文件",     0.00, 0.70),
         ("正在下载",           0.55, 0.62),
         ("正在预下载安装器依赖", 0.62, 0.78),
+        ("正在安装 Fabric",    0.70, 0.90),
+        ("正在安装 Quilt",     0.70, 0.90),
         ("正在运行",           0.78, 0.90),
         ("下载模组",           0.90, 0.99),
         ("整合包已安装",       1.00, 1.00),
