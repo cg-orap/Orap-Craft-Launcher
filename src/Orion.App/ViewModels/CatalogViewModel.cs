@@ -631,10 +631,6 @@ public sealed class CatalogViewModel : ObservableObject
                 return;
             }
         }
-        {
-            var bytes = await _main.Context.Http.GetByteArrayAsync(version.PrimaryFile.Url, ct).ConfigureAwait(true);
-            await File.WriteAllBytesAsync(target, bytes, ct).ConfigureAwait(true);
-        }
 
         await InstallPackFileAsync(target, displayName, ct).ConfigureAwait(true);
     }
