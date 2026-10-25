@@ -189,8 +189,25 @@ settings.json 设置
   为避免许可证传染与「简单包装器」，核心完全按公开协议实现。
 - **镜像只做传输替代**：所有文件仍按元数据中的 SHA-1 校验；不关闭 TLS 验证；
   镜像失败自动回退官方源。
-- **删除永不直接抹掉数据**：实例与 Mod 的移除都会移动到 `trash/`。
+- **CurseForge 只取元数据，不分发模组**：见下方「CurseForge 集成」一节。
 
+---
+
+## 4.1 CurseForge 集成（仅元数据，不重新分发模组）
+
+本项目**不托管、不镜像、不打包分发任何模组文件**。
+
+安装 CurseForge 整合包时：
+
+1. 读取整合包自带的 `manifest.json`，只取其中的 `projectID` / `fileID`；
+2. 用官方接口按 ID 解析真实下载地址：
+   `GET https://api.curseforge.com/v1/mods/{projectID}/files/{fileID}/download-url`
+   （需要在「设置 → 网络」填写自己的 CurseForge API Key）；
+3. **直接从 CurseForge 自家 CDN 下载**，文件落盘后按官方 SHA-1 校验。
+
+因此作者的下载计数与平台的收益链路保持完整；启动器既不缓存对外分发，也不绕过任何授权。
+没有 API Key 时只会尝试公开 CDN 路径，失败的文件会**明确列出浏览器链接**由用户自行下载，
+并且该次安装会被标记为「不完整」而不是「成功」。
 ---
 
 ## 5. 已知限制
