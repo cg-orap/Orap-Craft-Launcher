@@ -5,10 +5,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
         Title="Orap Craft Launcher — Minecraft Java 版启动器"
-        Height="780" Width="1240" MinHeight="600" MinWidth="900"
-        WindowState="Maximized"
+        Height="784" Width="1260" MinHeight="784" MinWidth="1260" MaxHeight="784" MaxWidth="1260"
+        WindowState="Normal"
         WindowStyle="None"
-        ResizeMode="CanResize"
+        ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBg}"
         TextOptions.TextFormattingMode="Ideal"
@@ -17,7 +17,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="56" ResizeBorderThickness="6" GlassFrameThickness="0"
+        <WindowChrome CaptionHeight="56" ResizeBorderThickness="0" GlassFrameThickness="0"
                       CornerRadius="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
@@ -85,8 +85,6 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="MinButton" Content="—" Style="{StaticResource CaptionButton}" Click="OnMinimize"
                         AutomationProperties.AutomationId="CaptionMinimize" />
-                <Button x:Name="MaxButton" Content="▢" Style="{StaticResource CaptionButton}" Click="OnMaximize"
-                        AutomationProperties.AutomationId="CaptionMaximize" />
                 <Button x:Name="CloseButton" Content="✕" Style="{StaticResource CaptionButton}" Click="OnClose"
                         AutomationProperties.AutomationId="CaptionClose" />
             </StackPanel>

@@ -208,4 +208,130 @@ public static class SkinAvatars
         image.Freeze();
         return image;
     }
+
+    /// <summary>
+    /// Front-facing full-body figure built from the classic 64x64 skin UV map
+    /// (head, body, both arms, both legs) - the same 2D preview mainstream launchers use.
+    /// </summary>
+    public static async Task<ImageSource?> LoadBodyAsync(
+        HttpClient http,
+        string? skinUrl,
+        string cacheKey,
+        string root,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(skinUrl)) return null;
+
+        var cachePath = Path.Combine(root, "cache", "skins", cacheKey + "-body.png");
+
+        try
+        {
+            if (File.Exists(cachePath))
+            {
+                var cached = Decode(cachePath);
+                if (cached is not null) return cached;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException)
+        {
+            AppLog.Warn("skin", "body-cache-read-failed", ("error", ex.Message));
+        }
+
+        try
+        {
+            var uri = new Uri(skinUrl.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase));
+            var bytes = await http.GetByteArrayAsync(uri, ct).ConfigureAwait(false);
+
+            var body = ComposeBody(bytes);
+            if (body is null) return null;
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
+                await using var stream = File.Create(cachePath);
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create((BitmapSource)body));
+                encoder.Save(stream);
+            }
+            catch (Exception ex) when (ex is IOException or NotSupportedException)
+            {
+                AppLog.Warn("skin", "body-cache-write-failed", ("error", ex.Message));
+            }
+
+            return body;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or UriFormatException
+                                       or NotSupportedException or TaskCanceledException)
+        {
+            AppLog.Warn("skin", "body-download-failed", ("error", ex.Message));
+            return null;
+        }
+    }
+
+    /// <summary>Convenience wrapper: null instead of throwing when the body cannot be built.</summary>
+    public static async Task<ImageSource?> LoadAsyncBodySafe(
+        HttpClient http, string? skinUrl, string cacheKey, string root, CancellationToken ct = default)
+    {
+        try { return await LoadBodyAsync(http, skinUrl, cacheKey, root, ct).ConfigureAwait(false); }
+        catch (Exception ex) { AppLog.Warn("skin", "body-load-failed", ("error", ex.Message)); return null; }
+    }
+
+    /// <summary>16x32 unit figure (head, body, arms, legs) scaled 4x = 64x128 pixels.</summary>
+    public static ImageSource? ComposeBody(byte[] pngBytes)
+    {
+        BitmapSource? texture;
+        try { texture = Decode(pngBytes); }
+        catch (Exception ex) { AppLog.Warn("skin", "texture-decode-failed", ("type", ex.GetType().Name)); return null; }
+
+        if (texture is null || texture.PixelWidth < 64 || texture.PixelHeight < 64) return null;
+
+        var converted = new FormatConvertedBitmap(texture, PixelFormats.Bgra32, null, 0);
+        converted.Freeze();
+
+        var stride = converted.PixelWidth * 4;
+        var pixels = new byte[stride * converted.PixelHeight];
+        converted.CopyPixels(pixels, stride, 0);
+
+        const int scaleUnits = 16;
+        const int canvasW = scaleUnits * 4;   // 64 px
+        const int canvasH = scaleUnits * 8;   // 128 px
+        var canvas = new byte[canvasW * canvasH * 4];
+
+        // (sourceX, sourceY, w, h, targetX, targetY) in skin units
+        var parts = new (int Sx, int Sy, int W, int H, int Tx, int Ty)[]
+        {
+            (8, 8, 8, 8, 4, 0),      // head
+            (20, 20, 8, 12, 4, 8),   // body
+            (44, 20, 4, 12, 0, 8),   // right arm
+            (36, 52, 4, 12, 12, 8),  // left arm
+            (4, 20, 4, 12, 4, 20),   // right leg
+            (20, 52, 4, 12, 8, 20),  // left leg
+        };
+
+        foreach (var part in parts)
+        {
+            for (var y = 0; y < part.H * 4; y++)
+            {
+                for (var x = 0; x < part.W * 4; x++)
+                {
+                    var sx = part.Sx + x / 4;
+                    var sy = part.Sy + y / 4;
+                    var src = sy * stride + sx * 4;
+
+                    var dx = part.Tx * 4 + x;
+                    var dy = part.Ty * 4 + y;
+                    var dst = dy * canvasW * 4 + dx * 4;
+
+                    canvas[dst] = pixels[src];
+                    canvas[dst + 1] = pixels[src + 1];
+                    canvas[dst + 2] = pixels[src + 2];
+                    canvas[dst + 3] = pixels[src + 3] == 0 ? (byte)0 : (byte)255;
+                }
+            }
+        }
+
+        var result = BitmapSource.Create(canvasW, canvasH, 96, 96, PixelFormats.Bgra32, null, canvas, canvasW * 4);
+        result.Freeze();
+        return result;
+    }
 }

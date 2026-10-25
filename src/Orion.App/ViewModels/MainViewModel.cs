@@ -133,6 +133,7 @@ public sealed class MainViewModel : ObservableObject
     private string _navKey = "home";
     private Account? _currentAccount;
     private ImageSource? _currentAccountAvatar;
+    private ImageSource? _currentAccountBody;
     private Instance? _currentInstance;
     private string _versionStatus = "";
     private NavItem? _selectedNavItem;
@@ -302,6 +303,19 @@ public sealed class MainViewModel : ObservableObject
 
     public bool HasCurrentAccountAvatar => _currentAccountAvatar is not null;
 
+    /// <summary>Full-body 2D figure of the current account's skin.</summary>
+    public ImageSource? CurrentAccountBody
+    {
+        get => _currentAccountBody;
+        private set
+        {
+            if (!SetProperty(ref _currentAccountBody, value)) return;
+            OnPropertyChanged(nameof(HasCurrentAccountBody));
+        }
+    }
+
+    public bool HasCurrentAccountBody => _currentAccountBody is not null;
+
     private async Task LoadAvatarAsync()
     {
         var account = _currentAccount;
@@ -347,6 +361,10 @@ public sealed class MainViewModel : ObservableObject
             if (!ReferenceEquals(account, _currentAccount)) return;
 
             CurrentAccountAvatar = avatar;
+
+            CurrentAccountBody = await Services.SkinAvatars
+                .LoadAsyncBodySafe(Context.Http, account.SkinUrl, account.EffectiveUuid, Context.Paths.Root)
+                .ConfigureAwait(true);
         }
         catch (Exception ex)
         {
