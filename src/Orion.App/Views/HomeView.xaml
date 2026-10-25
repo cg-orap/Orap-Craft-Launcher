@@ -67,11 +67,11 @@
             <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">
             <!-- account identity sits right above the launch button -->
             <StackPanel HorizontalAlignment="Center" Margin="0,0,0,14">
-                <Grid Width="44" Height="44" HorizontalAlignment="Center">
+                <Grid Width="68" Height="68" HorizontalAlignment="Center">
                     <Border CornerRadius="8" Background="{DynamicResource SurfaceAltBg}"
                             Visibility="{Binding DataContext.HasCurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
                         <TextBlock Text="{Binding DataContext.CurrentAccount.Username, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Initial}}"
-                                   FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                   FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <Border CornerRadius="8" ClipToBounds="True"
@@ -81,7 +81,7 @@
                     </Border>
                 </Grid>
                 <TextBlock Text="{Binding DataContext.AccountDisplay, RelativeSource={RelativeSource AncestorType=Window}}"
-                           HorizontalAlignment="Center" Margin="0,6,0,0" FontSize="15" FontWeight="SemiBold" />
+                           HorizontalAlignment="Center" Margin="0,8,0,0" FontSize="19" FontWeight="SemiBold" />
             </StackPanel>
             <!-- PCL-style launch button: the action in large text, the target version underneath -->
             <Button Style="{StaticResource LaunchHeroButton}" Width="360" Height="88"

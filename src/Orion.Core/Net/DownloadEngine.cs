@@ -328,6 +328,33 @@ public sealed class DownloadEngine
     /// usual .part file. Returns false (leaving no partial state) when the host does not support
     /// ranges or a chunk fails, so the caller can fall back to a single stream.
     /// </summary>
+    /// <summary>
+    /// Aborts a transfer that is technically alive but crawling (the last big file used to sit at a
+    /// few hundred bytes per second forever). After a grace period it requires a minimum average, so
+    /// DownloadOneAsync can retry the same file on the next candidate source.
+    /// </summary>
+    private sealed class TransferRateGuard
+    {
+        private const double MinKbPerSecond = 200;
+        private static readonly TimeSpan Grace = TimeSpan.FromSeconds(10);
+
+        private readonly long _expected;
+        private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
+        private long _bytes;
+
+        public TransferRateGuard(long expectedSize) => _expected = expectedSize;
+
+        public void Add(int count) => _bytes += count;
+
+        public bool ShouldAbort()
+        {
+            if (_expected < 8L * 1024 * 1024) return false;      // only big files justify a switch
+            if (_clock.Elapsed < Grace) return false;
+
+            var kbps = _bytes / 1024.0 / Math.Max(1, _clock.Elapsed.TotalSeconds);
+            return kbps < MinKbPerSecond;
+        }
+    }
     private async Task<bool> TryChunkedAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct)
     {
         var size = request.Size;
@@ -520,12 +547,20 @@ public sealed class DownloadEngine
                 BufferSize,
                 useAsync: true);
 
+            var rate = new TransferRateGuard(request.Size);
             int read;
             while ((read = await ReadWithStallGuardAsync(source, buffer, ct).ConfigureAwait(false)) > 0)
             {
                 await sink.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                 state.OnBytesTransferred(read);
                 RecordHostBytes(url.Host, read);
+
+                rate.Add(read);
+                if (rate.ShouldAbort())
+                {
+                    AppLog.Warn("download", "too-slow-switching-source", ("target", request.TargetPath), ("host", url.Host));
+                    throw new TaskCanceledException("下载过慢，正在切换来源");
+                }
             }
 
             await sink.FlushAsync(ct).ConfigureAwait(false);
