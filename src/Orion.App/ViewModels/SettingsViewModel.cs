@@ -116,7 +116,7 @@ public sealed class SettingsViewModel : ObservableObject
     public int MaxConcurrency
     {
         get => _maxConcurrency;
-        set => SetProperty(ref _maxConcurrency, Math.Clamp(value, 1, 32));
+        set => SetProperty(ref _maxConcurrency, Math.Clamp(value, 1, 256));
     }
 
     public DownloadSource Source

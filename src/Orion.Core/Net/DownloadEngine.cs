@@ -194,7 +194,7 @@ public sealed class DownloadEngine
         // files therefore gets a wider fan-out automatically (still bounded, still per-host safe).
         var fanout = Math.Max(1, _options.MaxConcurrency);
         var smallBatch = pending.Count >= 200 && pending.All(p => p.Size is > 0 and < 1024 * 1024);
-        if (smallBatch) fanout = Math.Min(64, fanout * 3);
+        if (smallBatch) fanout = Math.Min(128, fanout * 3);
         if (smallBatch) AppLog.Debug("download", "small-batch-fanout", ("files", pending.Count), ("fanout", fanout));
 
         var parallelOptions = new ParallelOptions

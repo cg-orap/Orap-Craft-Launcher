@@ -41,7 +41,7 @@ public sealed class DownloadsViewModel : ObservableObject
     public int MaxConcurrency
     {
         get => _maxConcurrency;
-        set => SetProperty(ref _maxConcurrency, Math.Clamp(value, 1, 32));
+        set => SetProperty(ref _maxConcurrency, Math.Clamp(value, 1, 256));
     }
 
     public IReadOnlyList<DownloadSource> Sources { get; } = [DownloadSource.Official, DownloadSource.BmclApi];

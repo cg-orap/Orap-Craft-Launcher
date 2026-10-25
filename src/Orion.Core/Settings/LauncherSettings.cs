@@ -51,7 +51,7 @@ public sealed class LauncherSettings
         Source = Source,
         CustomMirrorBase = CustomMirrorBase,
         ProxyUrl = ProxyUrl,
-        MaxConnectionsPerServer = 64,
+        MaxConnectionsPerServer = Math.Clamp(MaxConcurrency * 2, 64, 512),
     };
 
     public LauncherSettings Clone() => (LauncherSettings)MemberwiseClone();
