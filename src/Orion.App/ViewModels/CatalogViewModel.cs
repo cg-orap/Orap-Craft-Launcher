@@ -604,6 +604,14 @@ public sealed class CatalogViewModel : ObservableObject
     }
 
     /// <summary>Extracts "65/70" style counters so the task bar can advance during downloads.</summary>
+    /// <summary>Human label for the archive kind shown before the install starts.</summary>
+    private static string DescribePackKind(Core.Mods.PackArchiveKind kind) => kind switch
+    {
+        Core.Mods.PackArchiveKind.Modrinth => " Modrinth 整合包",
+        Core.Mods.PackArchiveKind.CurseForge => " CurseForge 整合包",
+        Core.Mods.PackArchiveKind.MinecraftZip => " .minecraft 整合包",
+        _ => "整合包（按 Modrinth 处理）",
+    };
     private static double? ParseRatio(string line)
     {
         var match = System.Text.RegularExpressions.Regex.Match(line, @"(\d+)\s*/\s*(\d+)");
@@ -643,9 +651,27 @@ public sealed class CatalogViewModel : ObservableObject
                 _main.Activities.Report(activity, lastFraction, line, speed);
             });
 
-            var result = await _main.Context.ModPacks
-                .InstallAsync(path, name, null, progress, linked.Token)
-                .ConfigureAwait(true);
+            // One entry point for every dropped/opened archive: sniff the format first instead of
+            // assuming Modrinth. A .zip was previously handed to the .mrpack installer, which failed
+            // with "整合包缺少合法的 modrinth.index.json" for CurseForge and domestic packs alike.
+            var info = Core.Mods.PackArchiveInstaller.Inspect(path);
+            Status = $"识别到{DescribePackKind(info.Kind)}：{info.Name}";
+
+            var result = info.Kind switch
+            {
+                Core.Mods.PackArchiveKind.CurseForge => await _main.Context.PackArchives
+                    .InstallCurseForgeAsync(path, name ?? info.Name, null, progress, linked.Token)
+                    .ConfigureAwait(true),
+
+                Core.Mods.PackArchiveKind.MinecraftZip => await _main.Context.PackArchives
+                    .InstallMinecraftZipAsync(path, name ?? info.Name, null, info.MinecraftVersion, linked.Token)
+                    .ConfigureAwait(true),
+
+                // Modrinth .mrpack (and anything that declares a modrinth index).
+                _ => await _main.Context.ModPacks
+                    .InstallAsync(path, name, null, progress, linked.Token)
+                    .ConfigureAwait(true),
+            };
 
             _main.Activities.Finish(activity,
                 result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
