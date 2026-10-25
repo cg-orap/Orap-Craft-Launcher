@@ -48,19 +48,22 @@ public sealed class PackArchiveInstaller
     private readonly LoaderService _loaders;
     private readonly InstanceImporter _importer;
     private readonly HttpClient _http;
+    private readonly string? _curseForgeApiKey;
 
     public PackArchiveInstaller(
         GamePaths paths,
         InstanceManager instances,
         LoaderService loaders,
         InstanceImporter importer,
-        HttpClient http)
+        HttpClient http,
+        string? curseForgeApiKey = null)
     {
         _paths = paths;
         _instances = instances;
         _loaders = loaders;
         _importer = importer;
         _http = http;
+        _curseForgeApiKey = curseForgeApiKey;
     }
 
     /// <summary>Quick sniff of an archive without installing anything (used for drag &amp; drop hints).</summary>
@@ -442,6 +445,12 @@ public sealed class PackArchiveInstaller
 
         candidates.Add($"https://www.curseforge.com/api/v1/mods/{file.ProjectId}/files/{file.FileId}/download");
 
+        // With an API key the official endpoint is authoritative (it returns the real CDN URL).
+        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey))
+        {
+            candidates.Insert(0, $"https://api.curseforge.com/v1/mods/{file.ProjectId}/files/{file.FileId}/download-url");
+        }
+
         foreach (var url in candidates)
         {
             try
@@ -449,8 +458,11 @@ public sealed class PackArchiveInstaller
                 using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 perFile.CancelAfter(TimeSpan.FromSeconds(60));
 
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                if (!string.IsNullOrWhiteSpace(_curseForgeApiKey)) request.Headers.TryAddWithoutValidation("x-api-key", _curseForgeApiKey);
+
                 using var response = await _http
-                    .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, perFile.Token)
+                    .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, perFile.Token)
                     .ConfigureAwait(false);
 
                 if (!response.IsSuccessStatusCode) continue;

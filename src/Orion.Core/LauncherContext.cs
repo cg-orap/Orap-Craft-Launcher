@@ -62,7 +62,7 @@ public sealed class LauncherContext : IAsyncDisposable
 
         // Declared but never constructed: the CurseForge/zip dispatch threw a
         // NullReferenceException the first time it ran.
-        PackArchives = new Mods.PackArchiveInstaller(paths, Instances, Loaders, Importer, http);
+        PackArchives = new Mods.PackArchiveInstaller(paths, Instances, Loaders, Importer, http, settings.CurseForgeApiKey);
     }
 
     public GamePaths Paths { get; }

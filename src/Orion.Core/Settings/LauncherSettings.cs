@@ -43,6 +43,12 @@ public sealed class LauncherSettings
     [JsonPropertyName("backgroundImagePath")] public string? BackgroundImagePath { get; set; }
 
 
+        /// <summary>
+    /// Optional CurseForge API key. Without one, CurseForge packs can only be resolved through public
+    /// CDN guesses, which misses many files; with a key the official download-url endpoint is used.
+    /// </summary>
+    [JsonPropertyName("curseForgeApiKey")] public string? CurseForgeApiKey { get; set; }
+
     [JsonPropertyName("showSnapshots")] public bool ShowSnapshots { get; set; } = true;
     [JsonPropertyName("showOldVersions")] public bool ShowOldVersions { get; set; } = true;
 
