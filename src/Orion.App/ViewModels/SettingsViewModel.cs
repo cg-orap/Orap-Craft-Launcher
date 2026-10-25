@@ -80,6 +80,7 @@ public sealed class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<ThemeOption> Themes { get; } =
     [
+        new("Midnight", "午夜（玻璃·深紫）"),
         new("Dark", "深色"),
         new("Light", "浅色"),
     ];
