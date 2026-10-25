@@ -52,6 +52,8 @@ public sealed class SettingsViewModel : ObservableObject
         new("Teal", "青绿", "#FF14B8A6"),
         new("Amber", "琥珀", "#FFF59E0B"),
         new("Rose", "玫瑰", "#FFF43F5E"),
+        new("Orange", "暖橙", "#FFF97316"),
+        new("Emerald", "翡翠", "#FF10B981"),
     ];
     private bool _forceUtf8Console = true;
     private string _microsoftClientId = "";

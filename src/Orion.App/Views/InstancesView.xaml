@@ -21,6 +21,9 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0">
+                <Button Content="← 返回首页" Style="{StaticResource GhostButton}" HorizontalAlignment="Left"
+                        Margin="0,0,0,10" Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="home" AutomationProperties.AutomationId="InstancesBackHome" />
                 <TextBlock Text="版本管理" Style="{StaticResource TitleText}" />
                 <TextBlock Text="每个版本拥有独立的游戏目录（存档、Mod、配置互不影响）。"
                            Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,12" />

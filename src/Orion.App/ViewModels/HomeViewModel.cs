@@ -32,6 +32,12 @@ public sealed class HomeViewModel : ObservableObject
     private string _launchStatus = "";
     private string _javaStatus = "";
     private string _instanceStatus = "";
+    private readonly System.Windows.Threading.DispatcherTimer _toastTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(5),
+    };
+
+    private string _toastText = "";
     private ImageSource? _backgroundImage;
     private string? _backgroundImagePath;
 
@@ -47,7 +53,33 @@ public sealed class HomeViewModel : ObservableObject
         OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("version-picker"));
         OpenVersionSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));   // sub-page, not a rail entry
 
+        _toastTimer.Tick += (_, _) =>
+        {
+            _toastTimer.Stop();
+            ToastText = "";
+        };
+
         ReloadBackground();
+    }
+
+    /// <summary>Transient launcher message shown as a floating toast, cleared automatically.</summary>
+    public string ToastText
+    {
+        get => _toastText;
+        private set
+        {
+            if (!SetProperty(ref _toastText, value)) return;
+            OnPropertyChanged(nameof(HasToast));
+        }
+    }
+
+    public bool HasToast => _toastText.Length > 0;
+
+    private void ShowToast(string message)
+    {
+        ToastText = message;
+        _toastTimer.Stop();
+        _toastTimer.Start();
     }
 
     public ICommand LaunchCommand { get; }
@@ -110,7 +142,13 @@ public sealed class HomeViewModel : ObservableObject
     public string LaunchStatus
     {
         get => _launchStatus;
-        set => SetProperty(ref _launchStatus, value);
+        set
+        {
+            if (!SetProperty(ref _launchStatus, value)) return;
+
+            // Short hints become a toast; long progress text stays visible while it is meaningful.
+            if (!string.IsNullOrWhiteSpace(value) && value.Length <= 120) ShowToast(value);
+        }
     }
 
     public string JavaStatus

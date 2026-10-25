@@ -132,7 +132,7 @@ public partial class App : Application
 
         var dictionaries = app.Resources.MergedDictionaries;
         var name = string.IsNullOrWhiteSpace(accent) ? "Blue" : accent.Trim();
-        var known = new[] { "Blue", "Violet", "Teal", "Amber", "Rose" };
+        var known = new[] { "Blue", "Violet", "Teal", "Amber", "Rose", "Orange", "Emerald" };
         if (!known.Contains(name, StringComparer.OrdinalIgnoreCase)) name = "Blue";
 
         var existing = dictionaries.FirstOrDefault(d =>

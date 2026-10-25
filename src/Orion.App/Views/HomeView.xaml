@@ -18,7 +18,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Shell" CornerRadius="16" Background="{DynamicResource AccentBrush}">
+                                                <Border x:Name="Shell" CornerRadius="18" BorderThickness="1" BorderBrush="#33FFFFFF">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
+                                    <GradientStop Color="{DynamicResource AccentHoverColor}" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="26" ShadowDepth="6" Opacity="0.45" Color="#000000" />
                             </Border.Effect>
@@ -27,11 +33,9 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Shell" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                                <Setter TargetName="Shell" Property="BorderBrush" Value="#66FFFFFF" />
                             </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Shell" Property="Background" Value="{DynamicResource AccentPressedBrush}" />
-                            </Trigger>
+
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Shell" Property="Background" Value="{DynamicResource MutedTextBrush}" />
                                 <Setter TargetName="Shell" Property="Opacity" Value="0.75" />
@@ -61,12 +65,7 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0" CornerRadius="20"
-                    Background="#33FFFFFF" BorderBrush="#59FFFFFF" BorderThickness="1" Padding="26,20,26,22">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="30" ShadowDepth="8" Opacity="0.28" Color="#000000" />
-                </Border.Effect>
-                <StackPanel>
+            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">
             <!-- PCL-style launch button: the action in large text, the target version underneath -->
             <Button Style="{StaticResource LaunchHeroButton}" Width="360" Height="88"
                     Command="{Binding LaunchCommand}"
@@ -102,18 +101,24 @@
                         ToolTip="在「版本管理」中调整这个版本的内存、Java 与窗口设置" />
             </Grid>
 
-            <!-- progress / result of the launch only -->
-            <TextBlock Text="{Binding LaunchStatus}" HorizontalAlignment="Center" TextAlignment="Center"
-                       MaxWidth="560" TextWrapping="Wrap" Margin="0,16,0,0" FontSize="12"
-                       Foreground="{DynamicResource MutedTextBrush}"
-                       AutomationProperties.AutomationId="LaunchStatusText"
-                       Visibility="{Binding LaunchStatus, Converter={StaticResource StringToVisibility}}" />
+
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0"
                             Visibility="{Binding IsLaunching, Converter={StaticResource BoolToVisibility}}">
                     <Button Content="结束游戏" Style="{StaticResource GhostButton}" Command="{Binding StopCommand}" />
                 </StackPanel>
-                </StackPanel>
+            </StackPanel>
+
+            <!-- floating toast: launch hints appear here and fade away on their own -->
+            <Border x:Name="Toast" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                    Margin="0,0,0,26" CornerRadius="10" Padding="18,10"
+                    Background="#E6111720" BorderBrush="#33FFFFFF" BorderThickness="1"
+                    Visibility="{Binding HasToast, Converter={StaticResource BoolToVisibility}}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.35" Color="#000000" />
+                </Border.Effect>
+                <TextBlock Text="{Binding ToastText}" Foreground="#F2FFFFFF" FontSize="12.5"
+                           AutomationProperties.AutomationId="LaunchToast" />
             </Border>
         </Grid>
 
