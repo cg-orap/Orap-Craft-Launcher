@@ -577,13 +577,22 @@ public sealed class DownloadEngine
         }
 
         var length = new FileInfo(part).Length;
+
         if (request.Size > 0 && length != request.Size)
         {
-            TryDelete(part);
-            throw new InvalidDataException($"下载大小不匹配: 期望 {request.Size} 字节, 实际 {length} 字节");
-        }
+            // Modrinth/CurseForge declared sizes can be a byte off the served object, and a stale
+            // entry can be far off; the hash is the authority, so reject only when it disagrees too.
+            var hashOk = await IsIntactAsync(part, request, ct).ConfigureAwait(false);
+            if (!hashOk)
+            {
+                AppLog.Warn("download", "size-mismatch-rejected", ("target", request.TargetPath), ("expected", request.Size), ("actual", length));
+                TryDelete(part);
+                throw new InvalidDataException($"下载大小不匹配: 期望 {request.Size} 字节, 实际 {length} 字节");
+            }
 
-        if (!await IsIntactAsync(part, request, ct).ConfigureAwait(false))
+            AppLog.Info("download", "size-mismatch-accepted", ("target", request.TargetPath), ("expected", request.Size), ("actual", length));
+        }
+        else if (!await IsIntactAsync(part, request, ct).ConfigureAwait(false))
         {
             TryDelete(part);
             throw new InvalidDataException("文件校验失败 (SHA 摘要不匹配)");
