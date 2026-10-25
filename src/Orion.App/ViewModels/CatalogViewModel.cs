@@ -88,6 +88,8 @@ public sealed class CatalogViewModel : ObservableObject
     // A search for the previous tab must never block the next one, and revisiting a tab should not
     // hit the network again: cancel the in-flight request and reuse cached hits.
     private CancellationTokenSource? _searchCts;
+    private CancellationTokenSource? _installCts;
+    private ActivityItem? _installActivity;
     private int _searchSeq;
     private readonly Dictionary<string, (IReadOnlyList<ModrinthProject> Hits, int TotalHits)> _resultCache =
         new(StringComparer.OrdinalIgnoreCase);
@@ -115,6 +117,17 @@ public sealed class CatalogViewModel : ObservableObject
         PreviousPageCommand = new AsyncRelayCommand(() => SearchAsync(_page - 1), () => !_busy && HasPreviousPage);
         RefreshCommand = new AsyncRelayCommand(() => SearchAsync(_page, forceRefresh: true), () => !_busy);
         CloseDetailCommand = new RelayCommand(CloseDetail);
+        CancelOperationCommand = new RelayCommand(CancelOperation, () => Busy);
+    }
+
+    public RelayCommand CancelOperationCommand { get; }
+
+    /// <summary>Stops the running install; the downloader reacts to the cancellation token.</summary>
+    public void CancelOperation()
+    {
+        _installCts?.Cancel();
+        Status = "正在取消当前任务…";
+        AppLog.Info("catalog", "install-cancelled-by-user");
     }
 
     public RelayCommand CloseDetailCommand { get; }
@@ -367,7 +380,18 @@ public sealed class CatalogViewModel : ObservableObject
         RaisePaging();
 
         Results.Clear();
-        foreach (var project in hits) Results.Add(new CatalogRow(project, this, _kind));
+        foreach (var project in hits)
+        {
+            var row = new CatalogRow(project, this, _kind);
+
+            // Rows are rebuilt from cache on every revisit; without this the avatars vanished.
+            if (!string.IsNullOrWhiteSpace(project.IconUrl) && _iconCache.TryGetValue(project.IconUrl, out var cached))
+            {
+                row.Icon = cached;
+            }
+
+            Results.Add(row);
+        }
 
         Status = Results.Count == 0
             ? "没有找到结果，换个关键词或分类试试。"
@@ -656,14 +680,26 @@ public sealed class CatalogViewModel : ObservableObject
     private async Task InstallCurseForgeAsync(string path, PackArchiveInfo info)
     {
         var activity = _main.Activities.Begin($"安装 CurseForge 整合包 {info.Name}", path);
+        _installActivity = activity;
+        _installCts?.Dispose();
+        _installCts = new CancellationTokenSource();
         Busy = true;
         Status = $"识别到 CurseForge 整合包：{info.Name}（MC {info.MinecraftVersion}）";
 
+        // Progress steps keep the download manager's bar moving while files are fetched.
+        var step = 0.05;
+
         try
         {
-            var progress = new Progress<string>(line => Status = line);
+            var progress = new Progress<string>(line =>
+            {
+                Status = line;
+                step = Math.Min(0.95, step + 0.03);
+                _main.Activities.Report(activity, step, line, "");
+            });
+
             var result = await _main.Context.PackArchives
-                .InstallCurseForgeAsync(path, info.Name, null, progress)
+                .InstallCurseForgeAsync(path, info.Name, null, progress, _installCts.Token)
                 .ConfigureAwait(true);
 
             _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
@@ -677,8 +713,12 @@ public sealed class CatalogViewModel : ObservableObject
             foreach (var warning in result.Warnings) _main.LogsPage.AppendSystem("整合包提示: " + warning);
             _main.LogsPage.AppendSystem(Status);
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException
-                                       or TaskCanceledException)
+        catch (OperationCanceledException)
+        {
+            Status = "已取消安装：" + info.Name;
+            _main.Activities.Finish(activity, ActivityState.Cancelled);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException)
         {
             Status = "CurseForge 整合包安装失败：" + ex.Message;
             AppLog.Warn("catalog", "curseforge-failed", ("error", ex.Message));
@@ -686,6 +726,9 @@ public sealed class CatalogViewModel : ObservableObject
         finally
         {
             Busy = false;
+            _installActivity = null;
+            _installCts?.Dispose();
+            _installCts = null;
         }
     }
 

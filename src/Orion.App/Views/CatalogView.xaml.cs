@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Controls;
 using Orion.App.ViewModels;
 
@@ -36,6 +38,13 @@ public partial class CatalogView : UserControl
     {
         if (ViewModel is not { } vm) return;
         if (e.OriginalSource is not DependencyObject source) return;
+
+        // A click on 安装 (or any button inside the row) belongs to that button.
+        for (var node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ButtonBase) return;
+            if (node is ListBoxItem) break;
+        }
 
         var container = ItemsControl.ContainerFromElement((ItemsControl)sender, source) as ListBoxItem;
         if (container?.DataContext is not CatalogRow row) return;

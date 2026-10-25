@@ -61,7 +61,12 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">
+            <Border Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0" CornerRadius="20"
+                    Background="#33FFFFFF" BorderBrush="#59FFFFFF" BorderThickness="1" Padding="26,20,26,22">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="30" ShadowDepth="8" Opacity="0.28" Color="#000000" />
+                </Border.Effect>
+                <StackPanel>
             <!-- PCL-style launch button: the action in large text, the target version underneath -->
             <Button Style="{StaticResource LaunchHeroButton}" Width="360" Height="88"
                     Command="{Binding LaunchCommand}"
@@ -108,7 +113,8 @@
                             Visibility="{Binding IsLaunching, Converter={StaticResource BoolToVisibility}}">
                     <Button Content="结束游戏" Style="{StaticResource GhostButton}" Command="{Binding StopCommand}" />
                 </StackPanel>
-            </StackPanel>
+                </StackPanel>
+            </Border>
         </Grid>
 
         <TextBlock Text="右键可更换背景图片" HorizontalAlignment="Right" VerticalAlignment="Bottom"

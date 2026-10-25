@@ -194,8 +194,15 @@
                                 Command="{Binding NextPageCommand}" Margin="8,0,0,0" />
                         <TextBlock Grid.Column="2" Text="{Binding PageText}" Style="{StaticResource CaptionText}"
                                    VerticalAlignment="Center" Margin="14,0,14,0" />
-                        <TextBlock Grid.Column="3" Text="{Binding TargetInfo}" Style="{StaticResource CaptionText}"
-                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="360" />
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="取消任务" Style="{StaticResource DangerButton}"
+                                    Command="{Binding CancelOperationCommand}" Padding="14,6" Margin="0,0,10,0"
+                                    AutomationProperties.AutomationId="CancelTaskButton"
+                                    Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="停止正在进行的下载 / 安装" />
+                            <TextBlock Text="{Binding TargetInfo}" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="330" />
+                        </StackPanel>
                     </Grid>
 
                     <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap"
