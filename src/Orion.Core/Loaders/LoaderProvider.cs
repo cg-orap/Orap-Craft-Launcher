@@ -109,12 +109,30 @@ public abstract class MetaProfileProvider : ILoaderProvider
         return result;
     }
 
+    /// <summary>
+    /// Loader metadata candidates, BMCLAPI mirror first.
+    ///
+    /// The official Fabric/Quilt meta endpoints answer in seconds at best and hang for some version
+    /// combinations on CN networks (26.3/0.19.5 timed out for 20s+ while the mirror replied in under
+    /// a second), and the download-source setting is only read when the resolver is created, so a
+    /// user who switches to a mirror mid-session can still end up with a single official URL.
+    /// </summary>
+    private IReadOnlyList<Uri> MetadataCandidates(Uri official)
+    {
+        var resolved = Mirrors.Resolve(official);
+        if (resolved.Count > 1) return resolved;   // the resolver already offers the mirror
+
+        var prefix = MetaBase.Contains("quiltmc", StringComparison.OrdinalIgnoreCase) ? "quilt-meta" : "fabric-meta";
+        var mirrored = new Uri($"https://bmclapi2.bangbang93.com/{prefix}{official.AbsolutePath}");
+        return [mirrored, .. resolved];
+    }
+
     public async Task<LoaderInstallResult> InstallAsync(LoaderInstallRequest request, CancellationToken ct = default)
     {
         var url = new Uri($"{MetaBase}/v2/versions/loader/{Uri.EscapeDataString(request.MinecraftVersion)}/{Uri.EscapeDataString(request.LoaderVersion)}/profile/json");
         request.Output?.Report($"正在获取 {DisplayName} 配置…");
 
-        var json = await HttpUtil.GetStringAsync(Http, Mirrors.Resolve(url), ct).ConfigureAwait(false);
+        var json = await HttpUtil.GetStringAsync(Http, MetadataCandidates(url), ct).ConfigureAwait(false);
 
         Json.VersionMetadata? profile;
         try
