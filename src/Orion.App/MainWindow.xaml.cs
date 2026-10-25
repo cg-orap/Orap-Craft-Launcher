@@ -35,4 +35,12 @@ public partial class MainWindow : Window
         nav.IsExpanded = !nav.IsExpanded;
         e.Handled = true;
     }
+
+    private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)
+        => WindowState = WindowState.Minimized;
+
+    private void OnMaximize(object sender, System.Windows.RoutedEventArgs e)
+        => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnClose(object sender, System.Windows.RoutedEventArgs e) => Close();
 }
