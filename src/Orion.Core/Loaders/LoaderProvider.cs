@@ -145,7 +145,19 @@ public abstract class MetaProfileProvider : ILoaderProvider
         request.Output?.Report($"已写入版本配置 {profile.Id}");
 
         // Download the libraries it references (and the vanilla parent).
-        var install = await InstallService.InstallAsync(profile.Id, new Install.InstallOptions(), null, ct).ConfigureAwait(false);
+        // Pass the caller's progress sink through: without it the download phase reported nothing,
+        // so a slow or stalled library/asset download looked exactly like a frozen UI.
+        request.Output?.Report($"正在下载 {profile.Id} 的依赖与资源…");
+        // Adapt the text sink to the install engine's structured progress so the UI and log see the
+        // real download phase (files counted) instead of an apparently frozen task.
+        var installProgress = request.Output is null
+            ? null
+            : new Progress<Install.InstallProgress>(p =>
+            {
+                if (!string.IsNullOrWhiteSpace(p.Message)) request.Output.Report(p.Message);
+            });
+
+        var install = await InstallService.InstallAsync(profile.Id, new Install.InstallOptions(), installProgress, ct).ConfigureAwait(false);
         if (!install.Success)
         {
             return new LoaderInstallResult
