@@ -21,20 +21,7 @@
                 <TextBlock Text="游戏版本、整合包、模组、光影与材质包都在这里下载。"
                            Style="{StaticResource CaptionText}" Margin="0,5,0,12" />
 
-                <ItemsControl ItemsSource="{Binding Kinds}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <RadioButton Content="{Binding Name}" GroupName="CatalogKinds"
-                                         Style="{StaticResource TabRadio}" Margin="0,0,8,0"
-                                         Checked="OnKindChecked" Tag="{Binding}" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+
             </StackPanel>
         </Border>
 

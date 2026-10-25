@@ -164,6 +164,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 SubItems =
                 {
+                    new NavSubItem("versions", "原版游戏"),
                     new NavSubItem("modpack", "整合包"),
                     new NavSubItem("mod", "模组"),
                     new NavSubItem("shader", "光影包"),
@@ -374,8 +375,10 @@ public sealed class MainViewModel : ObservableObject
     {
         if (parameter is not NavSubItem sub) return;
 
+        var kindKey = string.Equals(sub.Key, "versions", StringComparison.OrdinalIgnoreCase) ? "versions" : sub.Key;
+
         var kind = CatalogPage.Kinds.FirstOrDefault(k =>
-            string.Equals(k.Key, sub.Key, StringComparison.OrdinalIgnoreCase));
+            string.Equals(k.Key, kindKey, StringComparison.OrdinalIgnoreCase));
 
         if (kind is not null) CatalogPage.Kind = kind;
         Navigate("catalog");

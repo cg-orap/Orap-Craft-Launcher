@@ -3,7 +3,7 @@
 
     <!-- Light palette: identical keys to Dark.xaml. -->
     <Color x:Key="WindowBgColor">#FFF4F6FA</Color>
-    <Color x:Key="SurfaceBgColor">#D9FFFFFF</Color>
+    <Color x:Key="SurfaceBgColor">#B3FFFFFF</Color>
     <Color x:Key="SurfaceAltBgColor">#FFF0F3F9</Color>
     <Color x:Key="SurfaceHoverColor">#FFE4EAF4</Color>
     <Color x:Key="BorderColor">#FFD8DFEA</Color>

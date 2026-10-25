@@ -3,9 +3,9 @@
 
     <!-- Dark palette. Every key is also defined in Light.xaml so the theme can be swapped
          at runtime without restarting the application. -->
-    <Color x:Key="WindowBgColor">#E610131A</Color>
-    <Color x:Key="SurfaceBgColor">#D9181D27</Color>
-    <Color x:Key="SurfaceAltBgColor">#FF212836</Color>
+    <Color x:Key="WindowBgColor">#CC10131A</Color>
+    <Color x:Key="SurfaceBgColor">#B3181D27</Color>
+    <Color x:Key="SurfaceAltBgColor">#B3212836</Color>
     <Color x:Key="SurfaceHoverColor">#FF2A3444</Color>
     <Color x:Key="BorderColor">#FF2C3646</Color>
     <Color x:Key="AccentColor">#FF4C8DFF</Color>

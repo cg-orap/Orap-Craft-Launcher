@@ -121,6 +121,13 @@ public partial class App : Application
             var corners = 2;                                               // round window corners
             DwmSetWindowAttribute(hwnd, 33, ref corners, sizeof(int));
 
+            // caption colour matches the palette (COLORREF is 0x00BBGGRR)
+            var caption = dark ? 0x001A1F27 : 0x00FCF9F7;
+            DwmSetWindowAttribute(hwnd, 35, ref caption, sizeof(int));
+
+            var captionText = dark ? 0x00F0ECE9 : 0x001A1F27;
+            DwmSetWindowAttribute(hwnd, 36, ref captionText, sizeof(int));
+
             AppLog.Info("ui", "window-chrome", ("dark", dark));
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
