@@ -24,7 +24,7 @@ public sealed class ManifestVersion
     [JsonPropertyName("url")] public string Url { get; set; } = "";
     [JsonPropertyName("sha1")] public string? Sha1 { get; set; }
     [JsonPropertyName("time")] public DateTimeOffset? Time { get; set; }
-    [JsonPropertyName("releaseTime")] public DateTimeOffset? ReleaseTime { get; set; }
+    [JsonPropertyName("releaseTime"), JsonConverter(typeof(FlexibleDateConverter))] public DateTimeOffset? ReleaseTime { get; set; }
     [JsonPropertyName("complianceLevel")] public int ComplianceLevel { get; set; }
 }
 
@@ -54,7 +54,7 @@ public sealed class VersionMetadata
     [JsonPropertyName("logging")] public LoggingSettings? Logging { get; set; }
     [JsonPropertyName("minimumLauncherVersion")] public int MinimumLauncherVersion { get; set; }
     [JsonPropertyName("complianceLevel")] public int ComplianceLevel { get; set; }
-    [JsonPropertyName("releaseTime")] public DateTimeOffset? ReleaseTime { get; set; }
+    [JsonPropertyName("releaseTime"), JsonConverter(typeof(FlexibleDateConverter))] public DateTimeOffset? ReleaseTime { get; set; }
     [JsonPropertyName("time")] public DateTimeOffset? Time { get; set; }
 }
 
@@ -355,5 +355,45 @@ public sealed class ArgumentNodeConverter : JsonConverter<ArgumentNode>
         }
 
         writer.WriteEndObject();
+    }
+}
+
+/// <summary>
+/// Loader metadata is inconsistent about releaseTime (ISO strings, unix milliseconds, null and odd
+/// values). A strict DateTimeOffset converter threw and aborted the whole loader install, so values
+/// that cannot be parsed become null instead.
+/// </summary>
+public sealed class FlexibleDateConverter : JsonConverter<DateTimeOffset?>
+{
+    public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Null:
+                return null;
+
+            case JsonTokenType.Number when reader.TryGetInt64(out var unix):
+                return DateTimeOffset.FromUnixTimeMilliseconds(unix);
+
+            case JsonTokenType.String:
+                var text = reader.GetString();
+                if (string.IsNullOrWhiteSpace(text)) return null;
+                if (DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsed))
+                {
+                    return parsed;
+                }
+                return long.TryParse(text, out var millis) ? DateTimeOffset.FromUnixTimeMilliseconds(millis) : null;
+
+            default:
+                reader.Skip();
+                return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options)
+    {
+        if (value is null) writer.WriteNullValue();
+        else writer.WriteStringValue(value.Value);
     }
 }

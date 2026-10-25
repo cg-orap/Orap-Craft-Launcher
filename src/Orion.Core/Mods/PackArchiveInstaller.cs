@@ -217,7 +217,14 @@ public sealed class PackArchiveInstaller
                 try
                 {
                     output?.Report($"下载模组 {file.ProjectId}/{file.FileId}…");
-                    using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                    // No public key-less download API: the request may redirect to HTML or stall, so it
+                // is bounded and counted as unresolved instead of leaving the task in 进行中 forever.
+                using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                perFile.CancelAfter(TimeSpan.FromSeconds(30));
+
+                using var response = await _http
+                    .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, perFile.Token)
+                    .ConfigureAwait(false);
 
                     if (!response.IsSuccessStatusCode)
                     {
