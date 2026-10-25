@@ -144,6 +144,21 @@
 
                         <TextBlock Text="代理（例如 http://127.0.0.1:7890）" Style="{StaticResource CaptionText}" />
                         <TextBox Text="{Binding ProxyUrl, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                    <TextBlock Text="CurseForge API Key（可选，用于自动下载 CF 整合包的全部模组）"
+                               Style="{StaticResource CaptionText}" Margin="0,14,0,0" />
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Text="{Binding CurseForgeApiKey, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.AutomationId="CurseForgeKeyBox" />
+                        <Button Grid.Column="1" Content="测试 Key" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding TestCurseForgeKeyCommand}" Margin="8,0,0,0" Padding="14,6"
+                                AutomationProperties.AutomationId="CurseForgeKeyTest" />
+                    </Grid>
+                    <TextBlock Text="申请入口见 CurseForge 支持文档；留空则只能靠公开 CDN 猜测，部分模组会缺失。"
+                               Style="{StaticResource CaptionText}" Margin="0,6,0,0" TextWrapping="Wrap" />
 
                         <TextBlock Text="镜像仅作为传输替代，所有文件仍按官方 SHA-1 校验。启动器不会关闭 TLS 证书验证。"
                                    Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />

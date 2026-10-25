@@ -57,6 +57,7 @@ public sealed class SettingsViewModel : ObservableObject
     ];
     private bool _forceUtf8Console = true;
     private string _microsoftClientId = "";
+    private string _curseForgeApiKey = "";
     private string _status = "设置会立即保存到数据目录。";
 
     public SettingsViewModel(MainViewModel main)
@@ -64,6 +65,7 @@ public sealed class SettingsViewModel : ObservableObject
         _main = main;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, null, ex => Status = "保存失败: " + ex.Message);
+        TestCurseForgeKeyCommand = new AsyncRelayCommand(TestCurseForgeKeyAsync, null, ex => Status = "测试失败: " + ex.Message);
         DetectJavaCommand = new AsyncRelayCommand(DetectJavaAsync);
         BrowseJavaCommand = new RelayCommand(BrowseJava);
         OpenDataFolderCommand = new RelayCommand(() => OpenFolder(_main.Context.Paths.Root));
@@ -72,6 +74,7 @@ public sealed class SettingsViewModel : ObservableObject
     }
 
     public ICommand SaveCommand { get; }
+    public ICommand TestCurseForgeKeyCommand { get; }
     public ICommand DetectJavaCommand { get; }
     public ICommand BrowseJavaCommand { get; }
     public ICommand OpenDataFolderCommand { get; }
@@ -159,6 +162,13 @@ public sealed class SettingsViewModel : ObservableObject
         set => SetProperty(ref _forceUtf8Console, value);
     }
 
+    /// <summary>CurseForge API key: enables the official download-url endpoint for CF packs.</summary>
+    public string CurseForgeApiKey
+    {
+        get => _curseForgeApiKey;
+        set => SetProperty(ref _curseForgeApiKey, value);
+    }
+
     public string MicrosoftClientId
     {
         get => _microsoftClientId;
@@ -171,6 +181,33 @@ public sealed class SettingsViewModel : ObservableObject
         private set => SetProperty(ref _status, value);
     }
 
+    /// <summary>Calls the CurseForge games endpoint: 200 means the key is accepted.</summary>
+    private async Task TestCurseForgeKeyAsync()
+    {
+        var key = CurseForgeApiKey?.Trim();
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            Status = "请先填写 CurseForge API Key。";
+            return;
+        }
+
+        Status = "正在验证 CurseForge API Key…";
+        try
+        {
+            using var request = new System.Net.Http.HttpRequestMessage(
+                System.Net.Http.HttpMethod.Get, "https://api.curseforge.com/v1/games?pageSize=1");
+            request.Headers.TryAddWithoutValidation("x-api-key", key);
+
+            using var response = await _main.Context.Http.SendAsync(request).ConfigureAwait(true);
+            Status = response.IsSuccessStatusCode
+                ? $"Key 有效（HTTP {(int)response.StatusCode}）。保存后即可用于 CurseForge 整合包。"
+                : $"Key 被拒绝：HTTP {(int)response.StatusCode}。请检查是否复制完整或申请是否通过。";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            Status = "测试失败：" + ex.Message;
+        }
+    }
     public void LoadFromSettings()
     {
         var settings = _main.Context.Settings;
@@ -185,6 +222,7 @@ public sealed class SettingsViewModel : ObservableObject
         Accent = settings.Accent;
         ForceUtf8Console = settings.ForceUtf8Console;
         MicrosoftClientId = settings.MicrosoftClientId ?? "";
+        CurseForgeApiKey = settings.CurseForgeApiKey ?? "";
 
         OnPropertyChanged(nameof(DataRoot));
     }
@@ -203,6 +241,7 @@ public sealed class SettingsViewModel : ObservableObject
         settings.Accent = Accent;
         settings.ForceUtf8Console = ForceUtf8Console;
         settings.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();
+        settings.CurseForgeApiKey = string.IsNullOrWhiteSpace(CurseForgeApiKey) ? null : CurseForgeApiKey.Trim();
 
         await _main.Context.SettingsStore.SaveAsync(settings).ConfigureAwait(true);
 
