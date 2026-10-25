@@ -97,6 +97,9 @@ public sealed class DownloadEngine
 {
     private const int BufferSize = 96 * 1024;
 
+    /// <summary>No-data budget for a single body read; see ReadWithStallGuardAsync.</summary>
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(25);
+
     private readonly HttpClient _http;
     private readonly DownloadEngineOptions _options;
     private readonly MirrorResolver _mirrors;
@@ -290,6 +293,29 @@ public sealed class DownloadEngine
             last?.GetType().Name ?? "Unknown");
     }
 
+    /// <summary>
+    /// Reads the response body, treating "no bytes for StallTimeout" as a transport failure.
+    ///
+    /// Without this a connection that opens and then goes silent held the whole install forever: the
+    /// progress sat at 72/74 with 0 B/s because the read awaited a socket that never answered.
+    /// Throwing TaskCanceledException hands control back to DownloadOneAsync, which retries the next
+    /// mirror and finally reports the offending URL.
+    /// </summary>
+    private async Task<int> ReadWithStallGuardAsync(Stream source, byte[] buffer, CancellationToken ct)
+    {
+        using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        stall.CancelAfter(StallTimeout);
+
+        try
+        {
+            return await source.ReadAsync(buffer.AsMemory(0, BufferSize), stall.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            AppLog.Warn("download", "stalled", ("seconds", StallTimeout.TotalSeconds));
+            throw new TaskCanceledException($"下载停滞：{StallTimeout.TotalSeconds:0} 秒没有收到数据");
+        }
+    }
     private async Task TransferAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct)
     {
         var target = request.TargetPath;
@@ -361,7 +387,7 @@ public sealed class DownloadEngine
                 useAsync: true);
 
             int read;
-            while ((read = await source.ReadAsync(buffer.AsMemory(0, BufferSize), ct).ConfigureAwait(false)) > 0)
+            while ((read = await ReadWithStallGuardAsync(source, buffer, ct).ConfigureAwait(false)) > 0)
             {
                 await sink.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                 state.OnBytesTransferred(read);
