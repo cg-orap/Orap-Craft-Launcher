@@ -34,6 +34,10 @@ public static class JsonUtil
         };
         options.Converters.Add(new ArgumentNodeConverter());
         options.Converters.Add(new FlexibleStringConverter());
+
+        // Loader metadata timestamps are inconsistent (ISO, unix millis, null, odd strings), so every
+        // DateTimeOffset field goes through the forgiving converter instead of aborting the parse.
+        options.Converters.Add(new Orion.Core.Json.FlexibleDateConverter());
         return options;
     }
 
