@@ -115,7 +115,8 @@
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <Button Content="打开版本目录" Style="{StaticResource GhostButton}" Command="{Binding OpenVersionFolderCommand}" />
                             <Button Content="导出整合包" Style="{StaticResource SecondaryButton}" Command="{Binding ExportPackCommand}" Margin="8,0,0,0" />
-                            <Button Content="移除版本" Style="{StaticResource DangerButton}" Command="{Binding DeleteCommand}" Margin="8,0,0,0" />
+                            <Button Content="删除版本" Style="{StaticResource DangerFilledButton}" Command="{Binding DeleteCommand}" Margin="8,0,0,0" Padding="16,7"
+                        ToolTip="把整个版本目录放进 Windows 回收站，可从资源管理器还原" />
                         </StackPanel>
 
                         <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,12,0,0" />
@@ -124,9 +125,9 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="移除策略" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="删除策略" Style="{StaticResource SectionTitle}" />
                         <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}"
-                                   Text="移除版本时不会永久删除文件：整个版本目录会被移动到数据目录下的 trash 文件夹，可随时手动恢复。外部导入的版本只会解除注册，绝不修改原目录。" />
+                                   Text="删除版本时不会永久删除文件：整个版本目录会被放进 Windows 回收站，可从资源管理器还原。外部导入的版本只会解除注册，绝不修改原目录。" />
                     </StackPanel>
                 </Border>
             </StackPanel>

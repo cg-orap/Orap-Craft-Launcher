@@ -191,10 +191,10 @@ public sealed class InstancesViewModel : ObservableObject
 
         var hasData = InstanceManager.HasUserData(instance.GameDirectory);
         var message = hasData
-            ? $"版本「{instance.Name}」包含存档或 Mod。\n\n删除时不会永久删除文件，而是移动到回收目录（trash），你可以手动恢复。\n\n是否继续？"
-            : $"确定要移除版本「{instance.Name}」吗？\n\n文件会被移动到回收目录，而不是永久删除。";
+            ? $"版本「{instance.Name}」包含存档或 Mod。\n\n删除不会永久抹掉文件：整个版本目录会被放进 Windows 回收站，你可以从资源管理器还原。\n\n是否继续？"
+            : $"确定要删除版本「{instance.Name}」吗？\n\n整个版本目录会被放进 Windows 回收站，可从资源管理器还原。";
 
-        if (System.Windows.MessageBox.Show(message, "移除版本", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning)
+        if (System.Windows.MessageBox.Show(message, "删除版本", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning)
             != System.Windows.MessageBoxResult.OK)
         {
             return;
@@ -208,8 +208,8 @@ public sealed class InstancesViewModel : ObservableObject
             SelectedInstance = _main.Instances.FirstOrDefault();
 
             Status = trashPath is null
-                ? $"已移除版本「{instance.Name}」的注册信息。"
-                : $"已移除版本「{instance.Name}」，文件已移动到 {trashPath}";
+                ? $"已解除版本「{instance.Name}」的注册（外部版本，原目录未改动）。"
+                : $"已删除版本「{instance.Name}」，整个目录已放进 Windows 回收站：{trashPath}";
         }
         catch (IOException ex)
         {
