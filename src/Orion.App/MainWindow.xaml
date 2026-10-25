@@ -5,6 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
         Title="Orap Craft Launcher — Minecraft Java 版启动器"
+        Icon="Assets/app.ico"
         Height="780" Width="1240" MinHeight="600" MinWidth="900"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
@@ -142,10 +143,27 @@
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                           FontSize="15" Width="22" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding Title}" FontSize="13.5" VerticalAlignment="Center" />
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                               FontSize="15" Width="22" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Title}" FontSize="13.5" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <!-- second level: the four download tabs, shown while 下载中心 is active -->
+                                <ItemsControl ItemsSource="{Binding SubItems}" Margin="30,4,0,2"
+                                              Visibility="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left" Padding="10,5" Margin="0,2,0,0"
+                                                    Content="{Binding Title}"
+                                                    FontSize="12.5"
+                                                    Command="{Binding DataContext.OpenCatalogKindCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

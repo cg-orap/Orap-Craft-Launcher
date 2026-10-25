@@ -7,6 +7,7 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
+        Loaded += (_, _) => App.ApplyWindowChrome(this);
         InitializeComponent();
     }
 }

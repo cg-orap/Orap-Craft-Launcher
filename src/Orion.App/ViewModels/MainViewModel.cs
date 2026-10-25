@@ -160,7 +160,16 @@ public sealed class MainViewModel : ObservableObject
         NavItems.AddRange(
         [
             new NavItem("home", "首页", "\uE80F"),
-            new NavItem("catalog", "下载中心", "\uE896"),
+            new NavItem("catalog", "下载中心", "\uE896")
+            {
+                SubItems =
+                {
+                    new NavSubItem("modpack", "整合包"),
+                    new NavSubItem("mod", "模组"),
+                    new NavSubItem("shader", "光影包"),
+                    new NavSubItem("resourcepack", "材质包"),
+                },
+            },
             new NavItem("mods", "Mod 管理", "\uE7B8"),
             new NavItem("downloads", "下载管理", "\uE81C"),
             new NavItem("settings", "设置", "\uE713"),
@@ -168,6 +177,7 @@ public sealed class MainViewModel : ObservableObject
         ]);
 
         OpenLoginCommand = new RelayCommand(OpenLogin);
+        OpenCatalogKindCommand = new RelayCommand(OpenCatalogKind);
 
         _selectedNavItem = NavItems[0];
         _currentPage = Home;
@@ -196,6 +206,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableList<NavItem> NavItems { get; } = [];
 
     public ICommand OpenLoginCommand { get; }
+    public ICommand OpenCatalogKindCommand { get; }
 
     public NavItem? SelectedNavItem
     {
@@ -358,6 +369,18 @@ public sealed class MainViewModel : ObservableObject
     /// Opens the dedicated login window (the only place accounts are managed) and reloads the
     /// account list when it closes.
     /// </summary>
+    /// <summary>Jump straight into one of the download centre's resource tabs.</summary>
+    private void OpenCatalogKind(object? parameter)
+    {
+        if (parameter is not NavSubItem sub) return;
+
+        var kind = CatalogPage.Kinds.FirstOrDefault(k =>
+            string.Equals(k.Key, sub.Key, StringComparison.OrdinalIgnoreCase));
+
+        if (kind is not null) CatalogPage.Kind = kind;
+        Navigate("catalog");
+    }
+
     public void OpenLogin()
     {
         try
@@ -501,4 +524,14 @@ public sealed class NavItem(string key, string title, string glyph = "")
 
     /// <summary>Segoe Fluent Icons / Segoe MDL2 Assets glyph shown before the label.</summary>
     public string Glyph { get; } = glyph;
+
+    /// <summary>Second level entries revealed while this item is selected (下载中心 has four).</summary>
+    public List<NavSubItem> SubItems { get; } = [];
+}
+
+/// <summary>A nested navigation entry such as 整合包 / 模组 / 光影 / 材质包.</summary>
+public sealed class NavSubItem(string key, string title)
+{
+    public string Key { get; } = key;
+    public string Title { get; } = title;
 }

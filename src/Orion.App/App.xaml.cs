@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Orion.App.ViewModels;
 using Orion.Core;
@@ -94,6 +96,41 @@ public partial class App : Application
         Fit(window);
         window.Loaded += (_, _) => Fit(window);
     }
+
+    /// <summary>
+    /// Makes the native title bar follow the theme and enables the DWM backdrop (Mica / Acrylic on
+    /// Windows 11) so the translucent palette picks up the desktop behind the window. Older Windows
+    /// builds simply ignore the attributes.
+    /// </summary>
+    public static void ApplyWindowChrome(Window window)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        try
+        {
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            var dark = !string.Equals((Current as App)?._context?.Settings.Theme, "Light", StringComparison.OrdinalIgnoreCase);
+            var darkValue = dark ? 1 : 0;
+            DwmSetWindowAttribute(hwnd, 20, ref darkValue, sizeof(int));   // immersive dark title bar
+
+            var backdrop = 3;                                              // 3 = Acrylic
+            DwmSetWindowAttribute(hwnd, 38, ref backdrop, sizeof(int));    // system backdrop type
+
+            var corners = 2;                                               // round window corners
+            DwmSetWindowAttribute(hwnd, 33, ref corners, sizeof(int));
+
+            AppLog.Info("ui", "window-chrome", ("dark", dark));
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            AppLog.Debug("ui", "backdrop-unavailable");
+        }
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     /// <summary>
     /// Swaps the palette (dark / light) and the accent colour scheme at runtime.

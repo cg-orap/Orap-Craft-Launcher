@@ -8,6 +8,7 @@
     <AssemblyName>OrapCraftLauncher</AssemblyName>
     <Product>Orap Craft Launcher</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en;zh-Hans</SatelliteResourceLanguages>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
