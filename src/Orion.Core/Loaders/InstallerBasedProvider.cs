@@ -149,7 +149,9 @@ public abstract class InstallerBasedProvider : ILoaderProvider
             [
                 "-jar",
                 installerFile,
-                "--install-client",
+                // joptsimple is case-sensitive: "--install-client" is rejected with
+                // UnrecognizedOptionException (exit 1), so the camelCase spelling is required.
+                "--installClient",
                 Paths.Root,
             ]);
 
