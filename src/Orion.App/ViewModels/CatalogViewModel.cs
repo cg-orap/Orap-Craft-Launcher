@@ -1,3 +1,4 @@
+using Orion.Core.Net;
 using System.IO;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -595,6 +596,41 @@ public sealed class CatalogViewModel : ObservableObject
         var target = Path.Combine(temp, version.PrimaryFile.Filename);
 
         if (!File.Exists(target))
+        {
+            // A 30-100 MB archive used to be fetched invisibly before any activity existed: the
+            // catalogue showed 正在安装 while 下载管理 stayed empty. It now goes through the engine, so
+            // it gets an activity, a resumable transfer, SHA-1 verification and a real speed readout.
+            var archiveActivity = _main.Activities.Begin($"下载整合包 {version.PrimaryFile.Filename}", version.PrimaryFile.Url);
+
+            var archiveProgress = new Progress<DownloadProgress>(p =>
+                _main.Activities.Report(archiveActivity,
+            p.TotalBytes > 0 ? Math.Clamp((double)p.DownloadedBytes / p.TotalBytes, 0, 1) : 0,
+            $"下载整合包 {p.CompletedFiles}/{Math.Max(1, p.TotalFiles)} 个文件",
+            $"{p.BytesPerSecond / 1024:0} KB/s"));
+
+            var archiveDownload = await _main.Context.DownloadEngine.DownloadAsync(
+            [
+                new DownloadRequest
+                {
+                    TargetPath = target,
+                    Urls = [new Uri(version.PrimaryFile.Url)],
+                    Sha1 = version.PrimaryFile.Sha1,
+                    Size = version.PrimaryFile.Size,
+                    Verify = DownloadVerifyPolicy.Always,
+                    Label = version.PrimaryFile.Filename,
+                },
+            ], archiveProgress, ct).ConfigureAwait(true);
+
+            _main.Activities.Finish(archiveActivity,
+                archiveDownload.Success ? ActivityState.Completed : ActivityState.Failed,
+                archiveDownload.Success ? null : (archiveDownload.Failures.FirstOrDefault()?.Message ?? "整合包下载失败。"));
+
+            if (!archiveDownload.Success)
+            {
+                Status = "整合包下载失败：" + (archiveDownload.Failures.FirstOrDefault()?.Message ?? "未知错误");
+                return;
+            }
+        }
         {
             var bytes = await _main.Context.Http.GetByteArrayAsync(version.PrimaryFile.Url, ct).ConfigureAwait(true);
             await File.WriteAllBytesAsync(target, bytes, ct).ConfigureAwait(true);
