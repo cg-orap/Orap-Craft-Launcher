@@ -216,7 +216,10 @@ public sealed class VersionInstallService
                 Sha1 = client.Sha1,
                 Size = client.Size,
                 Label = $"客户端 {jarVersion}.jar",
-                Verify = DownloadVerifyPolicy.Auto,
+                            // Always verify: a file that merely matches in size may still be corrupted, and reusing
+            // it would poison every instance that later inherits from this version. Hashing a cached
+            // file is much cheaper than downloading it again.
+            Verify = DownloadVerifyPolicy.Always,
             });
         }
         else

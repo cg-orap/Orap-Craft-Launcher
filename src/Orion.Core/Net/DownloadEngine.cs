@@ -70,6 +70,7 @@ public sealed class DownloadReport
     public int TotalFiles { get; init; }
     public int CompletedFiles { get; init; }
     public int SkippedFiles { get; init; }
+    public long SkippedBytes { get; init; }
     public int FailedFiles { get; init; }
     public long DownloadedBytes { get; init; }
     public TimeSpan Duration { get; init; }
@@ -239,6 +240,7 @@ public sealed class DownloadEngine
         AppLog.Info("download", "batch-finished",
             ("ok", report.CompletedFiles),
             ("skipped", report.SkippedFiles),
+            ("reusedBytes", report.SkippedBytes),
             ("failed", report.FailedFiles),
             ("bytes", report.DownloadedBytes),
             ("seconds", Math.Round(report.Duration.TotalSeconds, 1)));
@@ -741,6 +743,7 @@ public sealed class DownloadEngine
             TotalFiles = state.TotalFiles,
             CompletedFiles = state.CompletedFilesView,
             SkippedFiles = state.SkippedFiles,
+            SkippedBytes = state.SkippedBytes,
             FailedFiles = failures.Length,
             DownloadedBytes = state.DownloadedBytes,
             Duration = DateTimeOffset.UtcNow - started,
@@ -809,6 +812,7 @@ public sealed class DownloadEngine
         private long _downloadedBytes;
         private int _completedFiles;
         private int _skippedFiles;
+        private long _skippedBytes;
         private string? _currentFile;
         private Task? _reporter;
         private long _precompletedBytes;
@@ -816,6 +820,7 @@ public sealed class DownloadEngine
         public int TotalFiles { get; set; }
         public long TotalBytes { get; set; }
         public int SkippedFiles => _skippedFiles;
+        public long SkippedBytes => Interlocked.Read(ref _skippedBytes);
         public int CompletedFilesView => _completedFiles;
         public long DownloadedBytes => _downloadedBytes + _precompletedBytes;
         public ConcurrentBag<DownloadFailure> Failures { get; } = [];
@@ -829,6 +834,7 @@ public sealed class DownloadEngine
         public void OnSkipped(long size)
         {
             Interlocked.Increment(ref _skippedFiles);
+            Interlocked.Add(ref _skippedBytes, size > 0 ? size : 0);
             Interlocked.Increment(ref _completedFiles);
             if (size > 0) Interlocked.Add(ref _precompletedBytes, size);
         }
