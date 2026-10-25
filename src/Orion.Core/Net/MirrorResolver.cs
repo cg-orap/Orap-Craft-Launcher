@@ -35,12 +35,13 @@ public sealed class MirrorResolver
     /// </summary>
     public IReadOnlyList<Uri> Resolve(Uri official)
     {
-        if (!IsMirrorEnabled) return [official];
-
         var mirror = TryMap(official);
         if (mirror is null) return [official];
 
-        return [mirror, official];
+        // Mirror enabled: try it first. Mirror disabled: official first, but the mirror is still kept
+        // as a last-resort fallback - a single unreachable host used to fail the whole install with
+        // "已尝试 1 个来源".
+        return IsMirrorEnabled ? [mirror, official] : [official, mirror];
     }
 
     public IReadOnlyList<Uri> Resolve(params Uri[] official)
