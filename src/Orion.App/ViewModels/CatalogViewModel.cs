@@ -641,6 +641,35 @@ public sealed class CatalogViewModel : ObservableObject
         Core.Mods.PackArchiveKind.MinecraftZip => " .minecraft 整合包",
         _ => "整合包（按 Modrinth 处理）",
     };
+    /// <summary>A Forge install runs the loader installer with java, so it needs a matching runtime.</summary>
+    private async Task<Core.Java.JavaRuntime?> PickInstallerJavaAsync(string? minecraftVersion)
+    {
+        var runtimes = _main.JavaRuntimes.Count > 0
+            ? _main.JavaRuntimes.ToList()
+            : (await _main.Context.JavaDetector.DiscoverAsync().ConfigureAwait(true)).ToList();
+
+        var required = minecraftVersion is null ? 17 : GuessRequiredJava(minecraftVersion);
+        var java = Core.Java.JavaDetector.SelectFor(required, runtimes);
+        if (java is not null) return java;
+
+        var detected = string.Join("、", runtimes.Select(r => "Java " + r.MajorVersion).Distinct());
+        Status = $"安装这个加载器需要 Java {required}，但只检测到 {(detected.Length == 0 ? "无" : detected)}。"
+               + "请安装对应 JDK，或在「设置 → Java」指定路径后重试。";
+        AppLog.Warn("catalog", "installer-java-missing", ("required", required), ("detected", detected));
+        return null;
+    }
+
+    /// <summary>Fallback rule when version metadata is not available yet.</summary>
+    private static int GuessRequiredJava(string minecraftVersion)
+    {
+        var parts = minecraftVersion.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2 || !int.TryParse(parts[0], out var major) || !int.TryParse(parts[1], out var minor)) return 17;
+
+        if (major >= 26) return 25;
+        if (major > 1) return 21;
+        return minor >= 21 ? 21 : minor >= 18 ? 17 : 8;
+    }
+
     private static double? ParseRatio(string line)
     {
         var match = System.Text.RegularExpressions.Regex.Match(line, @"(\d+)\s*/\s*(\d+)");
@@ -689,7 +718,7 @@ public sealed class CatalogViewModel : ObservableObject
             var result = info.Kind switch
             {
                 Core.Mods.PackArchiveKind.CurseForge => await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(path, name ?? info.Name, null, progress, linked.Token)
+                    .InstallCurseForgeAsync(path, name ?? info.Name, await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true), progress, linked.Token)
                     .ConfigureAwait(true),
 
                 Core.Mods.PackArchiveKind.MinecraftZip => await _main.Context.PackArchives
