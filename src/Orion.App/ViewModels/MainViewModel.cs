@@ -463,6 +463,32 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Cancels whatever catalogue/install operation is currently running.</summary>
     public void CancelRunningWork() => CatalogPage.CancelOperation();
 
+    /// <summary>
+    /// Jumps to 版本设置 with the freshly installed version selected and its name pre-filled, so the
+    /// user can rename it right after the install (installs otherwise keep the pack/file name).
+    /// </summary>
+    public async Task OpenInstanceForRenameAsync(string? instanceId, string? suggestedName = null)
+    {
+        await ReloadInstancesAsync().ConfigureAwait(true);
+
+        var target = Instances.FirstOrDefault(i =>
+            string.Equals(i.Id, instanceId, StringComparison.OrdinalIgnoreCase));
+
+        if (target is null && !string.IsNullOrWhiteSpace(suggestedName))
+        {
+            target = Instances.FirstOrDefault(i =>
+                string.Equals(i.Name, suggestedName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (target is not null)
+        {
+            InstancesPage.SelectedInstance = target;
+            InstancesPage.DisplayName = target.Name;
+        }
+
+        Navigate("instances");
+    }
+
     private void NavigateCore(string key)
     {
         // Sub-pages such as "version-picker" are not entries of the rail: only move the highlight
