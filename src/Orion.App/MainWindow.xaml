@@ -114,7 +114,7 @@
             <DockPanel>
 
                 <!-- account: first entry of the rail, opens the login window -->
-                <Button DockPanel.Dock="Top" Margin="10,0,10,10" Padding="0" Cursor="Hand"
+                <Button DockPanel.Dock="Bottom" Margin="10,10,10,10" Padding="0" Cursor="Hand"
                         Command="{Binding OpenLoginCommand}"
                         AutomationProperties.AutomationId="AccountButton"
                         ToolTip="点击登录 / 切换账户">
