@@ -12,7 +12,7 @@ public sealed class NetworkOptions
     /// <summary>Optional proxy, e.g. <c>http://127.0.0.1:7890</c>. Empty disables the proxy.</summary>
     public string? ProxyUrl { get; set; }
 
-    public int MaxConnectionsPerServer { get; set; } = 16;
+    public int MaxConnectionsPerServer { get; set; } = 64;
 
     public TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(12);
 

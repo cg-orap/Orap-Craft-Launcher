@@ -40,7 +40,7 @@ public sealed record DownloadRequest
 
 public sealed class DownloadEngineOptions
 {
-    public int MaxConcurrency { get; set; } = 8;
+    public int MaxConcurrency { get; set; } = 32;
     public int MaxRetries { get; set; } = 4;
     public TimeSpan BaseRetryDelay { get; set; } = TimeSpan.FromMilliseconds(400);
     public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromSeconds(15);
@@ -181,9 +181,18 @@ public sealed class DownloadEngine
         state.StartReporterIfNeeded();
 
         // 3. Bounded concurrent transfer.
+        //
+        // Thousands of tiny asset objects are latency bound, not bandwidth bound: at the user's
+        // concurrency of 8 they crawled along at ~22 KB/s. A batch that is clearly made of small
+        // files therefore gets a wider fan-out automatically (still bounded, still per-host safe).
+        var fanout = Math.Max(1, _options.MaxConcurrency);
+        var smallBatch = pending.Count >= 200 && pending.All(p => p.Size is > 0 and < 1024 * 1024);
+        if (smallBatch) fanout = Math.Min(64, fanout * 3);
+        if (smallBatch) AppLog.Debug("download", "small-batch-fanout", ("files", pending.Count), ("fanout", fanout));
+
         var parallelOptions = new ParallelOptions
         {
-            MaxDegreeOfParallelism = Math.Max(1, _options.MaxConcurrency),
+            MaxDegreeOfParallelism = fanout,
             CancellationToken = cancellationToken,
         };
 

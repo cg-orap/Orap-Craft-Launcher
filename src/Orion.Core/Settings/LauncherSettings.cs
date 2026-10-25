@@ -17,7 +17,12 @@ public sealed class LauncherSettings
     [JsonPropertyName("minMemoryMb")] public int MinMemoryMb { get; set; } = 512;
     [JsonPropertyName("jvmArguments")] public string? JvmArguments { get; set; }
 
-    [JsonPropertyName("maxConcurrency")] public int MaxConcurrency { get; set; } = 8;
+        /// <summary>
+    /// Files downloaded at the same time. Minecraft assets are thousands of small objects, so the
+    /// bottleneck is round-trip latency rather than bandwidth: a higher fan-out is what lifts
+    /// throughput from tens of KB/s into the MB/s range.
+    /// </summary>
+    [JsonPropertyName("maxConcurrency")] public int MaxConcurrency { get; set; } = 32;
     [JsonPropertyName("source")] public DownloadSource Source { get; set; } = DownloadSource.Official;
     [JsonPropertyName("customMirrorBase")] public string? CustomMirrorBase { get; set; }
     [JsonPropertyName("proxyUrl")] public string? ProxyUrl { get; set; }
@@ -37,6 +42,7 @@ public sealed class LauncherSettings
     /// <summary>Custom home page background image; empty shows the built-in gradient.</summary>
     [JsonPropertyName("backgroundImagePath")] public string? BackgroundImagePath { get; set; }
 
+
     [JsonPropertyName("showSnapshots")] public bool ShowSnapshots { get; set; } = true;
     [JsonPropertyName("showOldVersions")] public bool ShowOldVersions { get; set; } = true;
 
@@ -45,7 +51,7 @@ public sealed class LauncherSettings
         Source = Source,
         CustomMirrorBase = CustomMirrorBase,
         ProxyUrl = ProxyUrl,
-        MaxConnectionsPerServer = 16,
+        MaxConnectionsPerServer = 64,
     };
 
     public LauncherSettings Clone() => (LauncherSettings)MemberwiseClone();
