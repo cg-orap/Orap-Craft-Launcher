@@ -214,7 +214,20 @@ public sealed class MainViewModel : ObservableObject
         get => _selectedNavItem;
         set
         {
-            if (value is null || ReferenceEquals(_selectedNavItem, value)) return;
+            if (value is null) return;
+
+            // A rail entry with sub-pages (下载中心) does not navigate: the page is opened by one of
+            // its sub-entries. The open/shut toggle is driven by the view's click handler, because
+            // clicking an already selected item never raises another selection change.
+            if (value.SubItems.Count > 0)
+            {
+                if (ReferenceEquals(_selectedNavItem, value)) return;
+                _selectedNavItem = value;
+                OnPropertyChanged();
+                return;
+            }
+
+            if (ReferenceEquals(_selectedNavItem, value)) return;
             _selectedNavItem = value;
             OnPropertyChanged();
             NavigateCore(value.Key);
@@ -520,10 +533,19 @@ public sealed class MainViewModel : ObservableObject
 }
 
 /// <summary>One entry of the left navigation rail.</summary>
-public sealed class NavItem(string key, string title, string glyph = "")
+public sealed class NavItem(string key, string title, string glyph = "") : Mvvm.ObservableObject
 {
+    private bool _expanded;
+
     public string Key { get; } = key;
     public string Title { get; } = title;
+
+    /// <summary>True while this entry's sub-menu is unfolded.</summary>
+    public bool IsExpanded
+    {
+        get => _expanded;
+        set => SetProperty(ref _expanded, value);
+    }
 
     /// <summary>Segoe Fluent Icons / Segoe MDL2 Assets glyph shown before the label.</summary>
     public string Glyph { get; } = glyph;

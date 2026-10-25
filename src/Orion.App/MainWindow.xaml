@@ -139,6 +139,7 @@
                          SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
                          Background="Transparent" BorderThickness="0" Margin="10,0,10,0"
                          ItemContainerStyle="{StaticResource NavItemStyle}"
+                         PreviewMouseLeftButtonDown="OnNavClick"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -149,9 +150,9 @@
                                     <TextBlock Text="{Binding Title}" FontSize="13.5" VerticalAlignment="Center" />
                                 </StackPanel>
 
-                                <!-- second level: the four download tabs, shown while 下载中心 is active -->
-                                <ItemsControl ItemsSource="{Binding SubItems}" Margin="30,4,0,2"
-                                              Visibility="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Converter={StaticResource BoolToVisibility}}">
+                                <!-- second level: the five download tabs, unfolded by clicking 下载中心 -->
+                                <ItemsControl ItemsSource="{Binding SubItems}" Margin="16,4,0,2"
+                                              Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Stretch"
