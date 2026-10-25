@@ -120,6 +120,8 @@ public sealed class DownloadEngine
 
     /// <summary>Bytes received per host since the meter started; used to spot throttled sources.</summary>
     private readonly ConcurrentDictionary<string, long> _hostBytes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, long> _hostBytesLarge = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _hostFirstLarge = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _hostFirstByte = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>A host measured below this while an alternative exists is tried last.</summary>
@@ -259,7 +261,7 @@ public sealed class DownloadEngine
         {
             ct.ThrowIfCancellationRequested();
 
-            var ordered = OrderByHostHealth(request.Urls);
+            var ordered = OrderByHostHealth(request.Urls, request.Size >= LargeFileThreshold);
             var url = ordered[Math.Min(attempt, ordered.Count - 1)];
             lastUrl = url;
 
@@ -417,7 +419,7 @@ public sealed class DownloadEngine
                         {
                             await sink.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                             state.OnBytesTransferred(read);
-                            RecordHostBytes(url.Host, read);
+                            RecordHostBytes(url.Host, read, request.Size >= LargeFileThreshold);
                         }
                     }
                     finally
@@ -555,7 +557,7 @@ public sealed class DownloadEngine
             {
                 await sink.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                 state.OnBytesTransferred(read);
-                RecordHostBytes(url.Host, read);
+                RecordHostBytes(url.Host, read, request.Size >= LargeFileThreshold);
 
                 rate.Add(read);
                 if (rate.ShouldAbort())
@@ -659,8 +661,16 @@ public sealed class DownloadEngine
         _hostPenalty[url.Host] = DateTimeOffset.UtcNow + HostPenaltyDuration;
     }
 
-    private void RecordHostBytes(string host, int count)
+    private void RecordHostBytes(string host, int count, bool large)
     {
+        if (large)
+        {
+            if (count <= 0) return;
+            _hostFirstLarge.TryAdd(host, DateTimeOffset.UtcNow);
+            _hostBytesLarge.AddOrUpdate(host, count, (_, current) => current + count);
+            return;
+        }
+
         if (count <= 0) return;
         _hostFirstByte.TryAdd(host, DateTimeOffset.UtcNow);
         _hostBytes.AddOrUpdate(host, count, (_, current) => current + count);
@@ -677,8 +687,20 @@ public sealed class DownloadEngine
     }
 
     /// <summary>True when a host is measurably throttled; such hosts are tried last.</summary>
-    private bool IsSlowHost(string host) => Rate(host) is > 0 and < SlowHostKbPerSecond;
-    private List<Uri> OrderByHostHealth(IReadOnlyList<Uri> urls)
+    private double Rate(string host, bool large)
+    {
+        var bytes = large ? _hostBytesLarge : _hostBytes;
+        var first = large ? _hostFirstLarge : _hostFirstByte;
+
+        if (!bytes.TryGetValue(host, out var total)) return 0;
+        if (!first.TryGetValue(host, out var started)) return 0;
+
+        var seconds = Math.Max(1, (DateTimeOffset.UtcNow - started).TotalSeconds);
+        return total / 1024.0 / seconds;
+    }
+
+    private bool IsSlowHost(string host, bool large) => Rate(host, large) is > 0 and < SlowHostKbPerSecond;
+    private List<Uri> OrderByHostHealth(IReadOnlyList<Uri> urls, bool large)
     {
         if (urls.Count <= 1) return [.. urls];
 
@@ -698,14 +720,14 @@ public sealed class DownloadEngine
         // throughput actually measured for each host; unknown hosts keep their original priority.
         if (healthy.Count > 1)
         {
-            foreach (var slow in healthy.Where(u => IsSlowHost(u.Host)))
+            foreach (var slow in healthy.Where(u => IsSlowHost(u.Host, large)))
             {
                 AppLog.Info("download", "slow-host-demoted", ("host", slow.Host), ("kbs", Math.Round(Rate(slow.Host), 1)));
             }
 
             var indexed = healthy.Select((url, index) => (url, index)).ToList();
             healthy = indexed
-                .OrderByDescending(x => Rate(x.url.Host) == 0 ? 50 : Rate(x.url.Host))
+                .OrderByDescending(x => Rate(x.url.Host, large) == 0 ? 50 : Rate(x.url.Host, large))
                 .ThenBy(x => x.index)
                 .Select(x => x.url)
                 .ToList();
