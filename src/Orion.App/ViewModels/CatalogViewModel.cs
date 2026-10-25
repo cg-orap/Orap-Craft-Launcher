@@ -603,6 +603,17 @@ public sealed class CatalogViewModel : ObservableObject
         await InstallPackFileAsync(target, displayName, ct).ConfigureAwait(true);
     }
 
+    /// <summary>Extracts "65/70" style counters so the task bar can advance during downloads.</summary>
+    private static double? ParseRatio(string line)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(line, @"(\d+)\s*/\s*(\d+)");
+        if (!match.Success) return null;
+
+        if (!double.TryParse(match.Groups[1].Value, out var done)) return null;
+        if (!double.TryParse(match.Groups[2].Value, out var total) || total <= 0) return null;
+
+        return Math.Clamp(done / total, 0, 1);
+    }
     /// <summary>Installs a pack file from disk (<c>.mrpack</c> or a Modrinth <c>.zip</c> export).</summary>
     public async Task InstallPackFileAsync(string path, string? name, CancellationToken ct = default)
     {
@@ -618,7 +629,20 @@ public sealed class CatalogViewModel : ObservableObject
 
         try
         {
-            var progress = new Progress<string>(line => Status = line);
+            // Report into the activity as well: the download manager used to show only the pack path
+            // because the progress callback only touched the catalogue status line.
+            var lastFraction = 0.0;
+            var progress = new Progress<string>(line =>
+            {
+                Status = line;
+
+                var ratio = ParseRatio(line);
+                if (ratio is { } value && value >= lastFraction) lastFraction = value;
+
+                var speed = System.Text.RegularExpressions.Regex.Match(line, @"[\d.]+\s*[KMG]?B/s").Value;
+                _main.Activities.Report(activity, lastFraction, line, speed);
+            });
+
             var result = await _main.Context.ModPacks
                 .InstallAsync(path, name, null, progress, linked.Token)
                 .ConfigureAwait(true);
