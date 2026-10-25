@@ -54,14 +54,9 @@ public partial class VersionPickerView : UserControl
 
         if (item.DataContext is not Orion.Core.Instances.Instance instance) return;
 
-        // Clicking the row is the action: switch the current version, then run the page's select
-        // command (it navigates home and refreshes the launch key).
-        if (System.Windows.Window.GetWindow(this)?.DataContext is ViewModels.MainViewModel main)
-        {
-            main.CurrentInstance = instance;
-        }
-
-        vm.SelectCommand.Execute(null);
+        // Select(object? parameter) needs the instance; passing null made the command a no-op, which
+        // is why only the row button ever worked.
+        vm.SelectCommand.Execute(instance);
         e.Handled = true;
     }
 }
