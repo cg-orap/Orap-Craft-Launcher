@@ -101,7 +101,7 @@ public sealed class DownloadEngine
     private const long LargeFileThreshold = 4L * 1024 * 1024;
 
     /// <summary>Upper bound on parallel connections for one large file.</summary>
-    private const int MaxChunksPerFile = 6;
+    private const int MaxChunksPerFile = 4;
 
     /// <summary>No-data budget for a single body read; see ReadWithStallGuardAsync.</summary>
     private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(25);
@@ -194,7 +194,7 @@ public sealed class DownloadEngine
         // files therefore gets a wider fan-out automatically (still bounded, still per-host safe).
         var fanout = Math.Max(1, _options.MaxConcurrency);
         var smallBatch = pending.Count >= 200 && pending.All(p => p.Size is > 0 and < 1024 * 1024);
-        if (smallBatch) fanout = Math.Min(128, fanout * 3);
+        if (smallBatch) fanout = Math.Min(48, fanout * 2);
         if (smallBatch) AppLog.Debug("download", "small-batch-fanout", ("files", pending.Count), ("fanout", fanout));
 
         var parallelOptions = new ParallelOptions
@@ -331,7 +331,7 @@ public sealed class DownloadEngine
     private async Task<bool> TryChunkedAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct)
     {
         var size = request.Size;
-        var chunks = Math.Clamp(_options.MaxConcurrency / 2, 2, MaxChunksPerFile);
+        var chunks = Math.Clamp(_options.MaxConcurrency / 8, 2, 4);
         var chunkSize = size / chunks;
         if (chunkSize < 256 * 1024) return false;
 
@@ -668,7 +668,7 @@ public sealed class DownloadEngine
 
             var indexed = healthy.Select((url, index) => (url, index)).ToList();
             healthy = indexed
-                .OrderByDescending(x => Rate(x.url.Host) == 0 ? double.MaxValue : Rate(x.url.Host))
+                .OrderByDescending(x => Rate(x.url.Host) == 0 ? 50 : Rate(x.url.Host))
                 .ThenBy(x => x.index)
                 .Select(x => x.url)
                 .ToList();

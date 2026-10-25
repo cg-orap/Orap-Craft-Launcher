@@ -22,7 +22,7 @@ public sealed class LauncherSettings
     /// bottleneck is round-trip latency rather than bandwidth: a higher fan-out is what lifts
     /// throughput from tens of KB/s into the MB/s range.
     /// </summary>
-    [JsonPropertyName("maxConcurrency")] public int MaxConcurrency { get; set; } = 32;
+    [JsonPropertyName("maxConcurrency")] public int MaxConcurrency { get; set; } = 16;
     [JsonPropertyName("source")] public DownloadSource Source { get; set; } = DownloadSource.Official;
     [JsonPropertyName("customMirrorBase")] public string? CustomMirrorBase { get; set; }
     [JsonPropertyName("proxyUrl")] public string? ProxyUrl { get; set; }
