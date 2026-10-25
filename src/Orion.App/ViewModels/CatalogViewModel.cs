@@ -611,11 +611,16 @@ public sealed class CatalogViewModel : ObservableObject
         Busy = true;
         Status = "正在安装整合包（会创建新版本）…";
 
+        // The pack pipeline used to run with CancellationToken.None, so 取消任务 could not stop it.
+        _installCts?.Dispose();
+        _installCts = new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _installCts.Token);
+
         try
         {
             var progress = new Progress<string>(line => Status = line);
             var result = await _main.Context.ModPacks
-                .InstallAsync(path, name, null, progress, ct)
+                .InstallAsync(path, name, null, progress, linked.Token)
                 .ConfigureAwait(true);
 
             _main.Activities.Finish(activity,
@@ -629,6 +634,12 @@ public sealed class CatalogViewModel : ObservableObject
 
             _main.LogsPage.AppendSystem(Status);
         }
+        catch (OperationCanceledException)
+        {
+            Status = "已取消安装：" + (name ?? Path.GetFileName(path));
+            _main.Activities.Finish(activity, ActivityState.Cancelled);
+            AppLog.Info("catalog", "pack-install-cancelled");
+        }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException
                                        or TaskCanceledException or System.Text.Json.JsonException)
         {
@@ -638,6 +649,8 @@ public sealed class CatalogViewModel : ObservableObject
         finally
         {
             Busy = false;
+            _installCts?.Dispose();
+            _installCts = null;
         }
     }
 

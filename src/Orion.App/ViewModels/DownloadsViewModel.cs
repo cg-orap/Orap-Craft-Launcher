@@ -79,7 +79,7 @@ public sealed class DownloadsViewModel : ObservableObject
         if (parameter is not ActivityItem item) return;
         if (item.State != ActivityState.Running) return;
 
-        _main.CancelRunningWork();
+        _main.CancelRunningWork();   // stops the catalogue install pipeline (pack downloads included)
         _main.Activities.Finish(item, ActivityState.Cancelled);
         System.Diagnostics.Debug.WriteLine("task cancelled: " + item.Title);
     }
