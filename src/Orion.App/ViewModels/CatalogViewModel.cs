@@ -776,20 +776,6 @@ public sealed class CatalogViewModel : ObservableObject
                 : "整合包安装失败：" + (result.Error ?? "未知错误");
 
             _main.LogsPage.AppendSystem(Status);
-
-            if (result.Success)
-            {
-                await _main.OpenInstanceForRenameAsync(result.InstanceId, result.VersionId).ConfigureAwait(true);
-                Status += "　已打开「版本设置」，可在「名称」里改名后保存。";
-            }
-
-            // Let the user name the new version straight away instead of hunting for it later.
-            if (result.Success)
-            {
-                await _main.OpenInstanceForRenameAsync(result.InstanceId, name ?? result.VersionId).ConfigureAwait(true);
-                Status += "　已打开「版本设置」，可在「名称」里改成你想要的名字后保存。";
-                _main.LogsPage.AppendSystem(Status);
-            }
         }
         catch (OperationCanceledException)
         {
@@ -882,12 +868,6 @@ public sealed class CatalogViewModel : ObservableObject
 
             foreach (var warning in result.Warnings) _main.LogsPage.AppendSystem("整合包提示: " + warning);
             _main.LogsPage.AppendSystem(Status);
-
-            if (result.Success)
-            {
-                await _main.OpenInstanceForRenameAsync(result.InstanceId, result.VersionId).ConfigureAwait(true);
-                Status += "　已打开「版本设置」，可在「名称」里改名后保存。";
-            }
         }
         catch (OperationCanceledException)
         {
