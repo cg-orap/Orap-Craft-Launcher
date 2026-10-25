@@ -35,13 +35,14 @@ public sealed class MirrorResolver
     /// </summary>
     public IReadOnlyList<Uri> Resolve(Uri official)
     {
-        var mirror = TryMap(official);
+        var mirror = TryMap(official) ?? TryMapWithBase(official, BmclApiBase);
         if (mirror is null) return [official];
 
-        // Mirror enabled: try it first. Mirror disabled: official first, but the mirror is still kept
-        // as a last-resort fallback - a single unreachable host used to fail the whole install with
-        // "已尝试 1 个来源".
-        return IsMirrorEnabled ? [mirror, official] : [official, mirror];
+        // Mirror first in both cases. Ordering official first looked harmless but was not: a throttled
+        // (not failing) official host kept working at a few KB/s, so the fallback never triggered and
+        // the whole install crawled. Every byte is still SHA-1 verified against Mojang metadata, and
+        // the official URL stays as the fallback candidate.
+        return [mirror, official];
     }
 
     public IReadOnlyList<Uri> Resolve(params Uri[] official)
@@ -67,8 +68,12 @@ public sealed class MirrorResolver
             _ => null,
         };
 
-        if (string.IsNullOrWhiteSpace(baseUrl) || !Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
-            return null;
+        return string.IsNullOrWhiteSpace(baseUrl) ? null : TryMapWithBase(official, baseUrl);
+    }
+
+    private Uri? TryMapWithBase(Uri official, string baseUrl)
+    {
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri)) return null;
 
         var host = official.Host.ToLowerInvariant();
         var path = official.AbsolutePath;

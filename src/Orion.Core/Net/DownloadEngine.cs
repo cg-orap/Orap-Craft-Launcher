@@ -97,6 +97,12 @@ public sealed class DownloadEngine
 {
     private const int BufferSize = 96 * 1024;
 
+    /// <summary>Files at least this large are fetched with several parallel range requests.</summary>
+    private const long LargeFileThreshold = 4L * 1024 * 1024;
+
+    /// <summary>Upper bound on parallel connections for one large file.</summary>
+    private const int MaxChunksPerFile = 6;
+
     /// <summary>No-data budget for a single body read; see ReadWithStallGuardAsync.</summary>
     private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(25);
 
@@ -301,6 +307,106 @@ public sealed class DownloadEngine
     /// Throwing TaskCanceledException hands control back to DownloadOneAsync, which retries the next
     /// mirror and finally reports the offending URL.
     /// </summary>
+    /// <summary>
+    /// Downloads one large file as several parallel range requests and concatenates them into the
+    /// usual .part file. Returns false (leaving no partial state) when the host does not support
+    /// ranges or a chunk fails, so the caller can fall back to a single stream.
+    /// </summary>
+    private async Task<bool> TryChunkedAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct)
+    {
+        var size = request.Size;
+        var chunks = Math.Clamp(_options.MaxConcurrency / 2, 2, MaxChunksPerFile);
+        var chunkSize = size / chunks;
+        if (chunkSize < 256 * 1024) return false;
+
+        var part = request.TargetPath + ".part";
+        var temp = new string[chunks];
+
+        try
+        {
+            using (var probe = new HttpRequestMessage(HttpMethod.Get, url))
+            {
+                probe.Headers.Range = new RangeHeaderValue(0, 0);
+                using var probeResponse = await _http
+                    .SendAsync(probe, HttpCompletionOption.ResponseHeadersRead, ct)
+                    .ConfigureAwait(false);
+
+                if (probeResponse.StatusCode != HttpStatusCode.PartialContent) return false;
+            }
+
+            var directory = Path.GetDirectoryName(part);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+            var jobs = new List<Task>(chunks);
+
+            for (var i = 0; i < chunks; i++)
+            {
+                var index = i;
+                var start = (long)index * chunkSize;
+                var end = index == chunks - 1 ? size - 1 : start + chunkSize - 1;
+                temp[index] = part + "." + index;
+
+                jobs.Add(Task.Run(async () =>
+                {
+                    using var message = new HttpRequestMessage(HttpMethod.Get, url);
+                    message.Headers.Range = new RangeHeaderValue(start, end);
+
+                    using var response = await _http
+                        .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct)
+                        .ConfigureAwait(false);
+
+                    if (response.StatusCode != HttpStatusCode.PartialContent)
+                    {
+                        throw new HttpStatusException(response.StatusCode, null);
+                    }
+
+                    var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+                    try
+                    {
+                        await using var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                        await using var sink = new FileStream(temp[index], FileMode.Create, FileAccess.Write,
+                            FileShare.None, BufferSize, useAsync: true);
+
+                        int read;
+                        while ((read = await ReadWithStallGuardAsync(source, buffer, ct).ConfigureAwait(false)) > 0)
+                        {
+                            await sink.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+                            state.OnBytesTransferred(read);
+                        }
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(buffer);
+                    }
+                }, ct));
+            }
+
+            await Task.WhenAll(jobs).ConfigureAwait(false);
+
+            await using (var combined = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, useAsync: true))
+            {
+                foreach (var chunk in temp)
+                {
+                    await using var source = new FileStream(chunk, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true);
+                    await source.CopyToAsync(combined, ct).ConfigureAwait(false);
+                }
+            }
+
+            foreach (var chunk in temp) TryDelete(chunk);
+            return new FileInfo(part).Length == size;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or HttpStatusException or TaskCanceledException)
+        {
+            AppLog.Debug("download", "chunked-fallback", ("target", request.TargetPath), ("error", ex.Message));
+            for (var i = 0; i < chunks; i++) TryDelete(part + "." + i);
+            TryDelete(part);
+            return false;
+        }
+    }
     private async Task<int> ReadWithStallGuardAsync(Stream source, byte[] buffer, CancellationToken ct)
     {
         using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -337,6 +443,17 @@ public sealed class DownloadEngine
             resumeFrom = 0;
         }
 
+        // One connection is often throttled to a few KB/s while several together are fast (the same
+        // trick PCL2 uses for big files). Chunking only engages for large files on hosts that honour
+        // range requests; any problem falls back to the single-stream path below.
+        var chunked = false;
+        if (request.Size >= LargeFileThreshold && resumeFrom == 0)
+        {
+            chunked = await TryChunkedAsync(request, url, state, ct).ConfigureAwait(false);
+        }
+
+        if (!chunked)
+        {
         using var message = new HttpRequestMessage(HttpMethod.Get, url);
         if (resumeFrom > 0)
         {
@@ -398,6 +515,8 @@ public sealed class DownloadEngine
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+        }
+
         }
 
         var length = new FileInfo(part).Length;
