@@ -7,6 +7,8 @@ namespace Orion.Core.Net;
 /// <summary>Small JSON/text GET helper with mirror fallback and bounded retries.</summary>
 public static class HttpUtil
 {
+    private static readonly TimeSpan Timeout_ = TimeSpan.FromSeconds(30);
+
     public static async Task<string> GetStringAsync(
         HttpClient http,
         IReadOnlyList<Uri> urls,
@@ -21,9 +23,16 @@ public static class HttpUtil
             for (var attempt = 0; attempt < attemptsPerUrl; attempt++)
             {
                 ct.ThrowIfCancellationRequested();
+
+                // The shared HttpClient may allow an unbounded timeout (needed for big downloads), so
+                // a stalled metadata connection would hang the caller forever. Small JSON endpoints
+                // get their own 30s budget instead.
+                using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                requestCts.CancelAfter(Timeout_);
+
                 try
                 {
-                    using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                    using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, requestCts.Token).ConfigureAwait(false);
                     if (!response.IsSuccessStatusCode)
                     {
                         last = new HttpStatusException(response.StatusCode, response.Headers.RetryAfter?.Delta);
@@ -32,12 +41,17 @@ public static class HttpUtil
                     }
                     else
                     {
-                        return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                        return await response.Content.ReadAsStringAsync(requestCts.Token).ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
                     throw;
+                }
+                catch (OperationCanceledException ex)
+                {
+                    // timed out, not cancelled by the caller: retry / move on to the mirror
+                    last = ex;
                 }
                 catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
                 {
