@@ -30,7 +30,7 @@
 | 离线账户启动 | ✅ 已验证 | 离线 UUID 与 Java `nameUUIDFromBytes` 完全一致 |
 | NeoForge 1.21.1 安装 | ✅ 已验证 | 官方安装器 + 处理器执行成功，`Successfully installed client into launcher` |
 | NeoForge 1.21.1 启动 | ✅ 已验证 | `NeoForge mod loading, version 21.1.264, for MC 1.21.1` + 主菜单 |
-| 实例隔离 / 存档保护 | ✅ 已验证 | 独立 gameDir；移除实例移入 `trash` 而非删除 |
+| 实例隔离 / 存档保护 | ✅ 已验证 | 独立 gameDir；移除版本移入 Windows 回收站，可从资源管理器还原 |
 | `.minecraft` / Prism 实例导入 | ✅ 已验证（结构检测 + 配置解析） | 统一以「外部实例」注册，不写入原目录 |
 | Modrinth 搜索 / 安装 | ✅ 搜索已验证 | 按实例版本与加载器过滤（86 条结果） |
 | `.mrpack` 导入 / 导出 | ✅ 已验证 | 导出 → 重新导入往返成功 |
@@ -174,7 +174,7 @@ instances/<id>/
   minecraft/  该实例独立存档、Mod、配置
 cache/        清单与安装器缓存
 logs/         启动器日志、下载失败报告
-trash/        被移除实例/Mod 的回收站（不永久删除）
+trash/        被移除 Mod 的暂存目录（版本移除进 Windows 回收站）
 accounts.json 账户（令牌经 Windows DPAPI 加密）
 settings.json 设置
 ```
@@ -189,6 +189,8 @@ settings.json 设置
   为避免许可证传染与「简单包装器」，核心完全按公开协议实现。
 - **镜像只做传输替代**：所有文件仍按元数据中的 SHA-1 校验；不关闭 TLS 验证；
   镜像失败自动回退官方源。
+- **删除永不直接抹掉数据**：移除版本会把整个版本目录送进 **Windows 回收站**，可从资源管理器还原；
+  外部导入的版本只注销、绝不动原目录。Mod 移除仍走数据目录下的 `trash/`。
 - **CurseForge 只取元数据，不分发模组**：见下方「CurseForge 集成」一节。
 
 ---
