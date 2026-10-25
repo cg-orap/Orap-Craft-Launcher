@@ -14,6 +14,9 @@
         TextOptions.TextFormattingMode="Ideal"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
+        AllowDrop="True"
+        DragOver="OnWindowDragOver"
+        Drop="OnWindowDrop"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
 
     <WindowChrome.WindowChrome>

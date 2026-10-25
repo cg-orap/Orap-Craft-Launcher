@@ -63,4 +63,45 @@ public partial class MainWindow : Window
             ? work.Width / dpi.DpiScaleX
             : double.PositiveInfinity;
     }
+
+    private static readonly string[] PackExtensions = [".zip", ".mrpack"];
+
+    private static string[] DroppedPacks(System.Windows.DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)) return [];
+
+        return (e.Data.GetData(System.Windows.DataFormats.FileDrop) as string[] ?? [])
+            .Where(path => PackExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    /// <summary>Any page accepts a dropped pack: the caret turns into a copy cursor while hovering.</summary>
+    private void OnWindowDragOver(object sender, System.Windows.DragEventArgs e)
+    {
+        var packs = DroppedPacks(e);
+        e.Effects = packs.Length > 0
+            ? System.Windows.DragDropEffects.Copy
+            : System.Windows.DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>Dropping a .zip/.mrpack anywhere in the window installs it as a new version.</summary>
+    private async void OnWindowDrop(object sender, System.Windows.DragEventArgs e)
+    {
+        var packs = DroppedPacks(e);
+        if (packs.Length == 0) return;
+
+        e.Handled = true;
+
+        if (DataContext is not ViewModels.MainViewModel main) return;
+
+        // Jump to the download centre so the install (and its progress) is visible wherever the user
+        // dropped the file; the task itself also shows up in 下载管理.
+        main.Navigate("catalog");
+
+        foreach (var path in packs)
+        {
+            await main.CatalogPage.InstallPackFileAsync(path, null).ConfigureAwait(true);
+        }
+    }
 }
