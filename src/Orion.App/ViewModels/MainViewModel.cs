@@ -498,24 +498,51 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Loads accounts, instances, Java runtimes and version metadata into the shell.</summary>
     public async Task InitializeAsync()
     {
-        await Context.InitializeAsync().ConfigureAwait(true);
+        // The splash must never hinge on anything slow or fragile: everything that touches the disk
+        // or the network is best effort, and IsReady is always released in finally so the shell can
+        // never sit on 正在初始化… again.
+        try
+        {
+            await Context.InitializeAsync().ConfigureAwait(true);
 
-        await ReloadAccountsAsync().ConfigureAwait(true);
-        await ReloadInstancesAsync().ConfigureAwait(true);
+            await ReloadAccountsAsync().ConfigureAwait(true);
+            await ReloadInstancesAsync().ConfigureAwait(true);
 
-        var runtimes = await Context.JavaDetector.DiscoverAsync().ConfigureAwait(true);
-        JavaRuntimes.Replace(runtimes);
+            var runtimes = await Context.JavaDetector.DiscoverAsync().ConfigureAwait(true);
+            JavaRuntimes.Replace(runtimes);
 
-        VersionStatus = $"数据目录 {Context.Paths.Root}";
-        SettingsPage.LoadFromSettings();
+            VersionStatus = $"数据目录 {Context.Paths.Root}";
+            SettingsPage.LoadFromSettings();
 
-        AppLog.LineWritten += OnLogLine;
-        LogsPage.AppendSystem($"已就绪 · 数据目录 {Context.Paths.Root}");
+            AppLog.LineWritten += OnLogLine;
+            LogsPage.AppendSystem($"已就绪 · 数据目录 {Context.Paths.Root}");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("startup", "initialize-failed", ("error", ex.Message));
+            LogsPage.AppendSystem("初始化部分失败：" + ex.Message);
+        }
+        finally
+        {
+            IsReady = true;
+            AppLog.Info("ui", "ready");
+        }
 
-        await Home.RefreshAsync().ConfigureAwait(true);
-        await VersionsPage.LoadVersionsAsync().ConfigureAwait(true);
+        // Version metadata needs the network; load it behind the splash instead of blocking it.
+        _ = LoadMetadataAsync();
+    }
 
-        IsReady = true;
+    private async Task LoadMetadataAsync()
+    {
+        try
+        {
+            await Home.RefreshAsync().ConfigureAwait(true);
+            await VersionsPage.LoadVersionsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("startup", "metadata-failed", ("error", ex.Message));
+        }
     }
 
     public async Task ReloadAccountsAsync()

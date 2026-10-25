@@ -125,13 +125,32 @@ $log = Get-ChildItem (Join-Path $smokeRoot 'logs') -Filter 'launcher-*.log' -Err
        Sort-Object LastWriteTime | Select-Object -Last 1
 
 $startupError = $false
+$ready = $false
 if ($log) {
     # -Quiet already returns a boolean; comparing it to $null would always be true.
     $startupError = [bool](Select-String -Path $log.FullName -Pattern 'startup-failed' -SimpleMatch -Quiet)
+
+    # A window can appear while the splash never finishes (that shipped once). Wait for the ready
+    # marker the shell writes once IsReady is released.
+    $readyDeadline = (Get-Date).AddSeconds($SmokeTimeoutSeconds)
+    while ((Get-Date) -lt $readyDeadline) {
+        $ready = [bool](Select-String -Path $log.FullName -Pattern '[ui] ready' -SimpleMatch -Quiet)
+        if ($ready) { break }
+        Start-Sleep -Milliseconds 500
+    }
 }
 
 if ($proc) { $proc | Stop-Process -Force }
 Start-Sleep -Milliseconds 500
+
+if (-not $ready -and $proc -and $window -and -not $startupError) {
+    if ($log) {
+        Write-Host '--- log tail ---' -ForegroundColor Yellow
+        Get-Content $log.FullName -Encoding utf8 -Tail 12 | ForEach-Object { Write-Host "  $_" }
+    }
+    if ($proc) { $proc | Stop-Process -Force }
+    Fail 'the window appeared but initialization never reported ready (stuck splash)'
+}
 
 if (-not $proc -or -not $window -or $startupError) {
     if ($log) {

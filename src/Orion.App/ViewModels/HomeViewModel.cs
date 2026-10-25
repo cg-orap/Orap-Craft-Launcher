@@ -170,7 +170,7 @@ public sealed class HomeViewModel : ObservableObject
         get
         {
             var used = _launcherMemoryMb;
-            var allocated = _main.CurrentInstance?.MemoryMb ?? _main.Context.Settings.MemoryMb;
+            var allocated = _main.CurrentInstance?.MemoryMb ?? _main.Context?.Settings.MemoryMb ?? 0;
             return $"{used} MB 已用 · {allocated} MB 分配";
         }
     }
