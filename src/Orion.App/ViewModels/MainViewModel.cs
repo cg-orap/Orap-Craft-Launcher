@@ -458,6 +458,9 @@ public sealed class MainViewModel : ObservableObject
 
     public void Navigate(string key) => NavigateCore(key);
 
+    /// <summary>Cancels whatever catalogue/install operation is currently running.</summary>
+    public void CancelRunningWork() => CatalogPage.CancelOperation();
+
     private void NavigateCore(string key)
     {
         // Sub-pages such as "version-picker" are not entries of the rail: only move the highlight

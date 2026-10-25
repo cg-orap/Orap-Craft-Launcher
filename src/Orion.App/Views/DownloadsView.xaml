@@ -69,6 +69,12 @@
 
                             <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
                                 <TextBlock Text="{Binding Speed}" Style="{StaticResource CaptionText}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                <Button Content="取消" Style="{StaticResource DangerButton}" Padding="10,3" FontSize="11"
+                                        Margin="0,0,8,0" Command="{Binding DataContext.CancelTaskCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        Visibility="{Binding StateText, Converter={StaticResource StateToVisibility}}"
+                                        AutomationProperties.AutomationId="CancelActivityButton"
+                                        ToolTip="终止这个任务（不影响其它任务）" />
                                 <Border Style="{StaticResource Chip}">
                                     <TextBlock Text="{Binding StateText}" FontSize="11" />
                                 </Border>

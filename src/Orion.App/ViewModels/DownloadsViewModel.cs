@@ -21,6 +21,7 @@ public sealed class DownloadsViewModel : ObservableObject
         OpenLogFolderCommand = new RelayCommand(() => OpenFolder(_main.Context.Paths.LogsDir));
         OpenDownloadsFolderCommand = new RelayCommand(() => OpenFolder(Path.Combine(_main.Context.Paths.Root, "cache")));
         ClearFinishedCommand = new RelayCommand(ClearFinished);
+        CancelTaskCommand = new RelayCommand(CancelTask);
         RefreshCommand = new RelayCommand(() => OnPropertyChanged(nameof(Items)));
     }
 
@@ -28,6 +29,7 @@ public sealed class DownloadsViewModel : ObservableObject
     public ICommand OpenLogFolderCommand { get; }
     public ICommand OpenDownloadsFolderCommand { get; }
     public ICommand ClearFinishedCommand { get; }
+    public ICommand CancelTaskCommand { get; }
     public ICommand RefreshCommand { get; }
 
     public ObservableList<ActivityItem> Items => _main.Activities.Items;
@@ -69,5 +71,16 @@ public sealed class DownloadsViewModel : ObservableObject
     {
         Directory.CreateDirectory(directory);
         Process.Start(new ProcessStartInfo("explorer.exe", $"\"{directory}\"") { UseShellExecute = true });
+    }
+
+    /// <summary>Abandons one task: the activity is closed even if the work cannot observe the token.</summary>
+    private void CancelTask(object? parameter)
+    {
+        if (parameter is not ActivityItem item) return;
+        if (item.State != ActivityState.Running) return;
+
+        _main.CancelRunningWork();
+        _main.Activities.Finish(item, ActivityState.Cancelled);
+        System.Diagnostics.Debug.WriteLine("task cancelled: " + item.Title);
     }
 }

@@ -19,6 +19,7 @@
             <conv:InitialConverter x:Key="Initial" />
             <conv:EqualsToVisibilityConverter x:Key="EqualsToVisibility" />
             <conv:NotEqualsToVisibilityConverter x:Key="NotEqualsToVisibility" />
+    <conv:StateToVisibilityConverter x:Key="StateToVisibility" />
 
             <!-- Implicit templates map view models onto views, so navigation stays pure MVVM. -->
             <DataTemplate DataType="{x:Type vm:HomeViewModel}">
