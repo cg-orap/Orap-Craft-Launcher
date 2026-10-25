@@ -17,7 +17,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6" GlassFrameThickness="0"
+        <WindowChrome CaptionHeight="56" ResizeBorderThickness="6" GlassFrameThickness="0"
                       CornerRadius="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
@@ -56,7 +56,7 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="44" />
+            <RowDefinition Height="56" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -69,11 +69,11 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
-                <Border Width="24" Height="24" CornerRadius="7" Background="{DynamicResource AccentBrush}" Margin="0,0,9,0">
+                <Border Width="28" Height="28" CornerRadius="8" Background="{DynamicResource AccentBrush}" Margin="0,0,10,0">
                     <TextBlock Text="O" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Text="Orap Craft" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Text="Orap Craft Launcher" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <TextBlock Text="v0.1.0" FontSize="10.5" Margin="8,3,0,0" VerticalAlignment="Center"
                            Foreground="{DynamicResource MutedTextBrush}" />
             </StackPanel>
@@ -114,19 +114,6 @@
         <Border Grid.Column="0" Background="{DynamicResource NavRailBg}"
                 BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
             <DockPanel>
-                <!-- brand -->
-                <StackPanel DockPanel.Dock="Top" Margin="16,20,14,16" Orientation="Horizontal">
-                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource AccentBrush}"
-                            VerticalAlignment="Center" Margin="0,0,11,0">
-                        <TextBlock Text="O" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Orap Craft" FontSize="15.5" FontWeight="SemiBold" />
-                        <TextBlock Text="Minecraft Java 版" Style="{StaticResource CaptionText}"
-                                   Margin="0,2,0,0" TextWrapping="NoWrap" />
-                    </StackPanel>
-                </StackPanel>
 
                 <!-- account: first entry of the rail, opens the login window -->
                 <Button DockPanel.Dock="Top" Margin="10,0,10,10" Padding="0" Cursor="Hand"

@@ -9,7 +9,8 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
-        Loaded += (_, _) => App.ApplyWindowChrome(this);
+        Loaded += (_, _) => { App.ApplyWindowChrome(this); FixMaximizedBounds(); };
+        StateChanged += (_, _) => FixMaximizedBounds();
         InitializeComponent();
     }
     /// <summary>
@@ -43,4 +44,23 @@ public partial class MainWindow : Window
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
     private void OnClose(object sender, System.Windows.RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// A WindowChrome window maximises to the full monitor bounds, which hides the taskbar.
+    /// Clamping MaxHeight to the work area keeps the taskbar visible and is re-applied whenever
+    /// the window changes state or moves to another monitor.
+    /// </summary>
+    private void FixMaximizedBounds()
+    {
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+        var work = System.Windows.SystemParameters.WorkArea;
+
+        MaxHeight = WindowState == WindowState.Maximized
+            ? work.Height / dpi.DpiScaleY
+            : double.PositiveInfinity;
+
+        MaxWidth = WindowState == WindowState.Maximized
+            ? work.Width / dpi.DpiScaleX
+            : double.PositiveInfinity;
+    }
 }
