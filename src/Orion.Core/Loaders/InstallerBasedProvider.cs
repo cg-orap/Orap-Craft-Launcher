@@ -264,7 +264,13 @@ public abstract class InstallerBasedProvider : ILoaderProvider
         if (requests.Count == 0) return new DownloadReport { TotalFiles = 0, Duration = TimeSpan.Zero };
 
         output?.Report($"正在预下载安装器依赖 ({requests.Count} 个文件)…");
-        var report = await Downloader.DownloadAsync(requests, null, ct).ConfigureAwait(false);
+
+        // This phase silently downloaded ~60 jars; forward the engine progress so the bar moves.
+        var preseedProgress = output is null
+            ? null
+            : new Progress<DownloadProgress>(p =>
+                output.Report($"正在预下载安装器依赖 {p.CompletedFiles + p.FailedFiles}/{p.TotalFiles} · {p.BytesPerSecond / 1024:0} KB/s"));
+        var report = await Downloader.DownloadAsync(requests, preseedProgress, ct).ConfigureAwait(false);
         output?.Report($"安装器依赖预下载完成: {report.CompletedFiles} 个文件");
         return report;
     }
