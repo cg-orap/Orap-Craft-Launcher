@@ -148,12 +148,18 @@ public partial class App : Application
         var app = Current;
         if (app is null) return;
 
-        var fileName = string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase) ? "Light.xaml" : "Dark.xaml";
+                var fileName = theme?.ToLowerInvariant() switch
+        {
+            "light" => "Light.xaml",
+            "midnight" => "Midnight.xaml",
+            _ => "Dark.xaml",
+        };
         var dictionaries = app.Resources.MergedDictionaries;
 
         var palette = dictionaries.FirstOrDefault(d =>
             d.Source is not null &&
             (d.Source.OriginalString.EndsWith("Dark.xaml", StringComparison.OrdinalIgnoreCase) ||
+             d.Source.OriginalString.EndsWith("Midnight.xaml", StringComparison.OrdinalIgnoreCase) ||
              d.Source.OriginalString.EndsWith("Light.xaml", StringComparison.OrdinalIgnoreCase)));
 
         if (palette?.Source is null ||

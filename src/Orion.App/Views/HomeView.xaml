@@ -26,7 +26,7 @@
                                 </LinearGradientBrush>
                             </Border.Background>
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="26" ShadowDepth="6" Opacity="0.45" Color="#000000" />
+                                <DropShadowEffect BlurRadius="34" ShadowDepth="8" Opacity="0.55" Color="{DynamicResource AccentColor}" />
                             </Border.Effect>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                               Margin="{TemplateBinding Padding}" />

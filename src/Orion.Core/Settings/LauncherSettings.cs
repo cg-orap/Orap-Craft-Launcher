@@ -22,7 +22,7 @@ public sealed class LauncherSettings
     [JsonPropertyName("customMirrorBase")] public string? CustomMirrorBase { get; set; }
     [JsonPropertyName("proxyUrl")] public string? ProxyUrl { get; set; }
 
-    [JsonPropertyName("theme")] public string Theme { get; set; } = "Dark";
+    [JsonPropertyName("theme")] public string Theme { get; set; } = "Midnight";
 
     /// <summary>Accent colour scheme: Blue / Violet / Teal / Amber / Rose.</summary>
     [JsonPropertyName("accent")] public string Accent { get; set; } = "Blue";
