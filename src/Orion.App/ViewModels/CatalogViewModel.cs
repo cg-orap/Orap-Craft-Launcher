@@ -604,6 +604,35 @@ public sealed class CatalogViewModel : ObservableObject
     }
 
     /// <summary>Extracts "65/70" style counters so the task bar can advance during downloads.</summary>
+    /// <summary>
+    /// Overall progress across the pack pipeline. Each stage reports its own counters, so the bands
+    /// below turn them into one monotonic 0..1 number for the task bar:
+    /// vanilla client (its own file counts) -> installer jar -> installer dependencies -> Forge run ->
+    /// mod downloads -> done.
+    /// </summary>
+    private static readonly (string Keyword, double From, double To)[] PackPhases =
+    [
+        ("正在安装原版",       0.00, 0.55),
+        ("正在下载",           0.55, 0.62),
+        ("正在预下载安装器依赖", 0.62, 0.78),
+        ("正在运行",           0.78, 0.90),
+        ("下载模组",           0.90, 0.99),
+        ("整合包已安装",       1.00, 1.00),
+    ];
+
+    private static double PackPhaseProgress(string line)
+    {
+        foreach (var phase in PackPhases)
+        {
+            if (!line.Contains(phase.Keyword, StringComparison.Ordinal)) continue;
+
+            var inner = ParseRatio(line) ?? 0;
+            return Math.Clamp(phase.From + ((phase.To - phase.From) * inner), 0, 1);
+        }
+
+        // Unknown line: keep whatever the caller already had (no jump backwards).
+        return -1;
+    }
     /// <summary>Human label for the archive kind shown before the install starts.</summary>
     private static string DescribePackKind(Core.Mods.PackArchiveKind kind) => kind switch
     {
@@ -644,8 +673,8 @@ public sealed class CatalogViewModel : ObservableObject
             {
                 Status = line;
 
-                var ratio = ParseRatio(line);
-                if (ratio is { } value && value >= lastFraction) lastFraction = value;
+                var ratio = PackPhaseProgress(line);
+                if (ratio >= 0 && ratio >= lastFraction) lastFraction = ratio;
 
                 var speed = System.Text.RegularExpressions.Regex.Match(line, @"[\d.]+\s*[KMG]?B/s").Value;
                 _main.Activities.Report(activity, lastFraction, line, speed);
