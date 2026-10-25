@@ -66,8 +66,8 @@
 
             <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">
             <!-- account identity sits right above the launch button -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,14">
-                <Grid Width="38" Height="38" Margin="0,0,10,0">
+            <StackPanel HorizontalAlignment="Center" Margin="0,0,0,14">
+                <Grid Width="44" Height="44" HorizontalAlignment="Center">
                     <Border CornerRadius="8" Background="{DynamicResource SurfaceAltBg}"
                             Visibility="{Binding DataContext.HasCurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
                         <TextBlock Text="{Binding DataContext.CurrentAccount.Username, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Initial}}"
@@ -81,7 +81,7 @@
                     </Border>
                 </Grid>
                 <TextBlock Text="{Binding DataContext.AccountDisplay, RelativeSource={RelativeSource AncestorType=Window}}"
-                           VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" />
+                           HorizontalAlignment="Center" Margin="0,6,0,0" FontSize="15" FontWeight="SemiBold" />
             </StackPanel>
             <!-- PCL-style launch button: the action in large text, the target version underneath -->
             <Button Style="{StaticResource LaunchHeroButton}" Width="360" Height="88"
@@ -126,9 +126,40 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- bottom status bar: environment, memory, run state -->
+            <Border Grid.Row="2" VerticalAlignment="Bottom" Margin="20,0,20,14" CornerRadius="14" Padding="18,12"
+                    Background="{DynamicResource SurfaceBg}" BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
+                    AutomationProperties.AutomationId="HomeStatusBar">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Java 环境" Style="{StaticResource CaptionText}" />
+                        <TextBlock Text="{Binding RuntimeText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0"
+                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                   AutomationProperties.AutomationId="StatusJava" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                        <TextBlock Text="内存使用" Style="{StaticResource CaptionText}" />
+                        <TextBlock Text="{Binding MemoryUsageText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0"
+                                   AutomationProperties.AutomationId="StatusMemory" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="16,0,0,0">
+                        <TextBlock Text="运行状态" Style="{StaticResource CaptionText}" />
+                        <TextBlock Text="{Binding StateText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0"
+                                   AutomationProperties.AutomationId="StatusState" />
+                    </StackPanel>
+                </Grid>
+            </Border>
             <!-- floating toast: launch hints appear here and fade away on their own -->
             <Border x:Name="Toast" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                    Margin="0,0,0,26" CornerRadius="10" Padding="18,10"
+                    Margin="0,0,0,96" CornerRadius="10" Padding="18,10"
                     Background="#E6111720" BorderBrush="#33FFFFFF" BorderThickness="1"
                     Visibility="{Binding HasToast, Converter={StaticResource BoolToVisibility}}">
                 <Border.Effect>

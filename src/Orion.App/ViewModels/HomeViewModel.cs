@@ -32,11 +32,30 @@ public sealed class HomeViewModel : ObservableObject
     private string _launchStatus = "";
     private string _javaStatus = "";
     private string _instanceStatus = "";
+    private readonly System.Windows.Threading.DispatcherTimer _memoryTimer = new();
+
+    private void RefreshMemorySample()
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetCurrentProcess();
+            var mb = (int)Math.Round(process.WorkingSet64 / 1024.0 / 1024.0);
+            if (mb == _launcherMemoryMb) return;
+            _launcherMemoryMb = mb;
+            OnPropertyChanged(nameof(MemoryUsageText));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        {
+            // process already gone: the sample is simply skipped
+        }
+    }
+
     private readonly System.Windows.Threading.DispatcherTimer _toastTimer = new()
     {
         Interval = TimeSpan.FromSeconds(5),
     };
 
+    private int _launcherMemoryMb;
     private string _toastText = "";
     private ImageSource? _backgroundImage;
     private string? _backgroundImagePath;
@@ -52,6 +71,11 @@ public sealed class HomeViewModel : ObservableObject
         ClearBackgroundCommand = new RelayCommand(ClearBackground, () => HasBackgroundImage);
         OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("version-picker"));
         OpenVersionSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));   // sub-page, not a rail entry
+
+        _memoryTimer.Interval = TimeSpan.FromSeconds(2);
+        _memoryTimer.Tick += (_, _) => RefreshMemorySample();
+        _memoryTimer.Start();
+        RefreshMemorySample();
 
         _toastTimer.Tick += (_, _) =>
         {
@@ -139,6 +163,17 @@ public sealed class HomeViewModel : ObservableObject
     public string MemoryText => ((_main.CurrentInstance?.MemoryMb ?? _main.Context.Settings.MemoryMb)).ToString() + " MB";
 
     public string StateText => IsLaunching ? "运行中" : "就绪";
+
+    /// <summary>Launcher working set, refreshed a few times per second by the status timer.</summary>
+    public string MemoryUsageText
+    {
+        get
+        {
+            var used = _launcherMemoryMb;
+            var allocated = _main.CurrentInstance?.MemoryMb ?? _main.Context.Settings.MemoryMb;
+            return $"{used} MB 已用 · {allocated} MB 分配";
+        }
+    }
 
     /// <summary>Second line of the launch button (PCL style): which version will start.</summary>
     public string LaunchVersionLine => _main.CurrentInstance is { } instance
