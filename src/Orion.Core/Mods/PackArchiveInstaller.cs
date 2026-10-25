@@ -201,57 +201,41 @@ public sealed class PackArchiveInstaller
                 }
             }
 
-            // 3. mods: CurseForge manifests only carry ids, so resolve them through the public redirect
+
+            // 3. mods: CurseForge manifests carry ids only. Like PCL2/HMCL we build the ForgeCDN URL
+            // from the id pair (+ manifest fileName when present), fall back to the public redirect,
+            // download several files at once and hand the user a browser link for anything left.
             var manifest = ReadManifest(archivePath);
             var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
             Directory.CreateDirectory(modsDirectory);
 
-            var downloaded = 0;
-            foreach (var file in manifest?.Files ?? [])
+            var files = manifest?.Files ?? [];
+            var queue = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            var done = 0;
+            using var gate = new SemaphoreSlim(6);   // enough to hide per-connection throttling
+
+            var jobs = files.Select(async file =>
             {
-                ct.ThrowIfCancellationRequested();
-
-                var url = $"https://www.curseforge.com/api/v1/mods/{file.ProjectId}/files/{file.FileId}/download";
-                var target = Path.Combine(modsDirectory, $"{file.ProjectId}-{file.FileId}.jar");
-
+                await gate.WaitAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    output?.Report($"下载模组 {file.ProjectId}/{file.FileId}…");
-                    // No public key-less download API: the request may redirect to HTML or stall, so it
-                // is bounded and counted as unresolved instead of leaving the task in 进行中 forever.
-                using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                perFile.CancelAfter(TimeSpan.FromSeconds(30));
-
-                using var response = await _http
-                    .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, perFile.Token)
-                    .ConfigureAwait(false);
-
-                    if (!response.IsSuccessStatusCode)
+                    var ok = await DownloadCurseForgeFileAsync(file, modsDirectory, queue, ct).ConfigureAwait(false);
+                    if (ok)
                     {
-                        unresolved.Add($"{file.ProjectId}/{file.FileId}（HTTP {(int)response.StatusCode}）");
-                        continue;
+                        var finished = Interlocked.Increment(ref done);
+                        output?.Report($"下载模组 {finished}/{files.Count}…");
                     }
-
-                    // Prefer the server-provided name so the jar is recognisable.
-                    var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
-                                   ?? response.Content.Headers.ContentDisposition?.FileName;
-
-                    if (!string.IsNullOrWhiteSpace(fileName))
-                    {
-                        target = Path.Combine(modsDirectory, Path.GetFileName(fileName.Trim('"')));
-                    }
-
-                    await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-                    await using var destination = File.Create(target);
-                    await stream.CopyToAsync(destination, ct).ConfigureAwait(false);
-                    downloaded++;
                 }
-                catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+                finally
                 {
-                    unresolved.Add($"{file.ProjectId}/{file.FileId}（{ex.Message}）");
+                    gate.Release();
                 }
-            }
+            });
 
+            await Task.WhenAll(jobs).ConfigureAwait(false);
+
+            foreach (var item in queue) unresolved.Add(item);
+            var downloaded = done;
             if (unresolved.Count > 0)
             {
                 warnings.Add($"有 {unresolved.Count} 个模组无法自动下载，需要手动补齐（CurseForge 只提供项目/文件 ID）：");
@@ -432,6 +416,67 @@ public sealed class PackArchiveInstaller
         }
     }
 
+    /// <summary>
+    /// One CurseForge file, resolved the way PCL2/HMCL do it: the public ForgeCDN object first (no
+    /// key, fast CDN), the official redirect as a fallback. Anything still failing is queued with a
+    /// browser link so the user can fetch it by hand instead of an opaque "some files failed".
+    /// </summary>
+    private async Task<bool> DownloadCurseForgeFileAsync(
+        CurseForgeFile file,
+        string modsDirectory,
+        System.Collections.Concurrent.ConcurrentQueue<string> unresolved,
+        CancellationToken ct)
+    {
+        var name = string.IsNullOrWhiteSpace(file.FileName)
+            ? $"curseforge-{file.ProjectId}-{file.FileId}.jar"
+            : Path.GetFileName(file.FileName!.Trim('"'));
+
+        var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(file.FileName))
+        {
+            var bucket = file.FileId / 1000;
+            var escaped = Uri.EscapeDataString(name);
+            candidates.Add($"https://mediafilez.forgecdn.net/files/{bucket}/{file.FileId % 1000}/{escaped}");
+            candidates.Add($"https://edge.forgecdn.net/files/{bucket}/{file.FileId % 1000}/{escaped}");
+        }
+
+        candidates.Add($"https://www.curseforge.com/api/v1/mods/{file.ProjectId}/files/{file.FileId}/download");
+
+        foreach (var url in candidates)
+        {
+            try
+            {
+                using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                perFile.CancelAfter(TimeSpan.FromSeconds(60));
+
+                using var response = await _http
+                    .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, perFile.Token)
+                    .ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode) continue;
+
+                var target = Path.Combine(modsDirectory, name);
+                await using var stream = await response.Content.ReadAsStreamAsync(perFile.Token).ConfigureAwait(false);
+                await using var destination = File.Create(target);
+                await stream.CopyToAsync(destination, perFile.Token).ConfigureAwait(false);
+
+                if (new FileInfo(target).Length == 0)
+                {
+                    try { File.Delete(target); } catch (IOException) { }
+                    continue;
+                }
+
+                return true;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+            {
+                // next endpoint
+            }
+        }
+
+        unresolved.Enqueue($"{name}  →  https://www.curseforge.com/projects/{file.ProjectId}/files/{file.FileId}");
+        return false;
+    }
     private sealed class CurseForgeManifest
     {
         [JsonPropertyName("name")] public string? Name { get; set; }
@@ -457,5 +502,6 @@ public sealed class PackArchiveInstaller
         [JsonPropertyName("projectID")] public long ProjectId { get; set; }
         [JsonPropertyName("fileID")] public long FileId { get; set; }
         [JsonPropertyName("required")] public bool Required { get; set; } = true;
+        [JsonPropertyName("fileName")] public string? FileName { get; set; }
     }
 }
