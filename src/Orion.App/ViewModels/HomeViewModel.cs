@@ -286,14 +286,19 @@ public sealed class HomeViewModel : ObservableObject
             if (java is null)
             {
                 LaunchStatus = $"未找到 Java {resolved.RequiredJavaMajorVersion}。请到「设置」页指定 Java 路径。";
+                // Stay on the home page: jumping to Settings threw away the user context.
+                var detected = string.Join("、", runtimes.Select(r => r.MajorVersion).Where(m => m > 0).Distinct().OrderByDescending(m => m).Select(m => "Java " + m));
+                LaunchStatus = detected.Length == 0
+                    ? $"{instance.Name} 需要 Java {resolved.RequiredJavaMajorVersion}，但没有检测到任何 Java。"
+                    : $"{instance.Name} 需要 Java {resolved.RequiredJavaMajorVersion}，只检测到 {detected}。请安装对应 JDK，或在「设置 → Java」手动指定路径。";
                 _main.Activities.Finish(activity, ActivityState.Failed, LaunchStatus);
-                _main.Navigate("settings");
+                _main.LogsPage.AppendSystem(LaunchStatus);
                 return;
             }
 
             if (!File.Exists(context.Paths.VersionJarPath(resolved.ClientJarVersionId)))
             {
-                LaunchStatus = "客户端未安装，正在自动安装…";
+                  LaunchStatus = "客户端未安装，正在自动安装…";
                 _main.Activities.Report(activity, 0.05, "安装游戏文件…", "");
 
                 var progress = new Progress<InstallProgress>(p =>
