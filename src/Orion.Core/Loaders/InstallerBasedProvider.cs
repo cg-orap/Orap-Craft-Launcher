@@ -70,8 +70,17 @@ public abstract class InstallerBasedProvider : ILoaderProvider
         try
         {
             // 1. The loader installer needs a complete vanilla installation to patch.
-            request.Output?.Report("正在安装原版 Minecraft…");
-            var vanilla = await InstallService.InstallAsync(request.MinecraftVersion, new InstallOptions(), null, ct).ConfigureAwait(false);
+            request.Output?.Report("正在安装原版 Minecraft（这一阶段会下载完整客户端）…");
+            var vanillaProgress = request.Output is null
+                ? null
+                : new Progress<Install.InstallProgress>(p =>
+                {
+                    if (!string.IsNullOrWhiteSpace(p.Message)) request.Output.Report(p.Message);
+                });
+
+            // A null sink made this phase silent: downloading the whole vanilla install looked frozen.
+            var vanilla = await InstallService.InstallAsync(
+                request.MinecraftVersion, new InstallOptions(), vanillaProgress, ct).ConfigureAwait(false);
             if (!vanilla.Success)
             {
                 warnings.Add("原版安装未完成: " + (vanilla.Error ?? "未知错误"));
