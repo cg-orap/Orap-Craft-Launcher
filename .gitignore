@@ -20,3 +20,6 @@ screenshots/
 # Reference repositories and toolchain are kept outside the repo; never commit them
 .nuget/
 .vs/
+
+# verify.ps1 smoke-test data root
+artifacts/
