@@ -158,7 +158,7 @@ export default function App() {
 
   return (
     <Shell rail={rail} onRail={setRail} sidebar={sidebar} instanceName={current.name}>
-      {rail === 'home' ? <Home launch={launch} setLaunch={setLaunch} sync={sync} setSync={setSync} /> : null}
+      {rail === 'home' ? (<Home launch={launch} setLaunch={setLaunch} sync={sync} setSync={setSync} onOpenLogs={() => setRail('logs')} />) : null}
       {rail === 'instances' ? <Instance /> : null}
       {rail === 'logs' ? <Logs /> : null}
       {rail === 'download' ? (
@@ -195,8 +195,8 @@ export default function App() {
       ) : null}
 
       {/* 演示用状态切换器（不属于设计稿，仅方便评审） */}
-      <Card elevated className="fixed bottom-4 right-4 z-40 flex items-center gap-2 px-3 py-2">
-        <span className="text-[10px] text-tx-3">演示状态</span>
+      <Card elevated className="fixed bottom-3 right-3 z-40 flex items-center gap-1.5 border-white/10 bg-elevated/80 px-2.5 py-1.5 backdrop-blur-md">
+        <span className="text-[10px] text-tx-3">演示</span>
         {(['idle', 'starting', 'running'] as LaunchState[]).map((s) => (
           <button
             key={s}

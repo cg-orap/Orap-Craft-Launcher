@@ -83,7 +83,7 @@ export function Rail({
               'group relative grid h-11 w-11 place-items-center rounded-md transition-all duration-200 ease-smooth',
               isActive
                 ? 'bg-primary/12 text-primary'
-                : 'text-tx-3 hover:bg-white/[0.06] hover:text-tx-1',
+                : 'text-tx-2 hover:bg-white/[0.06] hover:text-tx-1',
             )}
             aria-current={isActive ? 'page' : undefined}
           >
@@ -176,7 +176,7 @@ export function Shell({
         <Rail active={rail} onSelect={onRail} />
         {sidebar}
         <main className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1200px] px-7 py-6">{children}</div>
+          <div className="mx-auto w-full max-w-[1200px] px-7 pb-4 pt-6">{children}</div>
         </main>
       </div>
     </div>

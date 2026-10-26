@@ -214,3 +214,52 @@ export function Crumb({ children }: { children: ReactNode }) {
     </span>
   )
 }
+/** 原创实例封面：天空/地面分层 + 少量像素块，不用任何官方素材。 */
+export function Cover({
+  seed,
+  label,
+  className,
+  tall,
+}: {
+  seed: string
+  label: string
+  className?: string
+  tall?: boolean
+}) {
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % 100000
+  const hue = hash % 360
+  const sky = `linear-gradient(180deg, hsl(${hue} 24% 21%) 0%, hsl(${hue} 20% 15%) 62%, hsl(${(hue + 16) % 360} 22% 12%) 100%)`
+  const ground = `hsl(${(hue + 130) % 360} 18% 13%)`
+
+  return (
+    <div
+      className={cx('relative overflow-hidden rounded-sm', tall ? 'h-[72px]' : 'h-20', className)}
+      style={{ background: sky }}
+    >
+      {/* 地面 */}
+      <div className="absolute inset-x-0 bottom-0" style={{ height: '38%', background: ground }} />
+      {/* 像素方块：由 seed 决定位置 */}
+      {[0, 1, 2, 3].map((i) => {
+        const left = 12 + ((hash >> (i * 3)) % 62)
+        const bottom = 8 + ((hash >> (i * 5)) % 26)
+        const size = i === 0 ? 10 : 6
+        return (
+          <span
+            key={i}
+            className="absolute rounded-[1px]"
+            style={{
+              left: left + '%',
+              bottom: bottom + '%',
+              width: size,
+              height: size,
+              background: `hsl(${(hue + 120 + i * 18) % 360} 26% ${20 + i * 4}%)`,
+            }}
+          />
+        )
+      })}
+      <span className="absolute inset-0" style={{ background: 'linear-gradient(120deg, rgba(255,255,255,0.05), transparent 45%)' }} />
+      <span className="absolute bottom-1 right-1.5 font-pixel text-[9px] leading-none text-white/25">{label}</span>
+    </div>
+  )
+}
