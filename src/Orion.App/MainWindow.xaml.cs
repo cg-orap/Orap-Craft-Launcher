@@ -53,13 +53,7 @@ public partial class MainWindow : Window
             if (node is System.Windows.Controls.ListBoxItem) break;
         }
 
-        if (System.Windows.Controls.ItemsControl.ContainerFromElement((System.Windows.Controls.ItemsControl)sender, source)
-            is not System.Windows.Controls.ListBoxItem { DataContext: NavItem nav }) return;
-
-        if (nav.SubItems.Count == 0) return;
-
-        nav.IsExpanded = !nav.IsExpanded;
-        e.Handled = true;
+        // 图标导航不再有子项：这里不做任何拦截，点击直接交给 ListBox 选择 → 导航。
     }
 
     /// <summary>窗口默认 1280x800，但在小屏或高 DPI 下按工作区收窄，避免超出屏幕。</summary>

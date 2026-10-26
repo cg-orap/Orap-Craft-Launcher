@@ -98,6 +98,10 @@ public sealed class CatalogViewModel : ObservableObject
     private string CacheKey(int page) =>
         $"{_kind.Key}|{_category}|{SearchText.Trim()}|{page}|{_main.CurrentInstance?.GameVersion}|{_main.CurrentInstance?.Loader}";
 
+    private void InitializeKindCommand()
+    {
+        // 占位：真正的赋值在构造函数内完成（见 SelectKindCommand = ...）。
+    }
     public CatalogViewModel(MainViewModel main)
     {
         _main = main;
@@ -165,6 +169,20 @@ public sealed class CatalogViewModel : ObservableObject
     }
 
     public IReadOnlyList<CatalogKindOption> Kinds { get; }
+
+    /// <summary>页面顶部的分类页签用：点一下就切到该分类并加载第一页。</summary>
+    public ICommand SelectKindCommand => new RelayCommand(parameter =>
+    {
+        if (parameter is string key)
+        {
+            var target = Kinds.FirstOrDefault(k => string.Equals(k.Key, key, StringComparison.OrdinalIgnoreCase));
+            if (target is not null) Kind = target;
+        }
+        else if (parameter is CatalogKindOption option)
+        {
+            Kind = option;
+        }
+    });
 
     public IReadOnlyList<string> Categories => _kind.Key switch
     {

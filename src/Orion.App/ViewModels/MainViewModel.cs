@@ -240,22 +240,11 @@ public sealed class MainViewModel : ObservableObject
         get => _selectedNavItem;
         set
         {
-            if (value is null) return;
-
-            // A rail entry with sub-pages (下载中心) does not navigate: the page is opened by one of
-            // its sub-entries. The open/shut toggle is driven by the view's click handler, because
-            // clicking an already selected item never raises another selection change.
-            if (value.SubItems.Count > 0)
-            {
-                if (ReferenceEquals(_selectedNavItem, value)) return;
-                _selectedNavItem = value;
-                OnPropertyChanged();
-                return;
-            }
-
-            if (ReferenceEquals(_selectedNavItem, value)) return;
+            if (value is null || ReferenceEquals(_selectedNavItem, value)) return;
             _selectedNavItem = value;
             OnPropertyChanged();
+
+            // 图标导航没有子项列表：点「下载中心」直接进页面，分类由页面顶部页签切换。
             NavigateCore(value.Key);
         }
     }

@@ -13,16 +13,29 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- page header -->
+        <!-- page header + kind tabs -->
         <Border Grid.Row="0" Background="Transparent" BorderThickness="0" Padding="24,18,24,10">
             <StackPanel>
                 <TextBlock Text="资源市场" FontSize="17" FontWeight="SemiBold" />
                 <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
                            Text="搜索并一键安装整合包、模组、光影与材质包；点击条目查看详情。" />
+                <ItemsControl ItemsSource="{Binding Kinds}" Margin="0,12,0,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource GhostButton}" Margin="0,0,8,0" Padding="14,6"
+                                    FontSize="12" Content="{Binding Name}"
+                                    Command="{Binding DataContext.SelectKindCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </Border>
-
-        <!-- Minecraft versions tab: the existing installer page, unchanged -->
         <Grid Grid.Row="1" Visibility="{Binding IsVersionsTab, Converter={StaticResource BoolToVisibility}}">
             <views:VersionsView DataContext="{Binding VersionsPage}" />
         </Grid>
