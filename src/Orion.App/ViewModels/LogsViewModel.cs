@@ -19,21 +19,113 @@ public sealed class LogsViewModel : ObservableObject
     {
         _main = main;
 
-        ClearCommand = new RelayCommand(() => { LauncherLines.Clear(); GameLines.Clear(); });
+        ClearCommand = new RelayCommand(() =>
+        {
+            LauncherLines.Clear();
+            GameLines.Clear();
+            LauncherLog.Clear();
+            GameLog.Clear();
+            RefreshFilter();
+        });
         OpenLogFolderCommand = new RelayCommand(() => Open(_main.Context.Paths.LogsDir));
         OpenGameLogCommand = new RelayCommand(() => { if (!string.IsNullOrWhiteSpace(GameLogPath)) Open(Path.GetDirectoryName(GameLogPath)!); });
         CopyCommand = new RelayCommand(Copy);
+        CopyCrashPathCommand = new RelayCommand(() =>
+        {
+            if (string.IsNullOrWhiteSpace(CrashReportPath)) return;
+            try
+            {
+                Clipboard.SetText(CrashReportPath);
+                AppendSystem("崩溃报告路径已复制。");
+            }
+            catch (Exception ex)
+            {
+                AppendSystem("复制失败: " + ex.Message);
+            }
+        });
+
+        GameLogView = System.Windows.Data.CollectionViewSource.GetDefaultView(GameLog);
+        GameLogView.Filter = Matches;
+
+        SetLevelCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is string level && level.Length > 0) LevelFilter = level;
+        });
 
         LauncherLines.Add("Orap Craft Launcher 日志面板");
         LauncherLines.Add("========================");
+        LauncherLog.Add(new LogLineView(LauncherLines[0]));
+        LauncherLog.Add(new LogLineView(LauncherLines[1]));
     }
+
+    private string _levelFilter = "ALL";
+    private string _searchText = "";
+    private bool _autoScroll = true;
+
+    /// <summary>级别筛选：ALL / ERROR / WARN / INFO / DEBUG。</summary>
+    public string LevelFilter
+    {
+        get => _levelFilter;
+        set
+        {
+            if (!SetProperty(ref _levelFilter, value)) return;
+            RefreshFilter();
+        }
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (!SetProperty(ref _searchText, value)) return;
+            RefreshFilter();
+        }
+    }
+
+    public bool AutoScroll
+    {
+        get => _autoScroll;
+        set => SetProperty(ref _autoScroll, value);
+    }
+
+    public int ErrorCount => GameLog.Count(l => l.Level == LogLevel.Error);
+    public int WarnCount => GameLog.Count(l => l.Level == LogLevel.Warn);
+
+    /// <summary>筛选后的游戏日志；界面只读这个。</summary>
+    public System.ComponentModel.ICollectionView GameLogView { get; }
+
+    private void RefreshFilter()
+    {
+        GameLogView?.Refresh();
+        OnPropertyChanged(nameof(ErrorCount));
+        OnPropertyChanged(nameof(WarnCount));
+    }
+
+    private bool Matches(object item)
+    {
+        if (item is not LogLineView line) return false;
+        if (_levelFilter != "ALL" && !string.Equals(line.LevelLabel, _levelFilter, StringComparison.OrdinalIgnoreCase)) return false;
+        if (_searchText.Length > 0 && !line.Text.Contains(_searchText, StringComparison.OrdinalIgnoreCase)) return false;
+        return true;
+    }
+
+    public ICommand SetLevelCommand { get; }
 
     public ICommand ClearCommand { get; }
     public ICommand OpenLogFolderCommand { get; }
     public ICommand OpenGameLogCommand { get; }
     public ICommand CopyCommand { get; }
 
+    /// <summary>复制崩溃报告路径（不分析内容）。</summary>
+    public ICommand CopyCrashPathCommand { get; }
+
     public ObservableList<string> LauncherLines { get; } = [];
+
+    /// <summary>与 LauncherLines 同步的带级别版本，供界面高亮与筛选使用。</summary>
+    public ObservableList<LogLineView> LauncherLog { get; } = [];
+
+    public ObservableList<LogLineView> GameLog { get; } = [];
     public ObservableList<string> GameLines { get; } = [];
     public ObservableList<string> CrashCauses { get; } = [];
     public ObservableList<string> Evidence { get; } = [];
@@ -66,8 +158,11 @@ public sealed class LogsViewModel : ObservableObject
     {
         RunOnUi(() =>
         {
-            LauncherLines.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
+            var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+            LauncherLines.Add(line);
+            LauncherLog.Add(new LogLineView(line));
             while (LauncherLines.Count > 1500) LauncherLines.RemoveAt(0);
+            while (LauncherLog.Count > 1500) LauncherLog.RemoveAt(0);
         });
     }
 
@@ -76,7 +171,10 @@ public sealed class LogsViewModel : ObservableObject
         RunOnUi(() =>
         {
             LauncherLines.Add(line);
+            LauncherLog.Add(new LogLineView(line));
             while (LauncherLines.Count > 1500) LauncherLines.RemoveAt(0);
+            while (LauncherLog.Count > 1500) LauncherLog.RemoveAt(0);
+            RefreshFilter();
         });
     }
 
@@ -85,7 +183,10 @@ public sealed class LogsViewModel : ObservableObject
         RunOnUi(() =>
         {
             GameLines.Add(line);
+            GameLog.Add(new LogLineView(line));
             while (GameLines.Count > 3000) GameLines.RemoveAt(0);
+            while (GameLog.Count > 3000) GameLog.RemoveAt(0);
+            RefreshFilter();
         });
     }
 
@@ -103,7 +204,9 @@ public sealed class LogsViewModel : ObservableObject
             if (analysis.IsCrash) TabIndex = 2;
 
             LauncherLines.Add("");
-            LauncherLines.Add($"=== 崩溃分析 {DateTime.Now:HH:mm:ss} ===");
+            LauncherLog.Add(new LogLineView(""));
+            LauncherLines.Add($"=== 崩溃报告 {DateTime.Now:HH:mm:ss} ===");
+            LauncherLog.Add(new LogLineView(LauncherLines[^1]));
             LauncherLines.Add("结论: " + analysis.Summary);
             foreach (var cause in analysis.Causes.Skip(1)) LauncherLines.Add("  - " + cause);
             foreach (var evidence in analysis.Evidence.Take(8)) LauncherLines.Add("  证据: " + evidence);

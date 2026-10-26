@@ -3,131 +3,211 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="clr-namespace:Orion.App.ViewModels"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="960">
 
-    <Grid Margin="26,22,26,22">
+    <UserControl.Resources>
+        <!-- 日志行：按级别着色，错误行加浅红底（颜色全部来自调色板） -->
+        <Style x:Key="LogLineItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Row" Background="Transparent" CornerRadius="3">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Level}" Value="Error">
+                                <Setter TargetName="Row" Property="Background" Value="#1AE06C75" />
+                                <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Level}" Value="Warn">
+                                <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Level}" Value="Debug">
+                                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                            </DataTrigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 级别筛选胶囊 -->
+        <Style x:Key="LevelChip" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" CornerRadius="5" Background="Transparent" Padding="8,4">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="24,20,24,18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="3*" />
-            <RowDefinition Height="2*" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
+        <!-- ===== 头部 ===== -->
+        <Grid Grid.Row="0" Margin="0,0,0,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel>
-                <TextBlock Text="日志与诊断" Style="{StaticResource TitleText}" />
-                <TextBlock Text="启动器日志、游戏输出与崩溃分析。完整日志同时写入数据目录的 logs 文件夹。"
-                           Style="{StaticResource CaptionText}" Margin="0,6,0,14" />
+                <TextBlock Text="日志与崩溃报告" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                           Text="只做查看、筛选、搜索与归档，不做任何自动分析。" />
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,4,0,0">
-                <Button Content="复制当前视图" Style="{StaticResource SecondaryButton}" Command="{Binding CopyCommand}" />
-                <Button Content="打开日志目录" Style="{StaticResource GhostButton}" Command="{Binding OpenLogFolderCommand}" Margin="8,0,0,0" />
-                <Button Content="清空" Style="{StaticResource GhostButton}" Command="{Binding ClearCommand}" Margin="4,0,0,0" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="打开日志文件夹" Style="{StaticResource GhostButton}" Command="{Binding OpenLogFolderCommand}" />
+                <Button Content="复制当前视图" Style="{StaticResource GhostButton}" Command="{Binding CopyCommand}" Margin="8,0,0,0" />
+                <Button Content="清空" Style="{StaticResource GhostButton}" Command="{Binding ClearCommand}" Margin="8,0,0,0" />
             </StackPanel>
         </Grid>
 
-        <!-- crash analysis -->
-        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,14"
-                Visibility="{Binding CrashSummary, Converter={StaticResource StringToVisibility}}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="崩溃分析" Style="{StaticResource SectionTitle}" Margin="0" />
-                    <TextBlock Text="{Binding CrashReportPath}" Style="{StaticResource CaptionText}"
-                               Margin="12,0,0,0" VerticalAlignment="Center" />
-                </StackPanel>
+        <!-- ===== 三栏：筛选 / 日志流 / 归档 ===== -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="176" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="248" />
+            </Grid.ColumnDefinitions>
 
-                <TextBlock Text="{Binding CrashSummary}" Foreground="{DynamicResource WarningBrush}"
-                           TextWrapping="Wrap" Margin="0,8,0,0" FontWeight="SemiBold" />
+            <!-- 左：级别、搜索、自动滚动、统计 -->
+            <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0" Padding="10">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock Text="级别" Style="{StaticResource CaptionText}" Margin="2,0,0,6" />
+                        <ItemsControl>
+                            <Button Style="{StaticResource LevelChip}" Content="ALL" Command="{Binding SetLevelCommand}" CommandParameter="ALL" />
+                            <Button Style="{StaticResource LevelChip}" Content="ERROR" Command="{Binding SetLevelCommand}" CommandParameter="ERROR" />
+                            <Button Style="{StaticResource LevelChip}" Content="WARN" Command="{Binding SetLevelCommand}" CommandParameter="WARN" />
+                            <Button Style="{StaticResource LevelChip}" Content="INFO" Command="{Binding SetLevelCommand}" CommandParameter="INFO" />
+                            <Button Style="{StaticResource LevelChip}" Content="DEBUG" Command="{Binding SetLevelCommand}" CommandParameter="DEBUG" />
+                        </ItemsControl>
 
-                <ItemsControl ItemsSource="{Binding CrashCauses}" Margin="0,8,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                        <TextBlock Text="搜索" Style="{StaticResource CaptionText}" Margin="2,12,0,6" />
+                        <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="6" Padding="8,4"
+                                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1">
+                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     Background="{DynamicResource SurfaceAltBg}" BorderThickness="0"
+                                     Padding="2,3" VerticalContentAlignment="Center"
+                                     FontFamily="Consolas" FontSize="11" CaretBrush="{DynamicResource TextBrush}"
+                                     Foreground="{DynamicResource TextBrush}" />
+                        </Border>
 
-                <ItemsControl ItemsSource="{Binding Evidence}" Margin="0,8,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" Style="{StaticResource MonoText}" TextWrapping="Wrap" Margin="0,1" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Border>
+                        <CheckBox Content="自动滚动" IsChecked="{Binding AutoScroll}" Margin="2,12,0,0" FontSize="11" />
+                    </StackPanel>
 
-        <!-- game log -->
-        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,14">
-            <DockPanel>
-                <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
-                    <TextBlock Text="游戏输出" FontWeight="SemiBold" />
-                    <TextBlock HorizontalAlignment="Right" Text="{Binding GameLogPath}" Style="{StaticResource CaptionText}"
-                               TextTrimming="CharacterEllipsis" MaxWidth="520" />
+                    <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Margin="2,10,0,0">
+                        <TextBlock Style="{StaticResource CaptionText}" Margin="0,2,0,0">
+                            <Run Text="错误 " /><Run Text="{Binding ErrorCount, Mode=OneWay}" Foreground="{DynamicResource DangerBrush}" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource CaptionText}" Margin="0,2,0,0">
+                            <Run Text="警告 " /><Run Text="{Binding WarnCount, Mode=OneWay}" Foreground="{DynamicResource WarningBrush}" />
+                        </TextBlock>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- 中：日志流 -->
+            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Padding="12,8" BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <TextBlock Text="游戏输出" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock HorizontalAlignment="Right" Text="{Binding GameLogPath}" Style="{StaticResource CaptionText}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="360" FontFamily="Consolas" />
+                        </Grid>
+                    </Border>
+
+                    <ListBox Grid.Row="1" ItemsSource="{Binding GameLogView}"
+                             Background="Transparent" BorderThickness="0" Margin="6,4,6,6"
+                             ItemContainerStyle="{StaticResource LogLineItem}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:LogLineView}">
+                                <TextBlock Text="{Binding Text}" FontFamily="Cascadia Mono, Consolas" FontSize="11"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
+            </Border>
 
-                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="8" Padding="8">
-                    <ListBox ItemsSource="{Binding GameLines}" Background="Transparent" BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}" FontFamily="Cascadia Mono, Consolas" FontSize="11.5"
-                                           Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Margin" Value="0" />
-                                <Setter Property="Padding" Value="2,1" />
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <ContentPresenter />
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
+            <!-- 右：崩溃报告归档 + 启动器日志 -->
+            <Grid Grid.Column="2" Margin="12,0,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{StaticResource Card}" Padding="12,10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="崩溃报告归档" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding CrashReportPath}" Style="{StaticResource CaptionText}"
+                                   FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"
+                                   Visibility="{Binding CrashReportPath, Converter={StaticResource StringToVisibility}}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="复制路径" Style="{StaticResource GhostButton}" Padding="8,3" FontSize="11"
+                                    Command="{Binding CopyCrashPathCommand}" />
+                            <Button Content="打开文件夹" Style="{StaticResource GhostButton}" Padding="8,3" FontSize="11"
+                                    Command="{Binding OpenGameLogCommand}" Margin="6,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="崩溃报告由游戏写入 crash-reports/，这里只归档与打开。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                    </StackPanel>
                 </Border>
-            </DockPanel>
-        </Border>
 
-        <!-- launcher log -->
-        <Border Grid.Row="3" Style="{StaticResource Card}">
-            <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="启动器日志" FontWeight="SemiBold" Margin="0,0,0,8" />
-
-                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="8" Padding="8">
-                    <ListBox ItemsSource="{Binding LauncherLines}" Background="Transparent" BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}" FontFamily="Cascadia Mono, Consolas" FontSize="11.5"
-                                           Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Margin" Value="0" />
-                                <Setter Property="Padding" Value="2,1" />
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <ContentPresenter />
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
+                <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="启动器日志" FontSize="12" FontWeight="SemiBold" Margin="12,8" />
+                        <ListBox Grid.Row="1" ItemsSource="{Binding LauncherLog}"
+                                 Background="Transparent" BorderThickness="0" Margin="6,0,6,6"
+                                 ItemContainerStyle="{StaticResource LogLineItem}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:LogLineView}">
+                                    <TextBlock Text="{Binding Text}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5"
+                                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
                 </Border>
-            </DockPanel>
-        </Border>
+            </Grid>
+        </Grid>
     </Grid>
 </UserControl>

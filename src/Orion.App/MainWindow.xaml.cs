@@ -13,6 +13,15 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => FixMaximizedBounds();
         InitializeComponent();
         FitToWorkArea();
+
+        // 支持 --page <key> 直接打开某个页面（截图、排障、深链接都用得上）。
+        var args = Environment.GetCommandLineArgs();
+        var index = Array.FindIndex(args, a => string.Equals(a, "--page", StringComparison.OrdinalIgnoreCase));
+        if (index >= 0 && index + 1 < args.Length)
+        {
+            var key = args[index + 1];
+            Loaded += (_, _) => (DataContext as ViewModels.MainViewModel)?.Navigate(key);
+        }
     }
     /// <summary>
     /// 下载中心 owns a sub-menu: a click folds it open/shut instead of navigating. The click is
