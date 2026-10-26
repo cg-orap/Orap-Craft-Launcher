@@ -5,10 +5,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
         Title="Orap Craft Launcher — Minecraft Java 版启动器"
-        Height="700" Width="1120" MinHeight="700" MinWidth="1120" MaxHeight="700" MaxWidth="1120"
-        WindowState="Normal"
-        WindowStyle="None"
-        ResizeMode="NoResize"
+        Height="800" Width="1280" MinHeight="720" MinWidth="1100"
+        WindowStyle="None" ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBg}"
         TextOptions.TextFormattingMode="Ideal"
@@ -20,24 +18,24 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="56" ResizeBorderThickness="0" GlassFrameThickness="0"
+        <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0"
                       CornerRadius="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <!-- Navigation entry: rounded hover, accent bar and accent label when selected. -->
-        <Style x:Key="NavItemStyle" TargetType="ListBoxItem">
+        <!-- 一级导航：仅图标，选中时主色 + 左侧竖条 -->
+        <Style x:Key="RailItemStyle" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Margin" Value="0,2,0,2" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Grid MinHeight="40" Margin="0,2">
+                        <Grid Height="40" Margin="0,2">
                             <Border x:Name="Fill" CornerRadius="8" Background="Transparent" />
-                            <Border x:Name="Bar" Width="3" CornerRadius="2" HorizontalAlignment="Left"
-                                    Margin="0,8,0,8" Background="Transparent" />
-                            <ContentPresenter Margin="14,9,10,9" VerticalAlignment="Center" />
+                            <Border x:Name="Bar" Width="2" Height="20" CornerRadius="1" HorizontalAlignment="Left"
+                                    Background="Transparent" />
+                            <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -48,7 +46,30 @@
                                 <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceAltBg}" />
                                 <Setter TargetName="Bar" Property="Background" Value="{DynamicResource AccentBrush}" />
                                 <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 侧栏实例条目：长条行，选中提亮 -->
+        <Style x:Key="SidebarInstanceStyle" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Fill" CornerRadius="6" Background="Transparent" Padding="8,6" Margin="0,1">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceAltBg}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -59,221 +80,270 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="56" />
+            <RowDefinition Height="40" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- ======================= custom title bar ======================= -->
-        <Grid Grid.Row="0" Background="{DynamicResource SurfaceBg}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <!-- ============ 自定义标题栏（40px，可拖拽） ============ -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBg}"
+                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
-                <Border Width="28" Height="28" CornerRadius="8" Background="{DynamicResource AccentBrush}" Margin="0,0,10,0">
-                    <TextBlock Text="O" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock Text="Orap Craft Launcher" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <TextBlock Text="v0.1.0" FontSize="10.5" Margin="8,3,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource MutedTextBrush}" />
-            </StackPanel>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <Border Width="22" Height="22" CornerRadius="6" Background="{DynamicResource AccentBrush}"
+                            Margin="0,0,9,0">
+                        <TextBlock Text="O" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Orap Craft" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="v0.2" FontSize="10" Margin="8,2,0,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource MutedTextBrush}" />
+                </StackPanel>
 
-            <TextBlock Grid.Column="1" Text="打造一个好用、好看的 Minecraft 启动器"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11.5" Opacity="0.65"
-                       Foreground="{DynamicResource MutedTextBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="&#xE7FC;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11"
+                               Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,6,0" />
+                    <TextBlock Text="{Binding InstanceDisplay}" FontSize="11.5"
+                               Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                <Button x:Name="MinButton" Content="—" Style="{StaticResource CaptionButton}" Click="OnMinimize"
-                        AutomationProperties.AutomationId="CaptionMinimize" />
-                <Button x:Name="CloseButton" Content="✕" Style="{StaticResource CaptionButton}" Click="OnClose"
-                        AutomationProperties.AutomationId="CaptionClose" />
-            </StackPanel>
-        </Grid>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="MinButton" Content="&#xE921;" Style="{StaticResource CaptionButton}" Click="OnMinimize"
+                            AutomationProperties.AutomationId="CaptionMinimize" />
+                    <Button x:Name="MaxButton" Content="&#xE922;" Style="{StaticResource CaptionButton}" Click="OnMaximize"
+                            AutomationProperties.AutomationId="CaptionMaximize" />
+                    <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CaptionButton}" Click="OnClose"
+                            AutomationProperties.AutomationId="CaptionClose" />
+                </StackPanel>
+            </Grid>
+        </Border>
 
-        <!-- layer 0: palette background (also what the translucent rail blends into) -->
+        <!-- 背景层 -->
         <Rectangle Grid.Row="1" Fill="{DynamicResource WindowBg}" />
-
-        <!-- layer 1: user wallpaper, shared by every page -->
         <Image Grid.Row="1" Source="{Binding Home.BackgroundImage}" Stretch="UniformToFill"
                RenderOptions.BitmapScalingMode="HighQuality"
                Visibility="{Binding Home.HasBackgroundImage, Converter={StaticResource BoolToVisibility}}" />
-
-        <!-- layer 2: scrim so cards and text stay readable over any picture -->
         <Rectangle Grid.Row="1" Fill="{DynamicResource ScrimBrush}"
                    Visibility="{Binding Home.HasBackgroundImage, Converter={StaticResource BoolToVisibility}}" />
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="72" />
+                <ColumnDefinition>
+                    <ColumnDefinition.Style>
+                        <Style TargetType="ColumnDefinition">
+                            <Setter Property="Width" Value="280" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                    <Setter Property="Width" Value="44" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ColumnDefinition.Style>
+                </ColumnDefinition>
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-        <!-- ======================= navigation rail ======================= -->
-        <Border Grid.Column="0" Background="{DynamicResource NavRailBg}"
-                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
-            <DockPanel>
+            <!-- ============ 一级导航 Rail（72px，仅图标） ============ -->
+            <Border Grid.Column="0" Background="{DynamicResource NavRailBg}"
+                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <Button DockPanel.Dock="Bottom" Margin="12,0,12,12" Width="40" Height="40" Padding="0"
+                            Cursor="Hand" Command="{Binding OpenLoginCommand}"
+                            AutomationProperties.AutomationId="AccountButton"
+                            ToolTip="{Binding AccountDisplay}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Fill" CornerRadius="10" Background="{DynamicResource SurfaceAltBg}"
+                                        BorderThickness="1" BorderBrush="Transparent">
+                                    <Grid>
+                                        <Border CornerRadius="6" Margin="4"
+                                                Visibility="{Binding HasCurrentAccountAvatar, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+                                            <TextBlock Text="{Binding CurrentAccount.Username, Converter={StaticResource Initial}}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <Border CornerRadius="6" Margin="4" ClipToBounds="True"
+                                                Visibility="{Binding HasCurrentAccountAvatar, Converter={StaticResource BoolToVisibility}}">
+                                            <Image Source="{Binding CurrentAccountAvatar}" Stretch="UniformToFill"
+                                                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                        <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
 
-                <!-- account: first entry of the rail, opens the login window -->
-                <Button DockPanel.Dock="Bottom" Margin="10,10,10,10" Padding="0" Cursor="Hand"
-                        Command="{Binding OpenLoginCommand}"
-                        AutomationProperties.AutomationId="AccountButton"
-                        ToolTip="点击登录 / 切换账户">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="Fill" Background="{DynamicResource SurfaceAltBg}"
-                                    CornerRadius="10" Padding="10" BorderThickness="1" BorderBrush="Transparent">
-                                <ContentPresenter />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
-                                    <Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Button.Template>
+                    <ListBox ItemsSource="{Binding NavView}"
+                             SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0" Margin="12,12,12,0"
+                             ItemContainerStyle="{StaticResource RailItemStyle}"
+                             PreviewMouseLeftButtonDown="OnNavClick"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Hidden">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ToolTip="{Binding Title}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- skin head (falls back to an initial badge) -->
-                        <Grid Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,10,0">
-                            <Border CornerRadius="6" Background="{DynamicResource SurfaceBg}"
-                                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
-                                    Visibility="{Binding HasCurrentAccountAvatar, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
-                                <TextBlock Text="{Binding CurrentAccount.Username, Converter={StaticResource Initial}}"
-                                           FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <Border CornerRadius="6" ClipToBounds="True"
-                                    Visibility="{Binding HasCurrentAccountAvatar, Converter={StaticResource BoolToVisibility}}">
-                                <Image Source="{Binding CurrentAccountAvatar}" Stretch="UniformToFill"
-                                       RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                            </Border>
-                        </Grid>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding AccountDisplay}" FontWeight="SemiBold" FontSize="12.5"
-                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                            <TextBlock Text="{Binding AccountDetail}" Style="{StaticResource CaptionText}"
-                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,2,0,0" />
-                        </StackPanel>
-                    </Grid>
-                </Button>
-
-                <!-- nav -->
-                <ListBox ItemsSource="{Binding NavView}"
-                         SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
-                         Background="Transparent" BorderThickness="0" Margin="10,0,10,0"
-                         ItemContainerStyle="{StaticResource NavItemStyle}"
-                         PreviewMouseLeftButtonDown="OnNavClick"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.GroupStyle>
-                        <GroupStyle>
-                            <GroupStyle.HeaderTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" FontSize="10.5" Margin="14,10,0,4" Opacity="0.55"
-                                               Foreground="{DynamicResource MutedTextBrush}" />
-                                </DataTemplate>
-                            </GroupStyle.HeaderTemplate>
-                        </GroupStyle>
-                    </ListBox.GroupStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                               FontSize="15" Width="22" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding Title}" FontSize="13.5" VerticalAlignment="Center" />
-                                </StackPanel>
-
-                                <!-- second level: the five download tabs, unfolded by clicking 下载中心 -->
-                                <ItemsControl ItemsSource="{Binding SubItems}" Margin="6,4,0,2"
-                                              Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Stretch"
-                                                    HorizontalContentAlignment="Left" Padding="10,5" Margin="0,2,0,0"
-                                                    Content="{Binding Title}"
-                                                    FontSize="12.5"
-                                                    Command="{Binding DataContext.OpenCatalogKindCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </DockPanel>
-        </Border>
-
-        <!-- ======================= page host ======================= -->
-        <Grid Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-            <!-- Only the home page shows the wallpaper; every other page gets a solid backdrop so
-                 text stays readable. The translucent rail still blends over the picture. -->
-            <Border Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource WindowBg}"
-                    Visibility="{Binding IsHomeSelected, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
-
-            <ContentControl Grid.Row="0" Content="{Binding CurrentPage}" />
-
-            <!-- status bar -->
-            <Border Grid.Row="1" Background="{DynamicResource SurfaceBg}"
-                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
-                    Padding="18,9">
+            <!-- ============ 二级侧栏（280 / 44，可折叠） ============ -->
+            <Border Grid.Column="1" Background="{DynamicResource NavRailBg}"
+                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                    <!-- 折叠/展开按钮：两种状态同一坐标（左 6，上 24） -->
+                    <Button x:Name="SidebarToggle" HorizontalAlignment="Left" VerticalAlignment="Top"
+                            Margin="6,24,0,0" Width="32" Height="32" Padding="0" Cursor="Hand"
+                            Command="{Binding ToggleSidebarCommand}"
+                            AutomationProperties.AutomationId="SidebarToggle"
 
-                    <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="{DynamicResource SuccessBrush}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Activities.IsBusy}" Value="True">
-                                            <Setter Property="Fill" Value="{DynamicResource WarningBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                        <TextBlock Text="{Binding Activities.Status}" Style="{StaticResource CaptionText}" />
-                    </StackPanel>
+                            Style="{StaticResource IconSquareButton}">
+                        <TextBlock Text="{Binding SidebarToggleGlyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
 
-                    <TextBlock Grid.Column="1" Text="{Binding VersionStatus}" Style="{StaticResource CaptionText}" />
+                    <!-- 展开态内容：标题 + 实例列表 + 底部占用 -->
+                    <DockPanel Margin="0,80,0,0"
+                               Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+                        <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource BorderBrushSoft}"
+                                BorderThickness="0,1,0,0" Padding="12,10">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="备份占用" FontSize="10.5" Foreground="{DynamicResource MutedTextBrush}" />
+                                    <TextBlock Text="1.1 GB / 8 GB" FontSize="10.5" HorizontalAlignment="Right"
+                                               FontFamily="Consolas" Foreground="{DynamicResource TextBrush}" />
+                                </Grid>
+                                <ProgressBar Value="14" Height="4" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Margin="12,0,12,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Border Background="{DynamicResource SurfaceBg}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1" Padding="8,5">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                   FontSize="10" Foreground="{DynamicResource MutedTextBrush}"
+                                                   VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBlock Text="搜索实例…" FontSize="11.5"
+                                                   Foreground="{DynamicResource MutedTextBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <ListBox Grid.Row="1" ItemsSource="{Binding Home.Instances}"
+                                     SelectedItem="{Binding Home.SidebarSelection, Mode=TwoWay}"
+                                     Background="Transparent" BorderThickness="0"
+                                     ItemContainerStyle="{StaticResource SidebarInstanceStyle}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Width="28" Height="28" CornerRadius="6"
+                                                    Margin="0,0,8,0" Background="{DynamicResource SurfaceBg}"
+                                                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1">
+                                                <TextBlock Text="{Binding Name, Converter={StaticResource Initial}}"
+                                                           FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="12"
+                                                           Foreground="{DynamicResource TextBrush}"
+                                                           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="10" Margin="0,1,0,0"
+                                                           FontFamily="Consolas"
+                                                           Foreground="{DynamicResource MutedTextBrush}"
+                                                           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </DockPanel>
                 </Grid>
             </Border>
 
-            <!-- initialisation overlay -->
-            <Border Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource WindowBg}"
-                    Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <Border Width="56" Height="56" CornerRadius="16" Background="{DynamicResource AccentBrush}"
-                            HorizontalAlignment="Center">
-                        <TextBlock Text="O" FontSize="28" FontWeight="Bold" Foreground="#FFFFFF"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="Orap Craft Launcher" FontSize="22" FontWeight="SemiBold"
-                               HorizontalAlignment="Center" Margin="0,18,0,0" />
-                    <TextBlock Text="正在初始化…" Style="{StaticResource CaptionText}" Margin="0,8,0,0" HorizontalAlignment="Center" />
-                    <ProgressBar IsIndeterminate="True" Width="240" Margin="0,18,0,0" Height="4" />
-                </StackPanel>
-            </Border>
-        </Grid>
+            <!-- ============ 内容区 ============ -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource WindowBg}"
+                        Visibility="{Binding IsHomeSelected, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+
+                <ContentControl Grid.Row="0" Content="{Binding CurrentPage}" Margin="0,0,0,0" />
+
+                <Border Grid.Row="1" Background="{DynamicResource SurfaceBg}"
+                        BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
+                        Padding="18,7">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,8,0">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Activities.IsBusy}" Value="True">
+                                                <Setter Property="Fill" Value="{DynamicResource WarningBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="{Binding Activities.Status}" Style="{StaticResource CaptionText}" />
+                        </StackPanel>
+                        <TextBlock HorizontalAlignment="Right" Text="{Binding VersionStatus}"
+                                   Style="{StaticResource CaptionText}" />
+                    </Grid>
+                </Border>
+
+                <!-- 初始化遮罩 -->
+                <Border Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource WindowBg}"
+                        Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Border Width="56" Height="56" CornerRadius="16" Background="{DynamicResource AccentBrush}"
+                                HorizontalAlignment="Center">
+                            <TextBlock Text="O" FontSize="28" FontWeight="Bold" Foreground="#FFFFFF"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Orap Craft Launcher" FontSize="22" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,18,0,0" />
+                        <TextBlock Text="正在初始化…" Style="{StaticResource CaptionText}" Margin="0,8,0,0"
+                                   HorizontalAlignment="Center" />
+                        <ProgressBar IsIndeterminate="True" Width="240" Margin="0,18,0,0" Height="4" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

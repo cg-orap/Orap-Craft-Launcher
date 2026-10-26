@@ -4,51 +4,48 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="760" d:DesignWidth="1120">
+             d:DesignHeight="760" d:DesignWidth="900">
 
     <UserControl.Resources>
-        <Style x:Key="LaunchHeroButton" TargetType="Button">
+        <Style x:Key="LaunchPrimary" TargetType="Button">
             <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
-            <Setter Property="FontSize" Value="21" />
+            <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="MinWidth" Value="280" />
-            <Setter Property="Padding" Value="40,14" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="MinWidth" Value="180" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                                                <Border x:Name="Shell" CornerRadius="18" BorderThickness="1" BorderBrush="#33FFFFFF">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
-                                    <GradientStop Color="{DynamicResource AccentHoverColor}" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="34" ShadowDepth="8" Opacity="0.55" Color="{DynamicResource AccentColor}" />
-                            </Border.Effect>
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
+                        <Border x:Name="Fill" CornerRadius="10" Background="{DynamicResource AccentBrush}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20,0" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Shell" Property="BorderBrush" Value="#66FFFFFF" />
+                                <Setter TargetName="Fill" Property="Opacity" Value="0.9" />
                             </Trigger>
-
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Shell" Property="Background" Value="{DynamicResource MutedTextBrush}" />
-                                <Setter TargetName="Shell" Property="Opacity" Value="0.75" />
+                                <Setter TargetName="Fill" Property="Opacity" Value="0.5" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="HomeCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+
+        <Style x:Key="MetaText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        </Style>
     </UserControl.Resources>
 
-    <!-- The window paints the wallpaper and its scrim behind every page, so this view stays
-         transparent; only the launch controls live here. -->
     <Grid Background="Transparent">
         <Grid.ContextMenu>
             <ContextMenu>
@@ -56,106 +53,202 @@
                 <MenuItem Header="恢复默认背景" Command="{Binding ClearBackgroundCommand}" />
             </ContextMenu>
         </Grid.ContextMenu>
-        <!-- Centre-bottom placement: the block is pushed below the vertical centre on purpose. -->
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="2.7*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="24,0,24,0">
-            <!-- account identity sits right above the launch button -->
-            <StackPanel HorizontalAlignment="Center" Margin="0,0,0,14">
-                <Grid Width="68" Height="68" HorizontalAlignment="Center">
-                    <Border CornerRadius="8" Background="{DynamicResource SurfaceAltBg}"
-                            Visibility="{Binding DataContext.HasCurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
-                        <TextBlock Text="{Binding DataContext.CurrentAccount.Username, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Initial}}"
-                                   FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <Border CornerRadius="8" ClipToBounds="True"
-                            Visibility="{Binding DataContext.HasCurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}">
-                        <Image Source="{Binding DataContext.CurrentAccountAvatar, RelativeSource={RelativeSource AncestorType=Window}}"
-                               Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                    </Border>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="28,24,28,28">
+
+                <Border Style="{StaticResource HomeCard}" Padding="24,20">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="72" Height="72" CornerRadius="10" ClipToBounds="True" Margin="0,0,16,0">
+                                <Grid>
+                                    <Rectangle Fill="{DynamicResource SurfaceAltBg}" />
+                                    <Rectangle Height="26" VerticalAlignment="Bottom" Opacity="0.55">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
+                                                <GradientStop Color="#00000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <TextBlock Text="{Binding InstanceTitle, Converter={StaticResource Initial}}"
+                                               FontSize="22" FontWeight="Bold" Foreground="#66FFFFFF"
+                                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,6" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="当前版本" Style="{StaticResource MetaText}" />
+                                <TextBlock Text="{Binding InstanceTitle}" FontSize="21" FontWeight="SemiBold"
+                                           Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="6,2"
+                                        HorizontalAlignment="Left" Margin="0,6,0,0">
+                                    <TextBlock Text="{Binding InstanceSubtitle}" FontSize="10.5"
+                                               FontFamily="Consolas"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                            <Button Style="{StaticResource LaunchPrimary}" Command="{Binding LaunchCommand}"
+                                    AutomationProperties.AutomationId="LaunchButton">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                               FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"
+                                               Foreground="#FFFFFF" />
+                                    <TextBlock Text="{Binding LaunchButtonText}" Foreground="#FFFFFF" FontSize="15"
+                                               FontWeight="SemiBold" VerticalAlignment="Center"
+                                               AutomationProperties.AutomationId="LaunchVersionLine" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Content="结束游戏" Style="{StaticResource GhostButton}" Margin="10,0,0,0"
+                                    Height="44" Command="{Binding StopCommand}"
+                                    Visibility="{Binding IsLaunching, Converter={StaticResource BoolToVisibility}}" />
+
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
+                                <TextBlock Text="{Binding RuntimeText}" Style="{StaticResource MetaText}"
+                                           VerticalAlignment="Center" AutomationProperties.AutomationId="StatusJava" />
+                                <TextBlock Text="·" Style="{StaticResource MetaText}" Margin="10,0" />
+                                <TextBlock Text="{Binding MemoryUsageText}" Style="{StaticResource MetaText}"
+                                           VerticalAlignment="Center" AutomationProperties.AutomationId="StatusMemory" />
+                                <TextBlock Text="·" Style="{StaticResource MetaText}" Margin="10,0" />
+                                <TextBlock Text="{Binding StateText}" Style="{StaticResource MetaText}"
+                                           VerticalAlignment="Center" AutomationProperties.AutomationId="StatusState" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource HomeCard}" Padding="20,14" Margin="0,16,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,18,0">
+                            <TextBlock Text="内存" Style="{StaticResource MetaText}" />
+                            <TextBlock Text="{Binding MemoryUsageText}" FontFamily="Consolas" FontSize="12"
+                                       Margin="0,4,0,6" />
+                            <ProgressBar Value="27" Height="4" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,18,0">
+                            <TextBlock Text="CPU" Style="{StaticResource MetaText}" />
+                            <TextBlock Text="—" FontFamily="Consolas" FontSize="12" Margin="0,4,0,6" />
+                            <ProgressBar Value="0" Height="4" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Margin="0,0,18,0">
+                            <TextBlock Text="GPU" Style="{StaticResource MetaText}" />
+                            <TextBlock Text="—" FontFamily="Consolas" FontSize="12" Margin="0,4,0,6" />
+                            <ProgressBar Value="0" Height="4" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3">
+                            <TextBlock Text="运行状态" Style="{StaticResource MetaText}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <Ellipse Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,6,0">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLaunching}" Value="True">
+                                                    <Setter Property="Fill" Value="{DynamicResource AccentBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                                <TextBlock Text="{Binding StateText}" FontSize="12" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid Margin="0,20,0,10">
+                    <TextBlock Text="最近游玩" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
                 </Grid>
-                <TextBlock Text="{Binding DataContext.AccountDisplay, RelativeSource={RelativeSource AncestorType=Window}}"
-                           HorizontalAlignment="Center" Margin="0,8,0,0" FontSize="19" FontWeight="SemiBold" />
-            </StackPanel>
-            <!-- PCL-style launch button: the action in large text, the target version underneath -->
-            <Button Style="{StaticResource LaunchHeroButton}" Width="360" Height="88"
-                    Command="{Binding LaunchCommand}"
-                    AutomationProperties.AutomationId="LaunchButton">
-                <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="{Binding LaunchButtonText}" HorizontalAlignment="Center"
-                               FontSize="23" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                    <TextBlock Text="{Binding LaunchVersionLine}" HorizontalAlignment="Center"
-                               FontSize="12" Margin="0,6,0,0" MaxWidth="320"
-                               Foreground="#D9FFFFFF"
-                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
-                               AutomationProperties.AutomationId="LaunchVersionLine" />
-                </StackPanel>
-            </Button>
 
-            <!-- secondary actions, side by side like the reference launcher -->
-            
+                <ItemsControl ItemsSource="{Binding Instances}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource SurfaceBg}"
+                                    BorderBrush="{DynamicResource BorderBrushSoft}"
+                                    BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
+                                    <Border Grid.Column="0" Width="28" Height="28" CornerRadius="6"
+                                            Background="{DynamicResource SurfaceAltBg}" Margin="0,0,10,0">
+                                        <TextBlock Text="{Binding Name, Converter={StaticResource Initial}}"
+                                                   FontSize="10" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
 
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontSize="12.5"
+                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="10.5" FontFamily="Consolas"
+                                                   Foreground="{DynamicResource MutedTextBrush}" Margin="0,1,0,0" />
+                                    </StackPanel>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0"
-                            Visibility="{Binding IsLaunching, Converter={StaticResource BoolToVisibility}}">
-                    <Button Content="结束游戏" Style="{StaticResource GhostButton}" Command="{Binding StopCommand}" />
-                </StackPanel>
-            </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="&#xE76C;" VerticalAlignment="Center"
+                                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-            <!-- bottom status bar: environment, memory, run state -->
-            <Border Grid.Row="2" VerticalAlignment="Bottom" Margin="20,0,20,14" CornerRadius="14" Padding="18,12"
-                    Background="{DynamicResource SurfaceBg}" BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
-                    AutomationProperties.AutomationId="HomeStatusBar">
-                <Grid>
+                <Grid Margin="0,14,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Java 环境" Style="{StaticResource CaptionText}" />
-                        <TextBlock Text="{Binding RuntimeText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0"
-                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
-                                   AutomationProperties.AutomationId="StatusJava" />
-                    </StackPanel>
+                    <Border Grid.Column="0" Style="{StaticResource HomeCard}" Padding="16,12" Margin="0,0,8,0">
+                        <StackPanel>
+                            <TextBlock Text="最近备份" Style="{StaticResource MetaText}" />
+                            <TextBlock Text="今天 22:35 · 412 MB" FontSize="12" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Grid.Column="1" Margin="16,0,0,0">
-                        <TextBlock Text="内存使用" Style="{StaticResource CaptionText}" />
-                        <TextBlock Text="{Binding MemoryUsageText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0"
-                                   AutomationProperties.AutomationId="StatusMemory" />
-                    </StackPanel>
+                    <Border Grid.Column="1" Style="{StaticResource HomeCard}" Padding="16,12" Margin="4,0,4,0">
+                        <StackPanel>
+                            <TextBlock Text="存储占用" Style="{StaticResource MetaText}" />
+                            <TextBlock Text="实例 2.6 GB · 缓存 812 MB" FontSize="12" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Grid.Column="2" Margin="16,0,0,0">
-                        <TextBlock Text="运行状态" Style="{StaticResource CaptionText}" />
-                        <TextBlock Text="{Binding StateText}" FontWeight="SemiBold" FontSize="13" Margin="0,3,0,0"
-                                   AutomationProperties.AutomationId="StatusState" />
-                    </StackPanel>
+                    <Border Grid.Column="2" Style="{StaticResource HomeCard}" Padding="16,12" Margin="8,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="公告 · 11-02" Style="{StaticResource MetaText}" />
+                            <TextBlock Text="备份时间线与快照回滚已上线" FontSize="12" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
-            </Border>
-            <!-- floating toast: launch hints appear here and fade away on their own -->
-            <Border x:Name="Toast" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                    Margin="0,0,0,96" CornerRadius="10" Padding="18,10"
-                    Background="#E6111720" BorderBrush="#33FFFFFF" BorderThickness="1"
-                    Visibility="{Binding HasToast, Converter={StaticResource BoolToVisibility}}">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.35" Color="#000000" />
-                </Border.Effect>
-                <TextBlock Text="{Binding ToastText}" Foreground="#F2FFFFFF" FontSize="12.5"
-                           AutomationProperties.AutomationId="LaunchToast" />
-            </Border>
-        </Grid>
+            </StackPanel>
+        </ScrollViewer>
 
-        <TextBlock Text="右键可更换背景图片" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                   Margin="0,0,16,12" FontSize="11" Opacity="0.55"
-                   Foreground="{DynamicResource MutedTextBrush}"
-                   Visibility="{Binding HasBackgroundImage, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+        <Border x:Name="Toast" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                Margin="0,0,0,54" CornerRadius="10" Padding="16,9"
+                Background="{DynamicResource SurfaceAltBg}" BorderBrush="{DynamicResource BorderBrushSoft}"
+                BorderThickness="1"
+                Visibility="{Binding HasToast, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding ToastText}" FontSize="12"
+                       AutomationProperties.AutomationId="LaunchToast" />
+        </Border>
     </Grid>
 </UserControl>

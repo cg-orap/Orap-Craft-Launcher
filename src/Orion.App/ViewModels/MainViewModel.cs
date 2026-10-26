@@ -129,6 +129,7 @@ public sealed class ActivityCenter : ObservableObject
 /// <summary>Shell view model: owns the launcher context, the shared state and the navigation.</summary>
 public sealed class MainViewModel : ObservableObject
 {
+    private bool _sidebarCollapsed;
     private ObservableObject? _currentPage;
     private string _navKey = "home";
     private Account? _currentAccount;
@@ -187,6 +188,8 @@ public sealed class MainViewModel : ObservableObject
         OpenCatalogKindCommand = new RelayCommand(OpenCatalogKind);
 
         _selectedNavItem = NavItems[0];
+        ToggleSidebarCommand = new RelayCommand(() => IsSidebarCollapsed = !IsSidebarCollapsed);
+
         _currentPage = Home;
     }
 
@@ -198,6 +201,21 @@ public sealed class MainViewModel : ObservableObject
     public ObservableList<Instance> Instances { get; } = [];
     public ObservableList<JavaRuntime> JavaRuntimes { get; } = [];
 
+    /// <summary>二级侧栏（实例列表）是否收起为 44px 窄条。</summary>
+    public bool IsSidebarCollapsed
+    {
+        get => _sidebarCollapsed;
+        set
+        {
+            if (!SetProperty(ref _sidebarCollapsed, value)) return;
+            OnPropertyChanged(nameof(SidebarToggleGlyph));
+        }
+    }
+
+    /// <summary>窄条上显示"展开"箭头，展开时显示"收起"箭头。</summary>
+    public string SidebarToggleGlyph => IsSidebarCollapsed ? "\uE76C" : "\uE76B";
+
+    public ICommand ToggleSidebarCommand { get; }
     public HomeViewModel Home { get; }
     public VersionsViewModel VersionsPage { get; }
     public InstancesViewModel InstancesPage { get; }
