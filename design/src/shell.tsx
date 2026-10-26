@@ -3,6 +3,8 @@ import {
   Bell,
   Boxes,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FolderTree,
   Gamepad2,
@@ -10,8 +12,6 @@ import {
   Maximize2,
   Minus,
   Package,
-  PanelLeftClose,
-  PanelLeftOpen,
   ScrollText,
   Settings,
   X,
@@ -30,29 +30,10 @@ const railItems: Array<{ key: RailKey; label: string; icon: ReactNode }> = [
   { key: 'settings', label: '设置', icon: <Settings className="h-[18px] w-[18px]" /> },
 ]
 
-export function TitleBar({
-  instanceName,
-  sidebarCollapsed,
-  onToggleSidebar,
-}: {
-  instanceName: string
-  sidebarCollapsed: boolean
-  onToggleSidebar: () => void
-}) {
+export function TitleBar({ instanceName }: { instanceName: string }) {
   return (
     <header className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-surface/60 px-3 backdrop-blur-md">
       <div className="flex items-center gap-2.5">
-        {/* 侧栏开关常驻标题栏：二级侧栏收起后这里仍可重新打开 */}
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          className="grid h-7 w-7 place-items-center rounded-sm text-tx-3 transition-colors duration-150 hover:bg-white/[0.07] hover:text-tx-1"
-          aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
-          aria-expanded={!sidebarCollapsed}
-          title={sidebarCollapsed ? '展开侧栏 (Ctrl+B)' : '收起侧栏 (Ctrl+B)'}
-        >
-          {sidebarCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-        </button>
         <div className="grid h-6 w-6 place-items-center rounded-sm bg-primary/15">
           <span className="font-pixel text-[11px] leading-none text-primary">O</span>
         </div>
@@ -188,14 +169,33 @@ export function Shell({
 }) {
   return (
     <div className="flex h-full flex-col bg-bg">
-      <TitleBar instanceName={instanceName} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={onToggleSidebar} />
+      <TitleBar instanceName={instanceName} />
       <div className="flex min-h-0 flex-1">
         <Rail active={rail} onSelect={onRail} />
+        <SidebarHandle collapsed={sidebarCollapsed} onToggle={onToggleSidebar} />
         {sidebar}
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1200px] px-7 pb-4 pt-6">{children}</div>
         </main>
       </div>
     </div>
+  )
+}
+/** 侧栏把手：贴在一级导航与侧栏之间，整条可点，收起后仍留在原位。 */
+export function SidebarHandle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={collapsed ? '展开侧栏' : '收起侧栏'}
+      aria-expanded={!collapsed}
+      title={collapsed ? '展开侧栏（Ctrl+B）' : '收起侧栏（Ctrl+B）'}
+      className="group relative flex w-4 shrink-0 items-center justify-center border-r border-border bg-white/[0.03] transition-colors duration-150 hover:bg-white/[0.07]"
+    >
+      <span className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-border transition-colors duration-150 group-hover:bg-primary/60" />
+      <span className="relative grid h-10 w-[22px] place-items-center rounded-md border border-white/15 bg-elevated text-tx-1 shadow-soft transition-all duration-150 group-hover:scale-[1.06] group-hover:border-primary/50 group-hover:text-primary">
+        {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+      </span>
+    </button>
   )
 }
