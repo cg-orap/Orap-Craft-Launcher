@@ -170,6 +170,10 @@ public sealed class CatalogViewModel : ObservableObject
 
     public IReadOnlyList<CatalogKindOption> Kinds { get; }
 
+    /// <summary>页面顶部只展示资源分类（不含"游戏版本"）。</summary>
+    /// <summary>页面顶部只展示资源分类（不含"游戏版本"）。</summary>
+    public IReadOnlyList<CatalogKindOption> ResourceKinds => Kinds.Where(k => k.ProjectType is not null).ToList();
+
     /// <summary>页面顶部的分类页签用：点一下就切到该分类并加载第一页。</summary>
     public ICommand SelectKindCommand => new RelayCommand(parameter =>
     {
