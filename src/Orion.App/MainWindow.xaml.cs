@@ -12,6 +12,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) => { App.ApplyWindowChrome(this); FixMaximizedBounds(); };
         StateChanged += (_, _) => FixMaximizedBounds();
         InitializeComponent();
+        FitToWorkArea();
     }
     /// <summary>
     /// 下载中心 owns a sub-menu: a click folds it open/shut instead of navigating. The click is
@@ -35,6 +36,16 @@ public partial class MainWindow : Window
 
         nav.IsExpanded = !nav.IsExpanded;
         e.Handled = true;
+    }
+
+    /// <summary>窗口默认 1280x800，但在小屏或高 DPI 下按工作区收窄，避免超出屏幕。</summary>
+    private void FitToWorkArea()
+    {
+        var area = SystemParameters.WorkArea;
+        var w = Math.Min(Width, area.Width - 64);
+        var h = Math.Min(Height, area.Height - 64);
+        Width = w;
+        Height = h;
     }
 
     private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)

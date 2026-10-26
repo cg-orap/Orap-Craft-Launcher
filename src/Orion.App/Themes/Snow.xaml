@@ -1,0 +1,40 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 霜白：浅色冷调，白卡片 + 墨绿主色。
+         Every key is also defined in the other palettes so the theme can be swapped at runtime. -->
+    <Color x:Key="WindowBgColor">#FFEEF1F5</Color>
+    <Color x:Key="SurfaceBgColor">#FFFFFFFF</Color>
+    <Color x:Key="SurfaceAltBgColor">#FFF2F5FA</Color>
+    <Color x:Key="SurfaceHoverColor">#FFE6EBF2</Color>
+    <Color x:Key="BorderColor">#FFD5DCE6</Color>
+    <Color x:Key="AccentColor">#FF1F8A5B</Color>
+    <Color x:Key="AccentHoverColor">#FF25A068</Color>
+    <Color x:Key="AccentPressedColor">#FF186F49</Color>
+    <Color x:Key="TextColor">#FF101822</Color>
+    <Color x:Key="MutedTextColor">#FF47556A</Color>
+    <Color x:Key="SuccessColor">#FF1F8A5B</Color>
+    <Color x:Key="WarningColor">#FF9A6512</Color>
+    <Color x:Key="DangerColor">#FFC03B48</Color>
+    <Color x:Key="ChipBgColor">#FFF2F5FA</Color>
+
+    <SolidColorBrush x:Key="WindowBg" Color="{StaticResource WindowBgColor}" />
+    <SolidColorBrush x:Key="SurfaceBg" Color="{StaticResource SurfaceBgColor}" />
+    <SolidColorBrush x:Key="SurfaceAltBg" Color="{StaticResource SurfaceAltBgColor}" />
+    <SolidColorBrush x:Key="SurfaceHover" Color="{StaticResource SurfaceHoverColor}" />
+    <SolidColorBrush x:Key="BorderBrushSoft" Color="{StaticResource BorderColor}" />
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}" />
+    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="{StaticResource MutedTextColor}" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+    <SolidColorBrush x:Key="ChipBg" Color="{StaticResource ChipBgColor}" />
+
+    <Color x:Key="NavRailColor">#FFF7F9FC</Color>
+    <SolidColorBrush x:Key="NavRailBg" Color="{StaticResource NavRailColor}" />
+    <SolidColorBrush x:Key="NavRailHover" Color="#14000000" />
+    <SolidColorBrush x:Key="ScrimBrush" Color="#33000000" />
+</ResourceDictionary>

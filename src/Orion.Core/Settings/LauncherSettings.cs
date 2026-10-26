@@ -27,10 +27,10 @@ public sealed class LauncherSettings
     [JsonPropertyName("customMirrorBase")] public string? CustomMirrorBase { get; set; }
     [JsonPropertyName("proxyUrl")] public string? ProxyUrl { get; set; }
 
-    [JsonPropertyName("theme")] public string Theme { get; set; } = "Midnight";
+    [JsonPropertyName("theme")] public string Theme { get; set; } = "Rock";
 
     /// <summary>Accent colour scheme: Blue / Violet / Teal / Amber / Rose.</summary>
-    [JsonPropertyName("accent")] public string Accent { get; set; } = "Blue";
+    [JsonPropertyName("accent")] public string Accent { get; set; } = "Moss";
     [JsonPropertyName("language")] public string Language { get; set; } = "zh-CN";
     [JsonPropertyName("closeLauncherOnGameStart")] public bool CloseLauncherOnGameStart { get; set; }
     [JsonPropertyName("forceUtf8Console")] public bool ForceUtf8Console { get; set; } = true;

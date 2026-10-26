@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
         Title="Orap Craft Launcher — Minecraft Java 版启动器"
-        Height="800" Width="1280" MinHeight="720" MinWidth="1100"
+        Height="680" Width="1120" MinHeight="600" MinWidth="980"
         WindowStyle="None" ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBg}"

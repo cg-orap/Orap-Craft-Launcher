@@ -111,7 +111,11 @@ public partial class App : Application
             var hwnd = new WindowInteropHelper(window).Handle;
             if (hwnd == IntPtr.Zero) return;
 
-            var dark = !string.Equals((Current as App)?._context?.Settings.Theme, "Light", StringComparison.OrdinalIgnoreCase);
+            var current = (Current as App)?._context?.Settings.Theme;
+        var dark = !(string.Equals(current, "Light", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(current, "Frost", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(current, "Snow", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(current, "Paper", StringComparison.OrdinalIgnoreCase));
             var darkValue = dark ? 1 : 0;
             DwmSetWindowAttribute(hwnd, 20, ref darkValue, sizeof(int));   // immersive dark title bar
 
@@ -148,19 +152,26 @@ public partial class App : Application
         var app = Current;
         if (app is null) return;
 
-                var fileName = theme?.ToLowerInvariant() switch
+        // 三套设计稿主题优先；旧主题名保留兼容，未知值回落到深岩。
+        var fileName = theme?.ToLowerInvariant() switch
         {
+            "snow" => "Snow.xaml",
+            "paper" => "Paper.xaml",
             "light" => "Light.xaml",
             "frost" => "Frost.xaml",
             "midnight" => "Midnight.xaml",
-            _ => "Dark.xaml",
+            "dark" => "Dark.xaml",
+            _ => "Rock.xaml",
         };
         var dictionaries = app.Resources.MergedDictionaries;
 
         var palette = dictionaries.FirstOrDefault(d =>
             d.Source is not null &&
-            (d.Source.OriginalString.EndsWith("Dark.xaml", StringComparison.OrdinalIgnoreCase) ||
+            (d.Source.OriginalString.EndsWith("Rock.xaml", StringComparison.OrdinalIgnoreCase) ||
+             d.Source.OriginalString.EndsWith("Snow.xaml", StringComparison.OrdinalIgnoreCase) ||
+             d.Source.OriginalString.EndsWith("Paper.xaml", StringComparison.OrdinalIgnoreCase) ||
              d.Source.OriginalString.EndsWith("Midnight.xaml", StringComparison.OrdinalIgnoreCase) ||
+             d.Source.OriginalString.EndsWith("Dark.xaml", StringComparison.OrdinalIgnoreCase) ||
              d.Source.OriginalString.EndsWith("Light.xaml", StringComparison.OrdinalIgnoreCase)
              || d.Source.OriginalString.EndsWith("Frost.xaml", StringComparison.OrdinalIgnoreCase)));
 
@@ -183,9 +194,9 @@ public partial class App : Application
         if (app is null) return;
 
         var dictionaries = app.Resources.MergedDictionaries;
-        var name = string.IsNullOrWhiteSpace(accent) ? "Blue" : accent.Trim();
-        var known = new[] { "Blue", "Violet", "Teal", "Amber", "Rose", "Orange", "Emerald" };
-        if (!known.Contains(name, StringComparer.OrdinalIgnoreCase)) name = "Blue";
+        var name = string.IsNullOrWhiteSpace(accent) ? "Moss" : accent.Trim();
+        var known = new[] { "Moss", "Jade", "Ochre", "Blue", "Violet", "Teal", "Amber", "Rose", "Orange", "Emerald" };
+        if (!known.Contains(name, StringComparer.OrdinalIgnoreCase)) name = "Moss";
 
         var existing = dictionaries.FirstOrDefault(d =>
             d.Source is not null &&

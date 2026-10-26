@@ -47,6 +47,9 @@ public sealed class SettingsViewModel : ObservableObject
     /// <summary>Accent swatches shown in settings (colour is only for the preview dot).</summary>
     public IReadOnlyList<AccentOption> Accents { get; } =
     [
+        new("Moss", "苔藓绿", "#FF6FBF73"),
+        new("Jade", "墨绿", "#FF1F8A5B"),
+        new("Ochre", "赭石", "#FF9B5F2A"),
         new("Blue", "经典蓝", "#FF4C8DFF"),
         new("Violet", "紫罗兰", "#FF8B5CF6"),
         new("Teal", "青绿", "#FF14B8A6"),
@@ -83,11 +86,10 @@ public sealed class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<ThemeOption> Themes { get; } =
     [
-        new("Midnight", "午夜（玻璃·深紫）"),
-        new("Dark", "深色"),
-        new("Light", "浅色"),
-        new("Frost", "玻璃浅色"),
-    ];
+        new("Rock", "深岩（默认）"),
+        new("Snow", "霜白（浅色）"),
+        new("Paper", "暖纸（浅色）"),
+        ];
 
     public IReadOnlyList<SourceOption> SourceOptions { get; } =
     [
