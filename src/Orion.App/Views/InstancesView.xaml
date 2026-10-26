@@ -4,133 +4,324 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="700" d:DesignWidth="960">
+             d:DesignHeight="700" d:DesignWidth="1120">
 
-    <Grid Margin="20,16,20,20">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="330" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <UserControl.Resources>
+        <Style x:Key="DetailTab" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" CornerRadius="6" Background="Transparent" Padding="12,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        <!-- ===================== instance list ===================== -->
-        <Grid Grid.Column="0" Margin="0,0,20,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <Style x:Key="StatLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
 
-            <StackPanel Grid.Row="0">
-                <Button Content="← 返回首页" Style="{StaticResource GhostButton}" HorizontalAlignment="Left"
-                        Margin="0,0,0,10" Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                        CommandParameter="home" AutomationProperties.AutomationId="InstancesBackHome" />
-                <TextBlock Text="版本管理" Style="{StaticResource TitleText}" />
-                <TextBlock Text="每个版本拥有独立的游戏目录（存档、Mod、配置互不影响）。"
-                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,12" />
-                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
-            </StackPanel>
+        <Style x:Key="StatValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
 
-            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="8">
-                <ListBox ItemsSource="{Binding DataContext.Instances, RelativeSource={RelativeSource AncestorType=Window}}"
-                         SelectedItem="{Binding SelectedInstance, Mode=TwoWay}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="10,8">
-                                <TextBlock Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource CaptionText}" Margin="0,3,0,0" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Border>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="24,20,24,20">
 
-            <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,14,0,0">
+            <!-- ===== 头部：实例身份 + 操作 + 页签 ===== -->
+            <Border Style="{StaticResource Card}" Padding="20,16">
                 <StackPanel>
-                    <TextBlock Text="新建版本" Style="{StaticResource SectionTitle}" />
-                    <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" ToolTip="版本名称（可留空）" />
-                    <ComboBox ItemsSource="{Binding VersionOptions}" SelectedItem="{Binding NewVersion}" Margin="0,8,0,0" />
-                    <Button Content="创建" Style="{StaticResource PrimaryButton}" Command="{Binding CreateCommand}" Margin="0,10,0,0" />
-                    <Button Content="导入 .minecraft / Prism 版本…" Style="{StaticResource SecondaryButton}" Command="{Binding ImportCommand}" Margin="0,8,0,0" />
-                    <Button Content="导入 Modrinth 整合包 (.mrpack)…" Style="{StaticResource SecondaryButton}" Command="{Binding ImportPackCommand}" Margin="0,8,0,0" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="64" Height="64" CornerRadius="10"
+                                Background="{DynamicResource SurfaceAltBg}"
+                                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
+                                Margin="0,0,16,0">
+                            <TextBlock Text="{Binding DisplayName, Converter={StaticResource Initial}}"
+                                       FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DisplayName}" FontSize="19" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                            <TextBlock Text="{Binding SelectionDetail}" Style="{StaticResource CaptionText}"
+                                       Margin="0,5,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="7,3"
+                                        Margin="0,0,8,0">
+                                    <TextBlock FontFamily="Consolas" FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}">
+                                        <Run Text="内存 " /><Run Text="{Binding MemoryMb, Mode=OneWay}" /><Run Text=" MB" />
+                                    </TextBlock>
+                                </Border>
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="7,3"
+                                        Margin="0,0,8,0">
+                                    <TextBlock FontFamily="Consolas" FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}">
+                                        <Run Text="窗口 " /><Run Text="{Binding WindowWidth, Mode=OneWay}" /><Run Text="×" /><Run Text="{Binding WindowHeight, Mode=OneWay}" />
+                                    </TextBlock>
+                                </Border>
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="7,3">
+                                    <TextBlock FontFamily="Consolas" FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="260"
+                                               Text="{Binding JavaPath, TargetNullValue='Java 自动选择'}" />
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="打开游戏目录" Style="{StaticResource GhostButton}"
+                                    Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" />
+                            <Button Content="删除版本" Style="{StaticResource DangerButton}"
+                                    Command="{Binding DeleteCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                    ToolTip="把整个版本目录放进 Windows 回收站，可从资源管理器还原" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
+                            Margin="0,16,0,0" Padding="0,10,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource DetailTab}" Content="概览"
+                                    Command="{Binding SelectTabCommand}" CommandParameter="0"
+                                    Foreground="{DynamicResource TextBrush}" />
+                            <Button Style="{StaticResource DetailTab}" Content="模组"
+                                    Command="{Binding SelectTabCommand}" CommandParameter="1" />
+                            <Button Style="{StaticResource DetailTab}" Content="存档"
+                                    Command="{Binding SelectTabCommand}" CommandParameter="2" />
+                            <Button Style="{StaticResource DetailTab}" Content="日志"
+                                    Command="{Binding SelectTabCommand}" CommandParameter="3" />
+                            <Button Style="{StaticResource DetailTab}" Content="快照"
+                                    Command="{Binding SelectTabCommand}" CommandParameter="4" />
+                            <Button Style="{StaticResource DetailTab}" Content="设置"
+                                    Command="{Binding SelectTabCommand}" CommandParameter="5" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
-        </Grid>
 
-        <!-- ===================== configuration ===================== -->
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-                <Border Style="{StaticResource Card}" Margin="0,52,0,16">
+            <!-- ===== 概览 ===== -->
+            <Grid Margin="0,14,0,0"
+                  Visibility="{Binding IsOverviewTab, Converter={StaticResource BoolToVisibility}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="300" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource Card}" Padding="18,14" Margin="0,0,14,0">
                     <StackPanel>
-                        <TextBlock Text="版本设置" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Text="{Binding SelectionDetail}" Style="{StaticResource CaptionText}"
-                                   TextWrapping="Wrap" Margin="0,0,0,14" />
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="16" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="名称" Style="{StaticResource CaptionText}" />
-                                <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
-
-                                <TextBlock Text="最大内存 (MB)" Style="{StaticResource CaptionText}" />
-                                <TextBox Text="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
-
-                                <TextBlock Text="窗口宽度" Style="{StaticResource CaptionText}" />
-                                <TextBox Text="{Binding WindowWidth, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Java 路径（留空自动选择）" Style="{StaticResource CaptionText}" />
-                                <Grid Margin="0,6,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Text="{Binding JavaPath, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Button Grid.Column="1" Content="…" Style="{StaticResource SecondaryButton}"
-                                            Command="{Binding BrowseJavaCommand}" Margin="6,0,0,0" Padding="10,6" />
-                                </Grid>
-
-                                <TextBlock Text="窗口高度" Style="{StaticResource CaptionText}" />
-                                <TextBox Text="{Binding WindowHeight, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
-
-                                <CheckBox Content="全屏启动" IsChecked="{Binding Fullscreen}" Margin="0,4,0,0" />
-                            </StackPanel>
+                        <TextBlock Text="版本信息" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
+                                   Margin="0,0,0,8" />
+                        <Grid Margin="0,4">
+                            <TextBlock Text="名称" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{Binding DisplayName}" Style="{StaticResource StatValue}" TextTrimming="CharacterEllipsis" MaxWidth="320" />
                         </Grid>
 
-                        <TextBlock Text="自定义 JVM 参数" Style="{StaticResource CaptionText}" Margin="0,12,0,0" />
-                        <TextBox Text="{Binding JvmArguments, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
-                                 ToolTip="例如 -XX:+UseG1GC -Dfile.encoding=UTF-8" />
-
-                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                            <Button Content="保存设置" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" />
-                            <Button Content="检查完整性 / 修复" Style="{StaticResource SecondaryButton}" Command="{Binding VerifyCommand}" Margin="8,0,0,0" />
-                            <Button Content="打开游戏目录" Style="{StaticResource SecondaryButton}" Command="{Binding OpenFolderCommand}" Margin="8,0,0,0" />
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="打开版本目录" Style="{StaticResource GhostButton}" Command="{Binding OpenVersionFolderCommand}" />
-                            <Button Content="导出整合包" Style="{StaticResource SecondaryButton}" Command="{Binding ExportPackCommand}" Margin="8,0,0,0" />
-                            <Button Content="删除版本" Style="{StaticResource DangerFilledButton}" Command="{Binding DeleteCommand}" Margin="8,0,0,0" Padding="16,7"
-                        ToolTip="把整个版本目录放进 Windows 回收站，可从资源管理器还原" />
-                        </StackPanel>
-
-                        <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                        <Grid Margin="0,4">
+                            <TextBlock Text="最大内存" Style="{StaticResource StatLabel}" />
+                            <TextBlock Style="{StaticResource StatValue}">
+                                <Run Text="{Binding MemoryMb, Mode=OneWay}" /><Run Text=" MB" />
+                            </TextBlock>
+                        </Grid>
+                        <Grid Margin="0,4">
+                            <TextBlock Text="窗口尺寸" Style="{StaticResource StatLabel}" />
+                            <TextBlock Style="{StaticResource StatValue}">
+                                <Run Text="{Binding WindowWidth, Mode=OneWay}" /><Run Text=" × " /><Run Text="{Binding WindowHeight, Mode=OneWay}" />
+                            </TextBlock>
+                        </Grid>
+                        <Grid Margin="0,4">
+                            <TextBlock Text="全屏启动" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{Binding Fullscreen}" Style="{StaticResource StatValue}" />
+                        </Grid>
+                        <Grid Margin="0,4">
+                            <TextBlock Text="Java" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{Binding JavaPath, TargetNullValue='自动选择'}" Style="{StaticResource StatValue}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="320" />
+                        </Grid>
+                        <TextBlock Text="每个版本拥有独立的游戏目录（存档、Mod、配置互不影响）。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,10,0,0" />
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="删除策略" Style="{StaticResource SectionTitle}" />
-                        <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}"
-                                   Text="删除版本时不会永久删除文件：整个版本目录会被放进 Windows 回收站，可从资源管理器还原。外部导入的版本只会解除注册，绝不修改原目录。" />
+                <StackPanel Grid.Column="1">
+                    <Border Style="{StaticResource Card}" Padding="16,14">
+                        <StackPanel>
+                            <TextBlock Text="操作" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
+                                       Margin="0,0,0,8" />
+                            <Button Content="检查完整性 / 修复" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding VerifyCommand}" FontSize="11.5" Padding="12,6"
+                                    HorizontalAlignment="Stretch" />
+                            <Button Content="打开版本目录" Style="{StaticResource GhostButton}"
+                                    Command="{Binding OpenVersionFolderCommand}" FontSize="11.5" Padding="12,6"
+                                    Margin="0,6,0,0" HorizontalAlignment="Stretch" />
+                            <Button Content="导出整合包" Style="{StaticResource GhostButton}"
+                                    Command="{Binding ExportPackCommand}" FontSize="11.5" Padding="12,6"
+                                    Margin="0,6,0,0" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="新建版本" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
+                                       Margin="0,0,0,8" />
+                            <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="版本名称（可留空）" FontSize="11.5" />
+                            <ComboBox ItemsSource="{Binding VersionOptions}" SelectedItem="{Binding NewVersion}"
+                                      Margin="0,6,0,0" FontSize="11.5" />
+                            <Button Content="创建" Style="{StaticResource PrimaryButton}" Command="{Binding CreateCommand}"
+                                    FontSize="11.5" Padding="12,6" Margin="0,8,0,0" HorizontalAlignment="Stretch" />
+                            <Button Content="导入 .minecraft / Prism…" Style="{StaticResource GhostButton}"
+                                    Command="{Binding ImportCommand}" FontSize="11" Padding="10,5"
+                                    Margin="0,6,0,0" HorizontalAlignment="Stretch" />
+                            <Button Content="导入整合包 (.mrpack)…" Style="{StaticResource GhostButton}"
+                                    Command="{Binding ImportPackCommand}" FontSize="11" Padding="10,5"
+                                    Margin="0,6,0,0" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- ===== 模组 ===== -->
+            <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
+                    Visibility="{Binding IsModsTab, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="模组" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                    <TextBlock Text="这个版本的模组在「模组」页面里集中管理：启用 / 禁用、删除、从 Modrinth 安装。"
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                    <Button Content="打开模组管理" Style="{StaticResource SecondaryButton}" Margin="0,12,0,0"
+                            HorizontalAlignment="Left" FontSize="11.5" Padding="14,6"
+                            Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="mods" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===== 存档 ===== -->
+            <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
+                    Visibility="{Binding IsSavesTab, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="存档" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                    <TextBlock Text="存档位于该版本的 saves 目录，和其他版本完全隔离。"
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                    <Button Content="打开游戏目录" Style="{StaticResource SecondaryButton}" Margin="0,12,0,0"
+                            HorizontalAlignment="Left" FontSize="11.5" Padding="14,6"
+                            Command="{Binding OpenFolderCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===== 日志 ===== -->
+            <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
+                    Visibility="{Binding IsLogsTab, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="日志" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                    <TextBlock Text="启动与崩溃日志在「日志」页面查看：支持级别筛选、搜索与崩溃报告归档。"
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                    <Button Content="打开日志页" Style="{StaticResource SecondaryButton}" Margin="0,12,0,0"
+                            HorizontalAlignment="Left" FontSize="11.5" Padding="14,6"
+                            Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="logs" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===== 快照 ===== -->
+            <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
+                    Visibility="{Binding IsSnapshotTab, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="快照" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                    <TextBlock Text="快照与回滚尚未实现：目前可以在版本目录里自行备份存档。"
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===== 设置 ===== -->
+            <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
+                    Visibility="{Binding IsSettingsTab, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="版本设置" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
+                               Margin="0,0,0,10" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="名称" Style="{StaticResource CaptionText}" />
+                            <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
+
+                            <TextBlock Text="最大内存 (MB)" Style="{StaticResource CaptionText}" />
+                            <TextBox Text="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
+
+                            <TextBlock Text="窗口宽度" Style="{StaticResource CaptionText}" />
+                            <TextBox Text="{Binding WindowWidth, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Java 路径（留空自动选择）" Style="{StaticResource CaptionText}" />
+                            <Grid Margin="0,6,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding JavaPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Grid.Column="1" Content="…" Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding BrowseJavaCommand}" Margin="6,0,0,0" Padding="10,6" />
+                            </Grid>
+
+                            <TextBlock Text="窗口高度" Style="{StaticResource CaptionText}" />
+                            <TextBox Text="{Binding WindowHeight, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
+
+                            <CheckBox Content="全屏启动" IsChecked="{Binding Fullscreen}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="自定义 JVM 参数" Style="{StaticResource CaptionText}" Margin="0,12,0,0" />
+                    <TextBox Text="{Binding JvmArguments, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12"
+                             ToolTip="例如 -XX:+UseG1GC -Dfile.encoding=UTF-8" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="保存设置" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" />
+                        <Button Content="检查完整性 / 修复" Style="{StaticResource SecondaryButton}" Command="{Binding VerifyCommand}" Margin="8,0,0,0" />
+                        <Button Content="打开游戏目录" Style="{StaticResource SecondaryButton}" Command="{Binding OpenFolderCommand}" Margin="8,0,0,0" />
                     </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="打开版本目录" Style="{StaticResource GhostButton}" Command="{Binding OpenVersionFolderCommand}" />
+                        <Button Content="导出整合包" Style="{StaticResource SecondaryButton}" Command="{Binding ExportPackCommand}" Margin="8,0,0,0" />
+                        <Button Content="删除版本" Style="{StaticResource DangerFilledButton}" Command="{Binding DeleteCommand}" Margin="8,0,0,0" Padding="16,7"
+                                ToolTip="把整个版本目录放进 Windows 回收站，可从资源管理器还原" />
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}" Margin="0,10,0,0"
+                               Text="删除版本时不会永久删除文件：整个版本目录会被放进 Windows 回收站，可从资源管理器还原。外部导入的版本只会解除注册，绝不修改原目录。" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

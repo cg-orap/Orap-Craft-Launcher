@@ -240,13 +240,29 @@
                             <TextBlock Text="从 Modrinth 安装" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
                             <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="6" Padding="8,5"
                                     BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1" Margin="0,8,0,0">
+                                <Grid>
+                                    <TextBlock Text="搜索 Modrinth…" FontSize="11.5" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource MutedTextBrush}" IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SearchText}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                          Background="Transparent" BorderThickness="0" FontSize="11.5"
-                                         Foreground="{DynamicResource TextBrush}" CaretBrush="{DynamicResource TextBrush}">
+                                         Foreground="{DynamicResource TextBrush}" CaretBrush="{DynamicResource TextBrush}"
+                                         VerticalAlignment="Center">
                                     <TextBox.InputBindings>
                                         <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
                                     </TextBox.InputBindings>
                                 </TextBox>
+                                </Grid>
                             </Border>
                             <Button Content="搜索" Style="{StaticResource SecondaryButton}" Margin="0,8,0,0"
                                     Command="{Binding SearchCommand}" FontSize="11.5" Padding="12,5" />

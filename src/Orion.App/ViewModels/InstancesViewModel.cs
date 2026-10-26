@@ -26,6 +26,11 @@ public sealed class InstancesViewModel : ObservableObject
 
     public InstancesViewModel(MainViewModel main)
     {
+        SelectTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is int index) TabIndex = index;
+            else if (parameter is string text && int.TryParse(text, out var parsed)) TabIndex = parsed;
+        });
         _main = main;
 
         CreateCommand = new AsyncRelayCommand(CreateAsync, () => !IsBusy && !string.IsNullOrWhiteSpace(NewVersion), ex => Status = "创建失败: " + ex.Message);
@@ -39,6 +44,33 @@ public sealed class InstancesViewModel : ObservableObject
         ImportPackCommand = new AsyncRelayCommand(ImportPackAsync, () => !IsBusy);
         ExportPackCommand = new AsyncRelayCommand(ExportPackAsync, () => SelectedInstance is not null && !IsBusy);
     }
+
+    private int _tabIndex;
+
+    /// <summary>详情页当前页签：0 概览 / 1 模组 / 2 存档 / 3 日志 / 4 快照 / 5 设置。</summary>
+    public int TabIndex
+    {
+        get => _tabIndex;
+        set
+        {
+            if (!SetProperty(ref _tabIndex, value)) return;
+            OnPropertyChanged(nameof(IsOverviewTab));
+            OnPropertyChanged(nameof(IsModsTab));
+            OnPropertyChanged(nameof(IsSavesTab));
+            OnPropertyChanged(nameof(IsLogsTab));
+            OnPropertyChanged(nameof(IsSnapshotTab));
+            OnPropertyChanged(nameof(IsSettingsTab));
+        }
+    }
+
+    public bool IsOverviewTab => _tabIndex == 0;
+    public bool IsModsTab => _tabIndex == 1;
+    public bool IsSavesTab => _tabIndex == 2;
+    public bool IsLogsTab => _tabIndex == 3;
+    public bool IsSnapshotTab => _tabIndex == 4;
+    public bool IsSettingsTab => _tabIndex == 5;
+
+    public ICommand SelectTabCommand { get; }
 
     public ICommand ImportPackCommand { get; }
     public ICommand ExportPackCommand { get; }
