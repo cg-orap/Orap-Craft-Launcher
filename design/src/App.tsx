@@ -37,7 +37,18 @@ export default function App() {
     return (allowed as string[]).includes(q ?? '') ? (q as RailKey) : 'home'
   })()
   const [rail, setRail] = useState<RailKey>(initialRail)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => new URLSearchParams(window.location.search).get('sidebar') === '0')
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        setCollapsed((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const [launch, setLaunch] = useState<LaunchState>('idle')
   const [sync, setSync] = useState<SyncState>('synced')
   const [instanceId, setInstanceId] = useState(instances[0].id)
@@ -198,7 +209,7 @@ export default function App() {
   )
 
   return (
-    <Shell rail={rail} onRail={setRail} sidebar={sidebar} instanceName={current.name}>
+    <Shell rail={rail} onRail={setRail} sidebar={sidebar} instanceName={current.name} sidebarCollapsed={collapsed} onToggleSidebar={() => setCollapsed((v) => !v)}>
       {rail === 'home' ? (<Home launch={launch} setLaunch={setLaunch} sync={sync} setSync={setSync} onOpenLogs={() => setRail('logs')} />) : null}
       {rail === 'instances' ? <Instance /> : null}
       {rail === 'logs' ? <Logs /> : null}

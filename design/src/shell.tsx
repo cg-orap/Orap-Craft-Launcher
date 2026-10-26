@@ -10,6 +10,8 @@ import {
   Maximize2,
   Minus,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   ScrollText,
   Settings,
   X,
@@ -28,10 +30,29 @@ const railItems: Array<{ key: RailKey; label: string; icon: ReactNode }> = [
   { key: 'settings', label: '设置', icon: <Settings className="h-[18px] w-[18px]" /> },
 ]
 
-export function TitleBar({ instanceName }: { instanceName: string }) {
+export function TitleBar({
+  instanceName,
+  sidebarCollapsed,
+  onToggleSidebar,
+}: {
+  instanceName: string
+  sidebarCollapsed: boolean
+  onToggleSidebar: () => void
+}) {
   return (
     <header className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-surface/60 px-3 backdrop-blur-md">
       <div className="flex items-center gap-2.5">
+        {/* 侧栏开关常驻标题栏：二级侧栏收起后这里仍可重新打开 */}
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="grid h-7 w-7 place-items-center rounded-sm text-tx-3 transition-colors duration-150 hover:bg-white/[0.07] hover:text-tx-1"
+          aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+          aria-expanded={!sidebarCollapsed}
+          title={sidebarCollapsed ? '展开侧栏 (Ctrl+B)' : '收起侧栏 (Ctrl+B)'}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+        </button>
         <div className="grid h-6 w-6 place-items-center rounded-sm bg-primary/15">
           <span className="font-pixel text-[11px] leading-none text-primary">O</span>
         </div>
@@ -139,16 +160,8 @@ export function Sidebar({
         collapsed ? 'w-0 overflow-hidden' : 'w-[280px]',
       )}
     >
-      <div className="flex h-11 items-center justify-between px-4">
+      <div className="flex h-11 items-center px-4">
         <span className="text-[12px] font-medium tracking-wide text-tx-2">{title}</span>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="text-tx-3 transition-colors hover:text-tx-1"
-          aria-label="折叠侧栏"
-        >
-          <ChevronDown className="h-3.5 w-3.5" />
-        </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">{children}</div>
       {footer ? <div className="border-t border-border px-3 py-3">{footer}</div> : null}
@@ -162,16 +175,20 @@ export function Shell({
   sidebar,
   children,
   instanceName,
+  sidebarCollapsed,
+  onToggleSidebar,
 }: {
   rail: RailKey
   onRail: (key: RailKey) => void
   sidebar: ReactNode
   children: ReactNode
   instanceName: string
+  sidebarCollapsed: boolean
+  onToggleSidebar: () => void
 }) {
   return (
     <div className="flex h-full flex-col bg-bg">
-      <TitleBar instanceName={instanceName} />
+      <TitleBar instanceName={instanceName} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={onToggleSidebar} />
       <div className="flex min-h-0 flex-1">
         <Rail active={rail} onSelect={onRail} />
         {sidebar}
