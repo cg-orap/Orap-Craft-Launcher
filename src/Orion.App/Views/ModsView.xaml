@@ -4,142 +4,290 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="700" d:DesignWidth="960">
+             d:DesignHeight="700" d:DesignWidth="1120">
 
-    <Grid Margin="26,22,26,22">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="392" />
-        </Grid.ColumnDefinitions>
+    <UserControl.Resources>
+        <Style x:Key="ModRowItem" TargetType="ListBoxItem">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Row" Background="Transparent" CornerRadius="8" Padding="10,8"
+                                BorderThickness="1" BorderBrush="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceAltBg}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        <!-- ===================== local mods ===================== -->
-        <Grid Grid.Column="0" Margin="0,0,20,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <Style x:Key="FilterTab" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" CornerRadius="6" Background="Transparent" Padding="12,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
 
-            <StackPanel Grid.Row="0">
-                <TextBlock Text="Mod 管理" Style="{StaticResource TitleText}" />
-                <TextBlock Text="{Binding InstanceLabel}" Style="{StaticResource CaptionText}" Margin="0,6,0,14" />
-            </StackPanel>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="24,20,24,20">
 
-            <Grid Grid.Row="1" Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <Button Grid.Column="1" Content="刷新" Style="{StaticResource SecondaryButton}" Command="{Binding RescanCommand}" Margin="8,0,0,0" />
-                <Button Grid.Column="2" Content="打开 mods 目录" Style="{StaticResource GhostButton}" Command="{Binding OpenFolderCommand}" Margin="8,0,0,0" />
-            </Grid>
-
-            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="8">
-                <ListBox ItemsSource="{Binding Mods}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="10,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Title}" FontSize="14" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Version}" Style="{StaticResource CaptionText}" Margin="8,0,0,0" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,3,0,0">
-                                        <Run Text="{Binding Loader, Mode=OneWay}" />
-                                        <Run Text=" · " />
-                                        <Run Text="{Binding FileName, Mode=OneWay}" />
-                                        <Run Text=" · " />
-                                        <Run Text="{Binding SizeText, Mode=OneWay}" />
-                                    </TextBlock>
-                                    <TextBlock Text="{Binding DependencyText}" Style="{StaticResource CaptionText}"
-                                               Visibility="{Binding HasDependencies, Converter={StaticResource BoolToVisibility}}" />
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource Chip}" Margin="0,0,8,0"
-                                            Visibility="{Binding Enabled, Converter={StaticResource BoolToVisibility}}">
-                                        <TextBlock Text="已启用" FontSize="11" Foreground="{DynamicResource SuccessBrush}" />
-                                    </Border>
-                                    <Border Style="{StaticResource Chip}" Margin="0,0,8,0"
-                                            Visibility="{Binding Enabled, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
-                                        <TextBlock Text="已禁用" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
-                                    </Border>
-                                    <Button Content="{Binding ToggleLabel}" Style="{StaticResource SecondaryButton}"
-                                            Command="{Binding ToggleCommand}" Padding="10,4" />
-                                    <Button Content="移除" Style="{StaticResource GhostButton}"
-                                            Command="{Binding DeleteCommand}" Margin="4,0,0,0" />
-                                </StackPanel>
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Border>
-        </Grid>
-
-        <!-- ===================== modrinth ===================== -->
-        <StackPanel Grid.Column="1">
-            <Border Style="{StaticResource Card}" Margin="0,52,0,16">
+            <!-- ===== 头部卡片：实例身份 + 操作 + 页签 ===== -->
+            <Border Style="{StaticResource Card}" Padding="20,16">
                 <StackPanel>
-                    <TextBlock Text="从 Modrinth 安装" Style="{StaticResource SectionTitle}" />
-
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="搜索 Mod，例如 sodium / jei" />
-                        <Button Grid.Column="1" Content="搜索" Style="{StaticResource PrimaryButton}"
-                                Command="{Binding SearchCommand}" Margin="8,0,0,0" />
+
+                        <Border Grid.Column="0" Width="56" Height="56" CornerRadius="10"
+                                Background="{DynamicResource SurfaceAltBg}"
+                                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
+                                Margin="0,0,14,0">
+                            <TextBlock Text="{Binding InstanceLabel, Converter={StaticResource Initial}}"
+                                       FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding InstanceLabel}" FontSize="18" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="6,2">
+                                    <TextBlock FontFamily="Consolas" FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}">
+                                        <Run Text="模组 " /><Run Text="{Binding Mods.Count, Mode=OneWay}" />
+                                        <Run Text=" · 已启用 " /><Run Text="{Binding EnabledCount, Mode=OneWay}" />
+                                        <Run Text=" · 已禁用 " /><Run Text="{Binding DisabledCount, Mode=OneWay}" />
+                                        <Run Text=" · 不兼容 " /><Run Text="{Binding IncompatibleCount, Mode=OneWay}" />
+                                    </TextBlock>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="打开 mods 目录" Style="{StaticResource GhostButton}"
+                                    Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" />
+                            <Button Content="重新扫描" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding RescanCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0" />
+                        </StackPanel>
                     </Grid>
 
-                    <TextBlock Text="搜索会按当前版本的 Minecraft 版本与加载器过滤。"
-                               Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
-
-                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,10,0,0"
-                                 Visibility="{Binding IsSearching, Converter={StaticResource BoolToVisibility}}" />
+                    <Border BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
+                            Margin="0,14,0,0" Padding="0,10,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource FilterTab}" Content="全部"
+                                    Command="{Binding SetModFilterCommand}" CommandParameter="ALL"
+                                    Foreground="{DynamicResource TextBrush}" />
+                            <Button Style="{StaticResource FilterTab}" Content="已启用"
+                                    Command="{Binding SetModFilterCommand}" CommandParameter="ENABLED"
+                                    Foreground="{DynamicResource MutedTextBrush}" />
+                            <Button Style="{StaticResource FilterTab}" Content="已禁用"
+                                    Command="{Binding SetModFilterCommand}" CommandParameter="DISABLED"
+                                    Foreground="{DynamicResource MutedTextBrush}" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource Card}" Padding="8">
-                <ListBox ItemsSource="{Binding SearchResults}" MaxHeight="460">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="10,8">
+            <!-- 状态行 -->
+            <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" Margin="2,10,2,10"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding Status, Converter={StaticResource StringToVisibility}}" />
+
+            <!-- ===== 两栏：模组列表 + 右侧概览/安装 ===== -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="300" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource Card}" Padding="6" Margin="0,0,14,0">
+                    <ListBox ItemsSource="{Binding ModsView}" Background="Transparent" BorderThickness="0"
+                             ItemContainerStyle="{StaticResource ModRowItem}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Width="32" Height="32" CornerRadius="7"
+                                            Background="{DynamicResource SurfaceAltBg}" Margin="0,0,10,0"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title, Converter={StaticResource Initial}}"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            <TextBlock Text="{Binding Version}" FontFamily="Consolas" FontSize="10.5"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource MutedTextBrush}" />
+                                        </StackPanel>
+                                        <TextBlock FontFamily="Consolas" FontSize="10" Margin="0,2,0,0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap">
+                                            <Run Text="{Binding Loader, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding FileName, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding SizeText, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding DependencyText}" FontSize="10" Margin="0,2,0,0"
+                                                   Foreground="{DynamicResource WarningBrush}" TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Visibility="{Binding HasDependencies, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="已启用" FontSize="10.5" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource SuccessBrush}" Margin="0,0,8,0"
+                                                   Visibility="{Binding Enabled, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="已禁用" FontSize="10.5" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,8,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Enabled}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <Button Content="{Binding ToggleLabel}" Style="{StaticResource GhostButton}"
+                                                FontSize="10.5" Padding="10,4" Command="{Binding ToggleCommand}" />
+                                        <Button Content="删除" Style="{StaticResource DangerButton}"
+                                                FontSize="10.5" Padding="10,4" Margin="6,0,0,0"
+                                                Command="{Binding DeleteCommand}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <StackPanel Grid.Column="1">
+                    <!-- 概览 -->
+                    <Border Style="{StaticResource Card}" Padding="16,14">
+                        <StackPanel>
+                            <TextBlock Text="概览" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
+                                       Margin="0,0,0,8" />
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Title}" FontSize="14" />
-                                    <TextBlock Text="{Binding Description}" Style="{StaticResource CaptionText}"
-                                               TextWrapping="Wrap" MaxHeight="42" TextTrimming="CharacterEllipsis" Margin="0,4,8,0" />
-                                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0">
-                                        <Run Text="{Binding Author, Mode=OneWay}" />
-                                        <Run Text=" · " />
-                                        <Run Text="{Binding Downloads, Mode=OneWay}" />
-                                    </TextBlock>
-                                </StackPanel>
-
-                                <Button Grid.Column="1" Content="安装" Style="{StaticResource SecondaryButton}"
-                                        Command="{Binding InstallCommand}" VerticalAlignment="Center" Padding="12,5" />
+                                <TextBlock Text="模组总数" FontSize="11.5" Foreground="{DynamicResource MutedTextBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Mods.Count}" FontFamily="Consolas" FontSize="11.5" />
                             </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Border>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="已启用" FontSize="11.5" Foreground="{DynamicResource MutedTextBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding EnabledCount}" FontFamily="Consolas" FontSize="11.5"
+                                           Foreground="{DynamicResource SuccessBrush}" />
+                            </Grid>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="不兼容" FontSize="11.5" Foreground="{DynamicResource MutedTextBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding IncompatibleCount}" FontFamily="Consolas" FontSize="11.5"
+                                           Foreground="{DynamicResource WarningBrush}" />
+                            </Grid>
+                            <TextBlock Text="停用的模组不会写进启动参数。" Style="{StaticResource CaptionText}"
+                                       TextWrapping="Wrap" Margin="0,10,0,0" />
+                        </StackPanel>
+                    </Border>
 
-            <Button Content="在浏览器中打开 Modrinth" Style="{StaticResource GhostButton}"
-                    Command="{Binding OpenModrinthPageCommand}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+                    <!-- 从 Modrinth 安装 -->
+                    <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="从 Modrinth 安装" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                            <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="6" Padding="8,5"
+                                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1" Margin="0,8,0,0">
+                                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="Transparent" BorderThickness="0" FontSize="11.5"
+                                         Foreground="{DynamicResource TextBrush}" CaretBrush="{DynamicResource TextBrush}">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                            </Border>
+                            <Button Content="搜索" Style="{StaticResource SecondaryButton}" Margin="0,8,0,0"
+                                    Command="{Binding SearchCommand}" FontSize="11.5" Padding="12,5" />
+                            <TextBlock Text="搜索会按当前版本的 Minecraft 版本与加载器过滤。" Style="{StaticResource CaptionText}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <ListBox ItemsSource="{Binding SearchResults}" MaxHeight="300" Margin="0,8,0,0"
+                                     Background="Transparent" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <ContentPresenter />
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="6"
+                                                Padding="8,6" Margin="0,0,0,6">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontSize="11.5"
+                                                           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                <TextBlock Text="{Binding Downloads}" FontFamily="Consolas" FontSize="10"
+                                                           Foreground="{DynamicResource MutedTextBrush}" Margin="0,2,0,0" />
+                                                <Button Content="安装" Style="{StaticResource GhostButton}" FontSize="10.5"
+                                                        Padding="10,3" Margin="0,6,0,0" HorizontalAlignment="Left"
+                                                        Command="{Binding InstallCommand}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -72,6 +72,12 @@ public sealed class ModsViewModel : ObservableObject
 
     public ModsViewModel(MainViewModel main)
     {
+        ModsView = System.Windows.Data.CollectionViewSource.GetDefaultView(Mods);
+        ModsView.Filter = MatchesFilter;
+        SetModFilterCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is string key && key.Length > 0) ModFilter = key.ToUpperInvariant();
+        });
         _main = main;
 
         RescanCommand = new AsyncRelayCommand(LoadModsAsync, () => SelectedInstance is not null);
@@ -80,12 +86,40 @@ public sealed class ModsViewModel : ObservableObject
         OpenModrinthPageCommand = new RelayCommand(OpenModrinthPage);
     }
 
+    private string _modFilter = "ALL";
+
+    private bool MatchesFilter(object item) => item is ModRow row && _modFilter switch
+    {
+        "ENABLED" => row.Enabled,
+        "DISABLED" => !row.Enabled,
+        _ => true,
+    };
+
     public ICommand RescanCommand { get; }
     public ICommand SearchCommand { get; }
     public ICommand OpenFolderCommand { get; }
     public ICommand OpenModrinthPageCommand { get; }
 
     public ObservableList<ModRow> Mods { get; } = [];
+
+    /// <summary>列表筛选：ALL / ENABLED / DISABLED（与设计稿的页签一致）。</summary>
+    public string ModFilter
+    {
+        get => _modFilter;
+        set
+        {
+            if (!SetProperty(ref _modFilter, value)) return;
+            ModsView?.Refresh();
+            OnPropertyChanged(nameof(EnabledCount));
+            OnPropertyChanged(nameof(DisabledCount));
+        }
+    }
+
+    public System.ComponentModel.ICollectionView ModsView { get; }
+
+    public ICommand SetModFilterCommand { get; }
+
+    public int DisabledCount => Mods.Count(m => !m.Enabled);
     public ObservableList<ModrinthRow> SearchResults { get; } = [];
 
     public Instance? SelectedInstance
