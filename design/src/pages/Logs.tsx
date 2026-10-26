@@ -49,7 +49,7 @@ export default function Logs() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[212px_minmax(0,1fr)_300px] gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-[176px_minmax(0,1fr)_264px] gap-4">
         {/* 左：筛选 */}
         <Card className="flex h-full flex-col p-3">
           <SectionTitle>级别</SectionTitle>
@@ -115,14 +115,14 @@ export default function Logs() {
         {/* 中：日志流 */}
         <Card className="flex h-full min-h-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="font-mono text-[10.5px] text-tx-3">latest.log · {rows.length} 行 · 等宽字体 JetBrains Mono</span>
+            <span className="whitespace-nowrap font-mono text-[10.5px] text-tx-3">latest.log · {rows.length} 行 · JetBrains Mono</span>
             <Button
               variant="quiet"
               size="sm"
               icon={<Copy className="h-3 w-3" />}
               disabled={selected === null}
             >
-              复制选中
+              <span className="whitespace-nowrap">复制选中</span>
             </Button>
           </div>
           <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] leading-[1.65]">
@@ -135,7 +135,7 @@ export default function Logs() {
                   type="button"
                   onClick={() => setSelected(line.id)}
                   className={cx(
-                    'flex w-full gap-2 rounded-sm px-1.5 text-left transition-colors duration-100',
+                    'flex min-w-max items-start gap-2 whitespace-pre rounded-sm px-1.5 text-left font-mono transition-colors duration-100',
                     selected === line.id
                       ? 'bg-primary/10'
                       : line.level === 'ERROR'
@@ -143,10 +143,10 @@ export default function Logs() {
                         : 'hover:bg-white/[0.04]',
                   )}
                 >
-                  <span className="shrink-0 text-tx-3">{line.time}</span>
-                  <span className={cx('w-[42px] shrink-0', levelTone[line.level])}>{line.level}</span>
-                  <span className="w-[70px] shrink-0 truncate text-tx-3">{line.source}</span>
-                  <span className={cx('min-w-0 flex-1 break-words', line.level === 'ERROR' ? 'text-[#f0b0b5]' : line.level === 'WARN' ? 'text-[#e8cf9d]' : 'text-tx-1')}>
+                  <span className="w-[86px] shrink-0 text-tx-3">{line.time}</span>
+                  <span className={cx('w-[44px] shrink-0', levelTone[line.level])}>{line.level}</span>
+                  <span className="w-[78px] shrink-0 text-tx-3">{line.source}</span>
+                  <span className={cx('whitespace-pre pr-3', line.level === 'ERROR' ? 'text-[#f0b0b5]' : line.level === 'WARN' ? 'text-[#e8cf9d]' : 'text-tx-1')}>
                     {line.text}
                   </span>
                 </button>

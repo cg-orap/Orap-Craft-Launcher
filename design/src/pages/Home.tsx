@@ -90,10 +90,7 @@ export default function Home({
                   >
                     {launch === 'starting' ? '正在启动…' : '启动游戏'}
                   </Button>
-                  <Button variant="quiet" size="md" onClick={() => setLaunch('running')} icon={<Spinner className="hidden" />}>
-                    模拟运行中
-                  </Button>
-                  <span className="text-[11px] text-tx-3">Enter 或点击启动 · 3 秒内完成选实例 → 启动</span>
+                  <span className="whitespace-nowrap text-[11px] text-tx-3">Enter 启动 · 选实例到进游戏 3 秒内</span>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">

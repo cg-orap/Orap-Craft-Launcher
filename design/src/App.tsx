@@ -28,7 +28,12 @@ const titles: Record<RailKey, string> = {
 }
 
 export default function App() {
-  const [rail, setRail] = useState<RailKey>('home')
+  const initialRail = (() => {
+    const q = new URLSearchParams(window.location.search).get('page')
+    const allowed: RailKey[] = ['home', 'instances', 'download', 'mods', 'backup', 'logs', 'settings']
+    return (allowed as string[]).includes(q ?? '') ? (q as RailKey) : 'home'
+  })()
+  const [rail, setRail] = useState<RailKey>(initialRail)
   const [collapsed, setCollapsed] = useState(false)
   const [launch, setLaunch] = useState<LaunchState>('idle')
   const [sync, setSync] = useState<SyncState>('synced')
@@ -42,11 +47,16 @@ export default function App() {
       onToggle={() => setCollapsed((v) => !v)}
       title={titles[rail]}
       footer={
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-sm bg-white/[0.05] font-pixel text-[9px] text-tx-2">cg</span>
-          <div className="min-w-0">
-            <div className="truncate text-[11.5px] text-tx-1">cg_orap</div>
-            <div className="flex items-center gap-1 text-[10px] text-tx-3"><Dot /> 微软正版</div>
+        <div className="space-y-1.5 text-[10.5px] text-tx-3">
+          <div className="flex items-center justify-between">
+            <span>备份占用</span>
+            <span className="font-mono text-tx-2">1.1 GB / 8 GB</span>
+          </div>
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full w-[14%] rounded-full bg-primary/70" />
+          </div>
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <Dot tone="success" /> 上次备份 4 分钟前
           </div>
         </div>
       }
