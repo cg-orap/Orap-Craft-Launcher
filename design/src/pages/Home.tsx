@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ChevronRight, Cloud, Cpu, Play, Radio, RotateCcw, Square, Sun, Terminal } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronRight, Cloud, Cpu, Gauge, MemoryStick, Play, Radio, RotateCcw, Square, Sun, Terminal } from 'lucide-react'
 import { backups, instances, type LaunchState, type SyncState } from '../mock'
 import { Button, Card, Cover, cx, Dot, Progress, Spinner, Tag } from '../ui'
 
@@ -22,7 +22,7 @@ export default function Home({
   const [progress, setProgress] = useState(launch === 'starting' ? 42 : 0)
 
   return (
-    <div className="space-y-5 pb-16">
+    <div className="space-y-5 pb-24">
       {/* ── 启动控制台 ─────────────────────────────── */}
       <section className="rounded-lg border border-border bg-surface p-6">
         <div className="flex items-start gap-4">
@@ -112,6 +112,9 @@ export default function Home({
         ) : null}
       </section>
 
+      {/* ── 运行性能 ───────────────────────────────── */}
+      <PerfPanel launch={launch} memoryMb={Number(current.memory.replace(/[^0-9]/g, ''))} />
+
       {/* ── 最近游玩（纵向长条列表） ─────────────────── */}
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -198,5 +201,108 @@ export default function Home({
         </Card>
       </section>
     </div>
+  )
+}
+/** 运行性能面板：内存 / CPU / GPU / 运行状态。数值为演示用 mock，运行中会自动波动。 */
+function PerfPanel({ launch, memoryMb }: { launch: LaunchState; memoryMb: number }) {
+  const running = launch === 'running'
+  const starting = launch === 'starting'
+
+  const [sample, setSample] = useState({ ram: 1180, cpu: 4, gpu: 2, seconds: 0 })
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSample((prev) => {
+        if (running) {
+          return {
+            ram: Math.round(memoryMb * (0.52 + Math.random() * 0.16)),
+            cpu: Math.round(38 + Math.random() * 26),
+            gpu: Math.round(46 + Math.random() * 28),
+            seconds: prev.seconds + 2,
+          }
+        }
+        if (starting) {
+          return {
+            ram: Math.round(prev.ram * 0.6 + memoryMb * 0.2),
+            cpu: Math.round(16 + Math.random() * 14),
+            gpu: Math.round(6 + Math.random() * 8),
+            seconds: 0,
+          }
+        }
+        return {
+          ram: Math.round(980 + Math.random() * 240),
+          cpu: Math.round(1 + Math.random() * 5),
+          gpu: Math.round(0 + Math.random() * 3),
+          seconds: 0,
+        }
+      })
+    }, 1600)
+    return () => clearInterval(timer)
+  }, [running, starting, memoryMb])
+
+  const ramPercent = Math.min(100, Math.round((sample.ram / Math.max(1, memoryMb)) * 100))
+  const state = running ? '运行中' : starting ? '启动中' : '就绪'
+  const stateTone = running ? 'text-primary' : starting ? 'text-info' : 'text-tx-2'
+
+  return (
+    <section className="rounded-lg border border-border bg-surface px-5 py-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="flex items-center gap-1.5 text-[12px] font-medium tracking-wide text-tx-2">
+          <Gauge className="h-3.5 w-3.5 text-tx-3" />
+          性能
+        </h2>
+        <span className="font-mono text-[10px] text-tx-3">
+          {running ? `已运行 ${Math.floor(sample.seconds / 60)} 分 ${sample.seconds % 60} 秒` : '采样间隔 1.6s · 演示数据'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-4 gap-5">
+        {/* 内存 */}
+        <div>
+          <div className="flex items-center justify-between text-[11px] text-tx-3">
+            <span className="inline-flex items-center gap-1.5"><MemoryStick className="h-3 w-3" />内存</span>
+            <span className="font-mono text-tx-2">{sample.ram} / {memoryMb} MB</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className={cx('h-full rounded-full transition-[width] duration-700 ease-smooth', ramPercent > 85 ? 'bg-warning' : 'bg-primary')}
+              style={{ width: ramPercent + '%' }}
+            />
+          </div>
+        </div>
+
+        {/* CPU */}
+        <div>
+          <div className="flex items-center justify-between text-[11px] text-tx-3">
+            <span className="inline-flex items-center gap-1.5"><Cpu className="h-3 w-3" />CPU</span>
+            <span className="font-mono text-tx-2">{sample.cpu}%</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full rounded-full bg-info transition-[width] duration-700 ease-smooth" style={{ width: sample.cpu + '%' }} />
+          </div>
+        </div>
+
+        {/* GPU */}
+        <div>
+          <div className="flex items-center justify-between text-[11px] text-tx-3">
+            <span className="inline-flex items-center gap-1.5"><Gauge className="h-3 w-3" />GPU</span>
+            <span className="font-mono text-tx-2">{sample.gpu}%</span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full rounded-full bg-accent/80 transition-[width] duration-700 ease-smooth" style={{ width: sample.gpu + '%' }} />
+          </div>
+        </div>
+
+        {/* 运行状态 */}
+        <div>
+          <div className="text-[11px] text-tx-3">运行状态</div>
+          <div className="mt-2 flex items-center gap-1.5">
+            <Dot tone={running ? 'success' : starting ? 'info' : 'success'} pulse={running || starting} />
+            <span className={cx('text-[12px]', stateTone)}>{state}</span>
+            <span className="ml-auto font-mono text-[10.5px] text-tx-3">Java 17</span>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
