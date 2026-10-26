@@ -14,6 +14,8 @@ import Instance from './pages/Instance'
 import Logs from './pages/Logs'
 import DownloadPage from './pages/Download'
 import SettingsPage from './pages/Settings'
+import ModsPage from './pages/Mods'
+import BackupPage from './pages/Backup'
 import Placeholder from './pages/Placeholder'
 import { Shell, Sidebar, type RailKey } from './shell'
 import { Button, Card, cx, Dot, Tag } from './ui'
@@ -54,7 +56,7 @@ export default function App() {
   const [instanceId, setInstanceId] = useState(instances[0].id)
   const [theme, setTheme] = useState<ThemeId>(() => {
     const q = new URLSearchParams(window.location.search).get('theme')
-    if (q === 'tundra' || q === 'amber' || q === 'rock') return q
+    if (q === 'frost' || q === 'paper' || q === 'rock') return q
     return (localStorage.getItem('orap-theme') as ThemeId | null) ?? 'rock'
   })
 
@@ -76,7 +78,7 @@ export default function App() {
             <span>备份占用</span>
             <span className="font-mono text-tx-2">1.1 GB / 8 GB</span>
           </div>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-tint2">
             <div className="h-full w-[14%] rounded-full bg-primary/70" />
           </div>
           <div className="flex items-center gap-1.5 pt-0.5">
@@ -87,7 +89,7 @@ export default function App() {
     >
       {rail === 'home' || rail === 'instances' ? (
         <div className="space-y-1">
-          <div className="mb-2 flex items-center gap-1.5 rounded-sm border border-border bg-black/20 px-2 py-1.5">
+          <div className="mb-2 flex items-center gap-1.5 rounded-sm border border-border bg-code px-2 py-1.5">
             <Search className="h-3 w-3 text-tx-3" />
             <input
               placeholder="搜索实例…"
@@ -104,7 +106,7 @@ export default function App() {
               }}
               className={cx(
                 'flex w-full items-start gap-2.5 rounded-sm px-2 py-2 text-left transition-colors duration-150',
-                item.id === current.id ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]',
+                item.id === current.id ? 'bg-tint2' : 'hover:bg-tint',
               )}
             >
               <span className={cx('mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-sm bg-gradient-to-br font-pixel text-[8px] text-tx-2', item.cover)}>
@@ -119,7 +121,7 @@ export default function App() {
               {item.id === current.id ? <Dot /> : null}
             </button>
           ))}
-          <button type="button" className="mt-1 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[11.5px] text-tx-3 hover:bg-white/[0.04] hover:text-tx-1">
+          <button type="button" className="mt-1 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[11.5px] text-tx-3 hover:bg-tint hover:text-tx-1">
             <Plus className="h-3.5 w-3.5" /> 新建实例
           </button>
         </div>
@@ -132,7 +134,7 @@ export default function App() {
             ['debug.log', '详细调试'],
             ['crash-reports', '3 份报告'],
           ].map(([name, hint]) => (
-            <div key={name} className="flex items-center justify-between rounded-sm px-2 py-1.5 text-[11.5px] text-tx-2 hover:bg-white/[0.04]">
+            <div key={name} className="flex items-center justify-between rounded-sm px-2 py-1.5 text-[11.5px] text-tx-2 hover:bg-tint">
               <span className="font-mono">{name}</span>
               <span className="text-[10px] text-tx-3">{hint}</span>
             </div>
@@ -143,7 +145,7 @@ export default function App() {
       {rail === 'backup' ? (
         <div className="space-y-1">
           {backups.map((b) => (
-            <div key={b.id} className="rounded-sm px-2 py-2 hover:bg-white/[0.04]">
+            <div key={b.id} className="rounded-sm px-2 py-2 hover:bg-tint">
               <div className="text-[11.5px] text-tx-1">{b.instance}</div>
               <div className="mt-0.5 flex items-center justify-between font-mono text-[10px] text-tx-3">
                 <span>{b.time}</span>
@@ -163,7 +165,7 @@ export default function App() {
               ['已安装（333）', '当前实例模组'],
               ['收藏（6）', '常用整合包与光影'],
             ].map(([name, hint]) => (
-              <div key={name} className="rounded-sm px-2 py-1.5 hover:bg-white/[0.04]">
+              <div key={name} className="rounded-sm px-2 py-1.5 hover:bg-tint">
                 <div className="text-[11.5px] text-tx-2">{name}</div>
                 <div className="mt-0.5 text-[10px] text-tx-3">{hint}</div>
               </div>
@@ -172,7 +174,7 @@ export default function App() {
           <div className="border-t border-border pt-3">
             <div className="mb-1.5 text-[10.5px] text-tx-3">最近搜索</div>
             {['机械动力', 'shader', 'optimization'].map((q) => (
-              <div key={q} className="rounded-sm px-2 py-1 text-[11.5px] text-tx-3 hover:bg-white/[0.04] hover:text-tx-2">{q}</div>
+              <div key={q} className="rounded-sm px-2 py-1 text-[11.5px] text-tx-3 hover:bg-tint hover:text-tx-2">{q}</div>
             ))}
           </div>
         </div>
@@ -182,7 +184,7 @@ export default function App() {
         <div className="space-y-2 text-[11.5px]">
           <div className="text-[10.5px] text-tx-3">当前配置</div>
           {[
-            ['主题', theme === 'rock' ? '深岩' : theme === 'tundra' ? '苔原' : '琥珀'],
+            ['主题', theme === 'rock' ? '深岩' : theme === 'frost' ? '霜白' : '暖纸'],
             ['默认内存', '4096 MB'],
             ['下载源', 'BMCLAPI 镜像'],
             ['备份', '启动前 · 保留 7 份'],
@@ -200,9 +202,20 @@ export default function App() {
       ) : null}
 
       {rail === 'mods' ? (
-        <div className="space-y-1 text-[11.5px] text-tx-3">
-          <div className="rounded-sm px-2 py-1.5 text-tx-2">占位分组</div>
-          <div className="px-2 text-[10.5px] leading-relaxed">模组页在本期为占位，可点击切换。</div>
+        <div className="space-y-2 text-[11.5px]">
+          <div className="text-[10.5px] text-tx-3">按分类</div>
+          {[['优化', 4], ['内容', 2], ['库', 2], ['兼容', 1]].map(([name, count]) => (
+            <div key={String(name)} className="flex items-center justify-between rounded-sm px-2 py-1.5 hover:bg-tint">
+              <span className="text-tx-2">{name}</span>
+              <span className="font-mono text-[10px] text-tx-3">{count}</span>
+            </div>
+          ))}
+          <div className="mt-2 border-t border-border pt-2">
+            <div className="mb-1.5 text-[10.5px] text-tx-3">可更新</div>
+            {['sodium 0.6.0', 'bettercombat 1.9.0'].map((m) => (
+              <div key={m} className="rounded-sm px-2 py-1 text-[10.5px] text-warning/90">{m}</div>
+            ))}
+          </div>
         </div>
       ) : null}
     </Sidebar>
@@ -214,26 +227,12 @@ export default function App() {
       {rail === 'instances' ? <Instance /> : null}
       {rail === 'logs' ? <Logs /> : null}
       {rail === 'download' ? <DownloadPage /> : null}
-      {rail === 'mods' ? (
-        <Placeholder
-          title="模组管理"
-          desc="按实例聚合模组列表、启用/禁用、检查更新、从市场补齐。本期为占位。"
-          icon={<Package className="h-4 w-4 text-tx-2" />}
-          actions={['检查更新', '批量启用']}
-        />
-      ) : null}
-      {rail === 'backup' ? (
-        <Placeholder
-          title="备份与云同步"
-          desc="备份时间线、云同步状态条（已同步 / 同步中 / 冲突）、恢复与清理策略。本期为占位。"
-          icon={<FolderTree className="h-4 w-4 text-tx-2" />}
-          actions={['立即备份', '模拟同步冲突']}
-        />
-      ) : null}
+      {rail === 'mods' ? <ModsPage /> : null}
+      {rail === 'backup' ? <BackupPage /> : null}
       {rail === 'settings' ? <SettingsPage theme={theme} onTheme={setTheme} /> : null}
 
       {/* 演示用状态切换器（不属于设计稿，仅方便评审） */}
-      <Card elevated className="fixed bottom-3 right-3 z-40 flex items-center gap-1.5 border-white/10 bg-elevated/80 px-2.5 py-1.5 backdrop-blur-md">
+      <Card elevated className="fixed bottom-3 right-3 z-40 flex items-center gap-1.5 border-bstrong bg-elevated/80 px-2.5 py-1.5 backdrop-blur-md">
         <span className="text-[10px] text-tx-3">演示</span>
         {(['idle', 'starting', 'running'] as LaunchState[]).map((s) => (
           <button

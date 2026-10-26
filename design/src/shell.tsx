@@ -85,7 +85,7 @@ export function Rail({
               'group relative grid h-11 w-11 place-items-center rounded-md transition-all duration-200 ease-smooth',
               isActive
                 ? 'bg-primary/12 text-primary'
-                : 'text-tx-2 hover:bg-white/[0.06] hover:text-tx-1',
+                : 'text-tx-2 hover:bg-tint2 hover:text-tx-1',
             )}
             aria-current={isActive ? 'page' : undefined}
           >
@@ -103,7 +103,7 @@ export function Rail({
       <div className="mt-auto flex flex-col items-center gap-2">
         <button
           type="button"
-          className="grid h-9 w-9 place-items-center rounded-md text-tx-3 transition-colors hover:bg-white/[0.06] hover:text-tx-1"
+          className="grid h-9 w-9 place-items-center rounded-md text-tx-3 transition-colors hover:bg-tint2 hover:text-tx-1"
           aria-label="通知"
         >
           <Bell className="h-4 w-4" />
@@ -140,7 +140,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-bstrong bg-tint text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
           aria-label="展开侧栏"
           aria-expanded="false"
           title="展开侧栏（Ctrl+B）"
@@ -162,7 +162,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-bstrong bg-tint text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
           aria-label="收起侧栏"
           title="收起侧栏（Ctrl+B）"
         >
@@ -216,10 +216,10 @@ export function SidebarHandle({ collapsed, onToggle }: { collapsed: boolean; onT
       aria-label={collapsed ? '展开侧栏' : '收起侧栏'}
       aria-expanded={!collapsed}
       title={collapsed ? '展开侧栏（Ctrl+B）' : '收起侧栏（Ctrl+B）'}
-      className="group relative flex w-4 shrink-0 items-center justify-center border-r border-border bg-white/[0.03] transition-colors duration-150 hover:bg-white/[0.07]"
+      className="group relative flex w-4 shrink-0 items-center justify-center border-r border-border bg-tint transition-colors duration-150 hover:bg-tint2"
     >
       <span className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-border transition-colors duration-150 group-hover:bg-primary/60" />
-      <span className="relative grid h-10 w-[22px] place-items-center rounded-md border border-white/15 bg-elevated text-tx-1 shadow-soft transition-all duration-150 group-hover:scale-[1.06] group-hover:border-primary/50 group-hover:text-primary">
+      <span className="relative grid h-10 w-[22px] place-items-center rounded-md border border-bstrong bg-elevated text-tx-1 shadow-soft transition-all duration-150 group-hover:scale-[1.06] group-hover:border-primary/50 group-hover:text-primary">
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </span>
     </button>

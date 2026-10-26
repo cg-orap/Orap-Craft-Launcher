@@ -41,7 +41,7 @@ export default function Settings({
               onClick={() => setSection(s.id)}
               className={cx(
                 'flex w-full items-center gap-2 rounded-sm px-2.5 py-2 text-[12px] transition-colors duration-150',
-                section === s.id ? 'bg-white/[0.07] text-tx-1' : 'text-tx-3 hover:bg-white/[0.04] hover:text-tx-2',
+                section === s.id ? 'bg-tint2 text-tx-1' : 'text-tx-3 hover:bg-tint hover:text-tx-2',
               )}
             >
               {s.icon}
@@ -65,7 +65,7 @@ export default function Settings({
                       onClick={() => onTheme(t.id)}
                       className={cx(
                         'rounded-md border p-3 text-left transition-all duration-200 ease-smooth',
-                        theme === t.id ? 'border-primary/50 bg-primary/[0.06]' : 'border-border hover:border-white/15 hover:bg-white/[0.03]',
+                        theme === t.id ? 'border-primary/50 bg-primary/[0.06]' : 'border-border hover:border-bstrong hover:bg-tint',
                       )}
                     >
                       <div className="flex items-center justify-between">
@@ -74,7 +74,7 @@ export default function Settings({
                       </div>
                       <div className="mt-2 flex gap-1">
                         {t.swatch.map((c) => (
-                          <span key={c} className="h-4 flex-1 rounded-[2px] border border-white/10" style={{ background: c }} />
+                          <span key={c} className="h-4 flex-1 rounded-[2px] border border-bstrong" style={{ background: c }} />
                         ))}
                       </div>
                       <div className="mt-2 text-[10.5px] leading-relaxed text-tx-3">{t.desc}</div>
@@ -96,7 +96,7 @@ export default function Settings({
                 <Row title="列表密度" desc="实例与模组列表的行高">
                   <div className="flex items-center gap-1 rounded-sm border border-border p-0.5">
                     {['紧凑', '舒适'].map((v, i) => (
-                      <span key={v} className={cx('rounded-sm px-2 py-0.5 text-[10.5px]', i === 1 ? 'bg-white/[0.08] text-tx-1' : 'text-tx-3')}>{v}</span>
+                      <span key={v} className={cx('rounded-sm px-2 py-0.5 text-[10.5px]', i === 1 ? 'bg-tint2 text-tx-1' : 'text-tx-3')}>{v}</span>
                     ))}
                   </div>
                 </Row>
@@ -202,7 +202,7 @@ function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       aria-pressed={on}
       className={cx(
         'relative h-4 w-8 rounded-full border transition-colors duration-150',
-        on ? 'border-primary/50 bg-primary/30' : 'border-border bg-white/[0.06]',
+        on ? 'border-primary/50 bg-primary/30' : 'border-border bg-tint2',
       )}
     >
       <span

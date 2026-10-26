@@ -2,17 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ───────────────────────── 默认主题：深岩（暗） ───────────────────────── */
 :root {
   --bg: #0f1115;
   --surface: #171a21;
   --surface-elevated: #1e222b;
   --surface-hover: #242935;
   --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --tint: rgba(255, 255, 255, 0.04);
+  --tint-strong: rgba(255, 255, 255, 0.08);
+  --code-bg: rgba(0, 0, 0, 0.22);
+  --scrim: rgba(0, 0, 0, 0.45);
   --text-primary: #e8eaed;
   --text-secondary: #9aa3b2;
   --text-muted: #667085;
   --primary: #6fbf73;
   --primary-hover: #7fd184;
+  --on-primary: #0d1410;
   --accent: #d9a85c;
   --info: #67c7d8;
   --danger: #e06c75;
@@ -22,6 +29,61 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.28);
+  color-scheme: dark;
+}
+
+/* ───────────────────────── 浅色主题：霜白 ───────────────────────── */
+[data-theme='frost'] {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-hover: #e6ebf2;
+  --border: rgba(17, 26, 40, 0.1);
+  --border-strong: rgba(17, 26, 40, 0.18);
+  --tint: rgba(17, 26, 40, 0.04);
+  --tint-strong: rgba(17, 26, 40, 0.08);
+  --code-bg: rgba(17, 26, 40, 0.05);
+  --scrim: rgba(17, 26, 40, 0.35);
+  --text-primary: #101822;
+  --text-secondary: #47556a;
+  --text-muted: #75839a;
+  --primary: #1f8a5b;
+  --primary-hover: #25a068;
+  --on-primary: #ffffff;
+  --accent: #a46518;
+  --info: #1f7f9c;
+  --danger: #c03b48;
+  --success: #1f8a5b;
+  --warning: #9a6512;
+  --shadow-soft: 0 8px 24px rgba(17, 26, 40, 0.1);
+  color-scheme: light;
+}
+
+/* ───────────────────────── 浅色主题：暖纸 ───────────────────────── */
+[data-theme='paper'] {
+  --bg: #f3ede2;
+  --surface: #fdfaf4;
+  --surface-elevated: #fffdf8;
+  --surface-hover: #ebe2d3;
+  --border: rgba(60, 44, 22, 0.12);
+  --border-strong: rgba(60, 44, 22, 0.2);
+  --tint: rgba(60, 44, 22, 0.045);
+  --tint-strong: rgba(60, 44, 22, 0.09);
+  --code-bg: rgba(60, 44, 22, 0.06);
+  --scrim: rgba(40, 28, 12, 0.35);
+  --text-primary: #241c12;
+  --text-secondary: #5a4c3a;
+  --text-muted: #8a7861;
+  --primary: #9b5f2a;
+  --primary-hover: #b06f34;
+  --on-primary: #fffaf3;
+  --accent: #3c6f8f;
+  --info: #2f7490;
+  --danger: #b23b34;
+  --success: #5a7a2f;
+  --warning: #99630f;
+  --shadow-soft: 0 8px 24px rgba(60, 44, 22, 0.12);
+  color-scheme: light;
 }
 
 html, body, #root { height: 100%; }
@@ -37,54 +99,23 @@ body {
 /* 克制的像素点缀：仅用于 Logo 与小面积插画 */
 .pixel-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 8px 8px;
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--border-strong);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; }
 
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-}
-/* ───────────── 主题：苔原（冷绿灰） ───────────── */
-[data-theme='tundra'] {
-  --bg: #0a1113;
-  --surface: #111a1d;
-  --surface-elevated: #1a2428;
-  --surface-hover: #202c31;
-  --border: rgba(206, 232, 226, 0.09);
-  --text-primary: #e4ecea;
-  --text-secondary: #93a8a5;
-  --text-muted: #5f7472;
-  --primary: #67b8a4;
-  --primary-hover: #7bccb7;
-  --accent: #cfd8a4;
-  --info: #6fb6c9;
-}
-
-/* ───────────── 主题：琥珀（暖砂棕） ───────────── */
-[data-theme='amber'] {
-  --bg: #17110a;
-  --surface: #221a11;
-  --surface-elevated: #2b2116;
-  --surface-hover: #372b1d;
-  --border: rgba(255, 236, 210, 0.1);
-  --text-primary: #f0e9dd;
-  --text-secondary: #b3a692;
-  --text-muted: #7a6e5e;
-  --primary: #d3a05a;
-  --primary-hover: #e0b273;
-  --accent: #d98a5c;
-  --info: #7fb3c9;
 }

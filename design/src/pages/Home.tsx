@@ -132,8 +132,8 @@ export default function Home({
               className={cx(
                 'group flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left transition-all duration-200 ease-smooth',
                 index === 0
-                  ? 'border-white/15 bg-elevated'
-                  : 'border-border bg-surface hover:border-white/15 hover:bg-elevated',
+                  ? 'border-bstrong bg-elevated'
+                  : 'border-border bg-surface hover:border-bstrong hover:bg-elevated',
               )}
             >
               <Cover
@@ -163,7 +163,7 @@ export default function Home({
                 <Tag tone={item.loader}>{item.loader}</Tag>
               </span>
 
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-sm text-tx-3 transition-colors duration-150 group-hover:bg-white/[0.06] group-hover:text-tx-1">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-sm text-tx-3 transition-colors duration-150 group-hover:bg-tint2 group-hover:text-tx-1">
                 <Play className="h-3.5 w-3.5" />
               </span>
             </button>
@@ -263,7 +263,7 @@ function PerfPanel({ launch, memoryMb }: { launch: LaunchState; memoryMb: number
             <span className="inline-flex items-center gap-1.5"><MemoryStick className="h-3 w-3" />内存</span>
             <span className="font-mono text-tx-2">{sample.ram} / {memoryMb} MB</span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-tint2">
             <div
               className={cx('h-full rounded-full transition-[width] duration-700 ease-smooth', ramPercent > 85 ? 'bg-warning' : 'bg-primary')}
               style={{ width: ramPercent + '%' }}
@@ -277,7 +277,7 @@ function PerfPanel({ launch, memoryMb }: { launch: LaunchState; memoryMb: number
             <span className="inline-flex items-center gap-1.5"><Cpu className="h-3 w-3" />CPU</span>
             <span className="font-mono text-tx-2">{sample.cpu}%</span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-tint2">
             <div className="h-full rounded-full bg-info transition-[width] duration-700 ease-smooth" style={{ width: sample.cpu + '%' }} />
           </div>
         </div>
@@ -288,7 +288,7 @@ function PerfPanel({ launch, memoryMb }: { launch: LaunchState; memoryMb: number
             <span className="inline-flex items-center gap-1.5"><Gauge className="h-3 w-3" />GPU</span>
             <span className="font-mono text-tx-2">{sample.gpu}%</span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-tint2">
             <div className="h-full rounded-full bg-accent/80 transition-[width] duration-700 ease-smooth" style={{ width: sample.gpu + '%' }} />
           </div>
         </div>

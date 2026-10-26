@@ -61,7 +61,7 @@ export default function Logs() {
                 onClick={() => setLevel(item)}
                 className={cx(
                   'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-[11.5px] transition-colors duration-150',
-                  level === item ? 'bg-white/[0.07] text-tx-1' : 'text-tx-3 hover:bg-white/[0.04] hover:text-tx-2',
+                  level === item ? 'bg-tint2 text-tx-1' : 'text-tx-3 hover:bg-tint hover:text-tx-2',
                 )}
               >
                 <span className="font-mono">{item}</span>
@@ -74,7 +74,7 @@ export default function Logs() {
 
           <div className="mt-4">
             <SectionTitle>搜索</SectionTitle>
-            <div className="flex items-center gap-1.5 rounded-sm border border-border bg-black/20 px-2 py-1.5">
+            <div className="flex items-center gap-1.5 rounded-sm border border-border bg-code px-2 py-1.5">
               <Search className="h-3 w-3 text-tx-3" />
               <input
                 value={query}
@@ -92,7 +92,7 @@ export default function Logs() {
               onClick={() => setAutoScroll((v) => !v)}
               className={cx(
                 'relative h-4 w-8 rounded-full border transition-colors duration-150',
-                autoScroll ? 'border-primary/50 bg-primary/30' : 'border-border bg-white/[0.06]',
+                autoScroll ? 'border-primary/50 bg-primary/30' : 'border-border bg-tint2',
               )}
               aria-pressed={autoScroll}
             >
@@ -140,7 +140,7 @@ export default function Logs() {
                       ? 'bg-primary/10'
                       : line.level === 'ERROR'
                         ? 'bg-danger/[0.06] hover:bg-danger/[0.1]'
-                        : 'hover:bg-white/[0.04]',
+                        : 'hover:bg-tint',
                   )}
                 >
                   <span className="w-[86px] shrink-0 text-tx-3">{line.time}</span>
@@ -163,7 +163,7 @@ export default function Logs() {
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-2">
             {crashes.map((c) => (
-              <div key={c.id} className="mb-2 rounded-sm border border-border/70 p-2.5 transition-colors hover:border-white/15 hover:bg-white/[0.03]">
+              <div key={c.id} className="mb-2 rounded-sm border border-border/70 p-2.5 transition-colors hover:border-bstrong hover:bg-tint">
                 <div className="flex items-center gap-1.5">
                   <FileWarning className="h-3 w-3 text-danger" />
                   <span className="text-[11.5px] text-tx-1">{c.instance}</span>

@@ -54,7 +54,7 @@ export default function Instance() {
               onClick={() => setTab(item)}
               className={cx(
                 'rounded-sm px-2.5 py-1.5 text-[12px] transition-colors duration-150 ease-smooth',
-                tab === item ? 'bg-white/[0.07] text-tx-1' : 'text-tx-3 hover:bg-white/[0.04] hover:text-tx-2',
+                tab === item ? 'bg-tint2 text-tx-1' : 'text-tx-3 hover:bg-tint hover:text-tx-2',
               )}
             >
               {item}
@@ -167,7 +167,7 @@ export default function Instance() {
             ].map(([name, ver, state]) => (
               <div key={name} className="flex items-center justify-between py-2.5">
                 <div className="flex items-center gap-3">
-                  <span className="grid h-7 w-7 place-items-center rounded-sm bg-white/[0.05] font-pixel text-[9px] text-tx-2">
+                  <span className="grid h-7 w-7 place-items-center rounded-sm bg-tint font-pixel text-[9px] text-tx-2">
                     {name.slice(0, 2).toUpperCase()}
                   </span>
                   <div>
@@ -203,7 +203,7 @@ export default function Instance() {
       </div>
 
       {rollbackTarget ? (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/50 backdrop-blur-[2px]">
+        <div className="fixed inset-0 z-30 grid place-items-center bg-scrim backdrop-blur-[2px]">
           <Card elevated className="w-[380px] p-5">
             <div className="text-[13.5px] font-medium text-tx-1">回滚到这个快照？</div>
             <p className="mt-2 text-[11.5px] leading-relaxed text-tx-2">

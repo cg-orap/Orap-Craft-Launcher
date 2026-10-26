@@ -94,9 +94,9 @@ export function Button({
   }[size]
   const variants = {
     primary:
-      'border-transparent bg-primary text-[#0d1410] font-medium hover:bg-primary-hover active:translate-y-[0.5px]',
-    ghost: 'border-border bg-white/[0.03] text-tx-1 hover:bg-hover hover:border-white/15 active:translate-y-[0.5px]',
-    quiet: 'border-transparent bg-transparent text-tx-2 hover:bg-white/[0.05] hover:text-tx-1',
+      'border-transparent bg-primary text-on-primary font-medium hover:bg-primary-hover active:translate-y-[0.5px]',
+    ghost: 'border-border bg-tint text-tx-1 hover:bg-hover hover:border-bstrong active:translate-y-[0.5px]',
+    quiet: 'border-transparent bg-transparent text-tx-2 hover:bg-tint hover:text-tx-1',
     danger: 'border-danger/60 bg-transparent text-danger hover:bg-danger/10 active:translate-y-[0.5px]',
   }[variant]
   return (
@@ -115,7 +115,7 @@ export function Button({
 export function Progress({ value, tone = 'primary' }: { value: number; tone?: 'primary' | 'info' | 'warning' }) {
   const bar = tone === 'info' ? 'bg-info' : tone === 'warning' ? 'bg-warning' : 'bg-primary'
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-tint2">
       <div
         className={cx('h-full rounded-full transition-[width] duration-200 ease-smooth', bar)}
         style={{ width: Math.min(100, Math.max(0, value)) + '%' }}
@@ -125,7 +125,7 @@ export function Progress({ value, tone = 'primary' }: { value: number; tone?: 'p
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cx('animate-pulse rounded-md bg-white/[0.06]', className)} />
+  return <div className={cx('animate-pulse rounded-md bg-tint2', className)} />
 }
 
 export function Spinner({ className }: { className?: string }) {
@@ -192,7 +192,7 @@ export function PixelArt({ variant = 'chest' }: { variant?: 'chest' | 'empty' | 
   }
   const rows = maps[variant]
   return (
-    <div className="pixel-grid inline-grid grid-cols-8 gap-[2px] rounded-md border border-border bg-black/20 p-2">
+    <div className="pixel-grid inline-grid grid-cols-8 gap-[2px] rounded-md border border-border bg-code p-2">
       {rows.flatMap((row, y) =>
         row.split('').map((ch, x) => (
           <span

@@ -68,7 +68,7 @@ export default function Download() {
           <h1 className="text-[17px] font-semibold tracking-tight text-tx-1">资源市场</h1>
           <p className="mt-1 text-[11.5px] text-tx-2">一键安装到当前实例，或作为新版本创建。点击卡片在右侧查看详情。</p>
         </div>
-        <div className="flex items-center gap-1 rounded-md border border-border bg-black/20 p-1">
+        <div className="flex items-center gap-1 rounded-md border border-border bg-code p-1">
           {(['modrinth', 'curseforge'] as Source[]).map((s) => (
             <button
               key={s}
@@ -76,7 +76,7 @@ export default function Download() {
               onClick={() => setSource(s)}
               className={cx(
                 'rounded-sm px-2.5 py-1 text-[11.5px] transition-colors duration-150',
-                source === s ? 'bg-white/[0.08] text-tx-1' : 'text-tx-3 hover:text-tx-2',
+                source === s ? 'bg-tint2 text-tx-1' : 'text-tx-3 hover:text-tx-2',
               )}
             >
               {s === 'modrinth' ? 'Modrinth' : 'CurseForge'}
@@ -111,7 +111,7 @@ export default function Download() {
                 'rounded-sm border px-2.5 py-1.5 text-[11.5px] transition-colors duration-150',
                 kind === k
                   ? 'border-primary/40 bg-primary/10 text-primary'
-                  : 'border-border text-tx-3 hover:border-white/15 hover:text-tx-2',
+                  : 'border-border text-tx-3 hover:border-bstrong hover:text-tx-2',
               )}
             >
               {k}
@@ -148,7 +148,7 @@ export default function Download() {
                 onClick={() => setActive(p)}
                 className={cx(
                   'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors duration-150',
-                  active?.id === p.id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]',
+                  active?.id === p.id ? 'bg-tint2' : 'hover:bg-tint',
                 )}
               >
                 <span
@@ -186,7 +186,7 @@ export default function Download() {
 
       {/* 右侧详情抽屉 */}
       {active ? (
-        <div className="fixed inset-0 z-30 flex justify-end bg-black/45 backdrop-blur-[2px]" onClick={() => setActive(null)}>
+        <div className="fixed inset-0 z-30 flex justify-end bg-scrim backdrop-blur-[2px]" onClick={() => setActive(null)}>
           <aside
             className="flex h-full w-[420px] flex-col border-l border-border bg-elevated shadow-soft"
             onClick={(e) => e.stopPropagation()}
