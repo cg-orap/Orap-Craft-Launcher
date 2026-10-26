@@ -141,7 +141,16 @@ export function Sidebar({
         collapsed ? 'w-0 overflow-hidden' : 'w-[280px]',
       )}
     >
-      <div className="flex h-11 items-center px-4">
+      <div className="flex h-11 items-center gap-1.5 px-2.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-sm border border-white/10 bg-white/[0.04] text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          aria-label="收起侧栏"
+          title="收起侧栏（Ctrl+B）"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
         <span className="text-[12px] font-medium tracking-wide text-tx-2">{title}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">{children}</div>
@@ -172,10 +181,23 @@ export function Shell({
       <TitleBar instanceName={instanceName} />
       <div className="flex min-h-0 flex-1">
         <Rail active={rail} onSelect={onRail} />
-        <SidebarHandle collapsed={sidebarCollapsed} onToggle={onToggleSidebar} />
+
         {sidebar}
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1200px] px-7 pb-4 pt-6">{children}</div>
+        <main className="relative min-w-0 flex-1 overflow-y-auto">
+          {sidebarCollapsed ? (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="absolute left-2 top-3 z-20 flex h-8 items-center gap-1 rounded-md border border-white/15 bg-elevated/90 px-2 text-tx-2 shadow-soft backdrop-blur-sm transition-colors duration-150 hover:border-primary/50 hover:text-primary"
+              aria-label="展开侧栏"
+              aria-expanded="false"
+              title="展开侧栏（Ctrl+B）"
+            >
+              <ChevronRight className="h-4 w-4" />
+              <span className="text-[10.5px]">展开</span>
+            </button>
+          ) : null}
+          <div className={cx('mx-auto w-full max-w-[1200px] px-7 pb-4', sidebarCollapsed ? 'pt-14' : 'pt-6')}>{children}</div>
         </main>
       </div>
     </div>
