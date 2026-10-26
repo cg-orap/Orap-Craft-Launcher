@@ -23,6 +23,8 @@
          the OAuth redirect and no Azure app registration or copy/paste is needed.
          The WebView2 *runtime* is Evergreen and provided by Windows, not shipped by us. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <!-- 真实 CPU / GPU 占用：PerformanceCounter 读取 Processor 与 GPU Engine 计数器 -->
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.0" />
   </ItemGroup>
 
   <!-- Self-contained single-file publish profile (see build/build.ps1). -->

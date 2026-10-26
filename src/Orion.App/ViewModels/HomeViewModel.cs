@@ -33,6 +33,9 @@ public sealed class HomeViewModel : ObservableObject
     private string _javaStatus = "";
     private string _instanceStatus = "";
     private readonly System.Windows.Threading.DispatcherTimer _memoryTimer = new();
+    private readonly Services.PerfSampler _perf = new();
+    private double? _cpuPercent;
+    private double? _gpuPercent;
 
     private void RefreshMemorySample()
     {
@@ -40,9 +43,28 @@ public sealed class HomeViewModel : ObservableObject
         {
             using var process = System.Diagnostics.Process.GetCurrentProcess();
             var mb = (int)Math.Round(process.WorkingSet64 / 1024.0 / 1024.0);
-            if (mb == _launcherMemoryMb) return;
-            _launcherMemoryMb = mb;
-            OnPropertyChanged(nameof(MemoryUsageText));
+            if (mb != _launcherMemoryMb)
+            {
+                _launcherMemoryMb = mb;
+                OnPropertyChanged(nameof(MemoryUsageText));
+                OnPropertyChanged(nameof(MemoryPercent));
+            }
+
+            var cpu = _perf.SampleCpu();
+            if (cpu is null ? _cpuPercent is not null : Math.Abs((cpu ?? 0) - (_cpuPercent ?? 0)) >= 1)
+            {
+                _cpuPercent = cpu;
+                OnPropertyChanged(nameof(CpuText));
+                OnPropertyChanged(nameof(CpuPercent));
+            }
+
+            var gpu = _perf.SampleGpu();
+            if (gpu is null ? _gpuPercent is not null : Math.Abs((gpu ?? 0) - (_gpuPercent ?? 0)) >= 1)
+            {
+                _gpuPercent = gpu;
+                OnPropertyChanged(nameof(GpuText));
+                OnPropertyChanged(nameof(GpuPercent));
+            }
         }
         catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
         {
@@ -165,6 +187,26 @@ public sealed class HomeViewModel : ObservableObject
     public string StateText => IsLaunching ? "运行中" : "就绪";
 
     /// <summary>Launcher working set, refreshed a few times per second by the status timer.</summary>
+    /// <summary>内存占用相对分配内存的百分比，用于性能条。</summary>
+    public double MemoryPercent
+    {
+        get
+        {
+            var allocated = Math.Max(1, _main.CurrentInstance?.EffectiveMemory ?? _main.Context.Settings.MemoryMb);
+            return Math.Clamp(_launcherMemoryMb * 100.0 / allocated, 0, 100);
+        }
+    }
+
+    /// <summary>系统 CPU 占用，计数器不可用时显示 —（不显示假的 0%）。</summary>
+    public string CpuText => _cpuPercent is { } v ? $"{v:0} %" : "—";
+
+    public double CpuPercent => _cpuPercent ?? 0;
+
+    /// <summary>GPU 占用，驱动未暴露 GPU Engine 计数器时显示 —。</summary>
+    public string GpuText => _gpuPercent is { } v ? $"{v:0} %" : "—";
+
+    public double GpuPercent => _gpuPercent ?? 0;
+
     public string MemoryUsageText
     {
         get
