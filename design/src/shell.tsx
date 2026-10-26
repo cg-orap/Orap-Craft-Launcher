@@ -188,16 +188,16 @@ export function Shell({
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="absolute left-2 top-3 z-20 flex h-8 items-center gap-1 rounded-md border border-white/15 bg-elevated/90 px-2 text-tx-2 shadow-soft backdrop-blur-sm transition-colors duration-150 hover:border-primary/50 hover:text-primary"
+              className="absolute left-2 top-0.5 z-20 flex h-5 items-center gap-1 rounded-sm border border-white/15 bg-elevated/85 px-1.5 text-tx-2 shadow-soft backdrop-blur-sm transition-colors duration-150 hover:border-primary/50 hover:text-primary"
               aria-label="展开侧栏"
               aria-expanded="false"
               title="展开侧栏（Ctrl+B）"
             >
-              <ChevronRight className="h-4 w-4" />
-              <span className="text-[10.5px]">展开</span>
+              <ChevronRight className="h-3 w-3" />
+              <span className="text-[9.5px] leading-none">展开</span>
             </button>
           ) : null}
-          <div className={cx('mx-auto w-full max-w-[1200px] px-7 pb-4', sidebarCollapsed ? 'pt-14' : 'pt-6')}>{children}</div>
+          <div className="mx-auto w-full max-w-[1200px] px-7 pb-4 pt-6">{children}</div>
         </main>
       </div>
     </div>
@@ -216,7 +216,7 @@ export function SidebarHandle({ collapsed, onToggle }: { collapsed: boolean; onT
     >
       <span className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-border transition-colors duration-150 group-hover:bg-primary/60" />
       <span className="relative grid h-10 w-[22px] place-items-center rounded-md border border-white/15 bg-elevated text-tx-1 shadow-soft transition-all duration-150 group-hover:scale-[1.06] group-hover:border-primary/50 group-hover:text-primary">
-        {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </span>
     </button>
   )
