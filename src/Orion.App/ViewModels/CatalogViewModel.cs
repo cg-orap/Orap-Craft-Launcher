@@ -10,10 +10,19 @@ using Orion.Core.Mods;
 namespace Orion.App.ViewModels;
 
 /// <summary>One catalogue tab: Minecraft versions plus the four Modrinth project kinds.</summary>
-public sealed class CatalogKindOption(string key, string name, string? projectType)
+public sealed class CatalogKindOption(string key, string name, string? projectType) : ObservableObject
 {
     public string Key { get; } = key;
     public string Name { get; } = name;
+
+    private bool _isCurrent;
+
+    /// <summary>当前选中的分类，供页签高亮。</summary>
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set => SetProperty(ref _isCurrent, value);
+    }
 
     /// <summary>Modrinth <c>project_type</c>; null for the built-in "Minecraft versions" tab.</summary>
     public string? ProjectType { get; } = projectType;
@@ -216,6 +225,7 @@ public sealed class CatalogViewModel : ObservableObject
             _kind = value;
             _category = null;
             CloseDetail();
+            foreach (var option in Kinds) option.IsCurrent = ReferenceEquals(option, value);
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsVersionsTab));
