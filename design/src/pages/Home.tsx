@@ -112,7 +112,7 @@ export default function Home({
         ) : null}
       </section>
 
-      {/* ── 最近游玩 ───────────────────────────────── */}
+      {/* ── 最近游玩（纵向长条列表） ─────────────────── */}
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[12px] font-medium tracking-wide text-tx-2">最近游玩</h2>
@@ -120,29 +120,53 @@ export default function Home({
             全部实例 <ChevronRight className="h-3 w-3" />
           </button>
         </div>
-        <div className="grid grid-cols-4 gap-3">
+
+        <div className="space-y-1.5">
           {instances.map((item, index) => (
             <button
               key={item.id}
               type="button"
               className={cx(
-                'group rounded-md border p-2.5 text-left transition-all duration-200 ease-smooth',
+                'group flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left transition-all duration-200 ease-smooth',
                 index === 0
                   ? 'border-white/15 bg-elevated'
                   : 'border-border bg-surface hover:border-white/15 hover:bg-elevated',
               )}
             >
-              <Cover seed={item.id} label={item.loader.slice(0, 2).toUpperCase()} />
-              <div className="mt-2.5 truncate text-[12px] text-tx-1">{item.name}</div>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="font-mono text-[10px] text-tx-3">MC {item.mc}</span>
-                <span className="text-[10px] text-tx-3">{item.lastPlayed}</span>
-              </div>
+              <Cover
+                seed={item.id}
+                label={item.loader.slice(0, 2).toUpperCase()}
+                className="h-9 w-9 shrink-0"
+              />
+
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                  <span className="truncate text-[12.5px] text-tx-1">{item.name}</span>
+                  {index === 0 ? (
+                    <span className="rounded-sm bg-primary/12 px-1.5 py-0.5 text-[10px] text-primary">当前</span>
+                  ) : null}
+                </span>
+                <span className="mt-0.5 flex items-center gap-2 font-mono text-[10.5px] text-tx-3">
+                  <span>MC {item.mc}</span>
+                  <span className="text-tx-3/60">·</span>
+                  <span>{item.loader}</span>
+                  <span className="text-tx-3/60">·</span>
+                  <span>{item.mods} 模组</span>
+                </span>
+              </span>
+
+              <span className="hidden shrink-0 items-center gap-3 text-[10.5px] text-tx-3 sm:flex">
+                <span>{item.lastPlayed}</span>
+                <Tag tone={item.loader}>{item.loader}</Tag>
+              </span>
+
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-sm text-tx-3 transition-colors duration-150 group-hover:bg-white/[0.06] group-hover:text-tx-1">
+                <Play className="h-3.5 w-3.5" />
+              </span>
             </button>
           ))}
         </div>
       </section>
-
       {/* ── 一行状态条：备份 / P2P / 公告 ────────────── */}
       <section className="grid grid-cols-3 gap-3">
         <Card className="flex items-center justify-between px-4 py-3">
