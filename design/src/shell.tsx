@@ -145,7 +145,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-sm border border-white/10 bg-white/[0.04] text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
           aria-label="收起侧栏"
           title="收起侧栏（Ctrl+B）"
         >
@@ -188,13 +188,12 @@ export function Shell({
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="absolute left-2 top-0.5 z-20 flex h-5 items-center gap-1 rounded-sm border border-white/15 bg-elevated/85 px-1.5 text-tx-2 shadow-soft backdrop-blur-sm transition-colors duration-150 hover:border-primary/50 hover:text-primary"
+              className="absolute left-0 top-1/2 z-20 grid h-16 w-8 -translate-y-1/2 place-items-center rounded-r-lg border border-l-0 border-primary/35 bg-elevated/90 text-primary shadow-soft backdrop-blur-sm transition-all duration-200 ease-smooth hover:w-9 hover:border-primary/60 hover:bg-primary/10"
               aria-label="展开侧栏"
               aria-expanded="false"
               title="展开侧栏（Ctrl+B）"
             >
-              <ChevronRight className="h-3 w-3" />
-              <span className="text-[9.5px] leading-none">展开</span>
+              <ChevronRight className="h-5 w-5" />
             </button>
           ) : null}
           <div className="mx-auto w-full max-w-[1200px] px-7 pb-4 pt-6">{children}</div>
