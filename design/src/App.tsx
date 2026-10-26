@@ -188,7 +188,7 @@ export default function App() {
       {rail === 'settings' ? (
         <Placeholder
           title="设置"
-          desc="分组：外观、Java、下载源、备份、联机、高级。外观提供 3 套预设主题与标题栏材质切换。"
+          desc="分组：外观、Java、下载源、备份、高级。外观提供 3 套预设主题与标题栏材质切换；联机功能暂未开放。"
           icon={<Settings className="h-4 w-4 text-tx-2" />}
           actions={['主题 A · 深岩', '主题 B · 苔原', '主题 C · 琥珀']}
         />

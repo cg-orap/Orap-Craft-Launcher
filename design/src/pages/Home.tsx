@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronRight, Cloud, Cpu, Gauge, MemoryStick, Play, Radio, RotateCcw, Square, Sun, Terminal } from 'lucide-react'
+import { ChevronRight, Cloud, Cpu, Gauge, HardDrive, MemoryStick, Play, RotateCcw, Square, Sun, Terminal } from 'lucide-react'
 import { backups, instances, type LaunchState, type SyncState } from '../mock'
 import { Button, Card, Cover, cx, Dot, Progress, Spinner, Tag } from '../ui'
 
@@ -185,11 +185,11 @@ export default function Home({
         <Card className="flex items-center justify-between px-4 py-3">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-[11px] text-tx-3">
-              <Radio className="h-3 w-3 text-info" /> P2P 联机
+              <HardDrive className="h-3 w-3 text-info" /> 存储占用
             </div>
-            <div className="mt-0.5 truncate text-[12px] text-tx-1">支持 {current.mc} · 无需公网 IP</div>
+            <div className="mt-0.5 truncate text-[12px] text-tx-1">实例 2.6 GB · 缓存 812 MB</div>
           </div>
-          <Button variant="quiet" size="sm">创建房间</Button>
+          <Button variant="quiet" size="sm">清理缓存</Button>
         </Card>
 
         <Card className="flex items-center justify-between px-4 py-3">
