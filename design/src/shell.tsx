@@ -188,7 +188,7 @@ export function Shell({
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="absolute left-0 top-1/2 z-20 grid h-16 w-8 -translate-y-1/2 place-items-center rounded-r-lg border border-l-0 border-primary/35 bg-elevated/90 text-primary shadow-soft backdrop-blur-sm transition-all duration-200 ease-smooth hover:w-9 hover:border-primary/60 hover:bg-primary/10"
+              className="absolute left-1 top-1 z-20 grid h-8 w-10 place-items-center rounded-md border border-primary/35 bg-elevated/92 text-primary shadow-soft backdrop-blur-sm transition-all duration-200 ease-smooth hover:border-primary/60 hover:bg-primary/10"
               aria-label="展开侧栏"
               aria-expanded="false"
               title="展开侧栏（Ctrl+B）"
