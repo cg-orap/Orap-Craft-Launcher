@@ -22,6 +22,21 @@ public partial class MainWindow : Window
             var key = args[index + 1];
             Loaded += (_, _) => (DataContext as ViewModels.MainViewModel)?.Navigate(key);
         }
+
+        // --kind <modpack|mod|shader|resourcepack|versions>：直接定位到下载中心的某个资源分类。
+        var kindIndex = Array.FindIndex(args, a => string.Equals(a, "--kind", StringComparison.OrdinalIgnoreCase));
+        if (kindIndex >= 0 && kindIndex + 1 < args.Length)
+        {
+            var kindKey = args[kindIndex + 1];
+            Loaded += (_, _) =>
+            {
+                if (DataContext is not ViewModels.MainViewModel main) return;
+                var kind = main.CatalogPage.Kinds.FirstOrDefault(k =>
+                    string.Equals(k.Key, kindKey, StringComparison.OrdinalIgnoreCase));
+                if (kind is not null) main.CatalogPage.Kind = kind;
+                main.Navigate("catalog");
+            };
+        }
     }
     /// <summary>
     /// 下载中心 owns a sub-menu: a click folds it open/shut instead of navigating. The click is
