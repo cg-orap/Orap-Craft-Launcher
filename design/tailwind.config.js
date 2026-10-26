@@ -1,0 +1,38 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        elevated: 'var(--surface-elevated)',
+        hover: 'var(--surface-hover)',
+        border: 'var(--border)',
+        primary: 'var(--primary)',
+        'primary-hover': 'var(--primary-hover)',
+        accent: 'var(--accent)',
+        info: 'var(--info)',
+        danger: 'var(--danger)',
+        success: 'var(--success)',
+        warning: 'var(--warning)',
+        'tx-1': 'var(--text-primary)',
+        'tx-2': 'var(--text-secondary)',
+        'tx-3': 'var(--text-muted)',
+      },
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+      },
+      boxShadow: { soft: 'var(--shadow-soft)' },
+      fontFamily: {
+        sans: ['Inter', '"Noto Sans SC"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'Consolas', 'monospace'],
+        pixel: ['"Silkscreen"', '"Noto Sans SC"', 'monospace'],
+      },
+      transitionTimingFunction: { smooth: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    },
+  },
+  plugins: [],
+}
