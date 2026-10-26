@@ -136,11 +136,11 @@ export function Sidebar({
 }) {
   if (collapsed) {
     return (
-      <aside className="flex w-11 shrink-0 flex-col items-center border-r border-border bg-surface/25 pt-6">
+      <aside className="relative flex w-11 shrink-0 flex-col border-r border-border bg-surface/25">
         <button
           type="button"
           onClick={onToggle}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-bstrong bg-tint text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          className="absolute left-1.5 top-6 z-10 grid h-8 w-8 place-items-center rounded-md border border-bstrong bg-tint text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
           aria-label="展开侧栏"
           aria-expanded="false"
           title="展开侧栏（Ctrl+B）"
@@ -154,20 +154,20 @@ export function Sidebar({
   return (
     <aside
       className={cx(
-        'flex shrink-0 flex-col border-r border-border bg-surface/25 transition-[width] duration-250 ease-smooth',
+        'relative flex shrink-0 flex-col border-r border-border bg-surface/25 transition-[width] duration-250 ease-smooth',
         'w-[280px]',
       )}
     >
-      <div className="flex h-11 items-center gap-1.5 px-2.5">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-bstrong bg-tint text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-          aria-label="收起侧栏"
-          title="收起侧栏（Ctrl+B）"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" />
-        </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute left-1.5 top-6 z-10 grid h-8 w-8 place-items-center rounded-md border border-bstrong bg-tint text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+        aria-label="收起侧栏"
+        title="收起侧栏（Ctrl+B）"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+      <div className="flex h-20 items-center pl-11 pr-3">
         <span className="text-[12px] font-medium tracking-wide text-tx-2">{title}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">{children}</div>
