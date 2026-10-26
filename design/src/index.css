@@ -57,3 +57,34 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+/* ───────────── 主题：苔原（冷绿灰） ───────────── */
+[data-theme='tundra'] {
+  --bg: #0a1113;
+  --surface: #111a1d;
+  --surface-elevated: #1a2428;
+  --surface-hover: #202c31;
+  --border: rgba(206, 232, 226, 0.09);
+  --text-primary: #e4ecea;
+  --text-secondary: #93a8a5;
+  --text-muted: #5f7472;
+  --primary: #67b8a4;
+  --primary-hover: #7bccb7;
+  --accent: #cfd8a4;
+  --info: #6fb6c9;
+}
+
+/* ───────────── 主题：琥珀（暖砂棕） ───────────── */
+[data-theme='amber'] {
+  --bg: #17110a;
+  --surface: #221a11;
+  --surface-elevated: #2b2116;
+  --surface-hover: #372b1d;
+  --border: rgba(255, 236, 210, 0.1);
+  --text-primary: #f0e9dd;
+  --text-secondary: #b3a692;
+  --text-muted: #7a6e5e;
+  --primary: #d3a05a;
+  --primary-hover: #e0b273;
+  --accent: #d98a5c;
+  --info: #7fb3c9;
+}

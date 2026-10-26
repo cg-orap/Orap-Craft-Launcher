@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Download,
   FolderTree,
@@ -12,10 +12,13 @@ import {
 import Home from './pages/Home'
 import Instance from './pages/Instance'
 import Logs from './pages/Logs'
+import DownloadPage from './pages/Download'
+import SettingsPage from './pages/Settings'
 import Placeholder from './pages/Placeholder'
 import { Shell, Sidebar, type RailKey } from './shell'
 import { Button, Card, cx, Dot, Tag } from './ui'
 import { backups, instances, type LaunchState, type SyncState } from './mock'
+import { applyTheme, type ThemeId } from './themes'
 
 const titles: Record<RailKey, string> = {
   home: '概览',
@@ -38,6 +41,16 @@ export default function App() {
   const [launch, setLaunch] = useState<LaunchState>('idle')
   const [sync, setSync] = useState<SyncState>('synced')
   const [instanceId, setInstanceId] = useState(instances[0].id)
+  const [theme, setTheme] = useState<ThemeId>(() => {
+    const q = new URLSearchParams(window.location.search).get('theme')
+    if (q === 'tundra' || q === 'amber' || q === 'rock') return q
+    return (localStorage.getItem('orap-theme') as ThemeId | null) ?? 'rock'
+  })
+
+  useEffect(() => {
+    applyTheme(theme)
+    localStorage.setItem('orap-theme', theme)
+  }, [theme])
 
   const current = instances.find((i) => i.id === instanceId) ?? instances[0]
 
@@ -131,26 +144,54 @@ export default function App() {
       ) : null}
 
       {rail === 'download' ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-1 rounded-sm border border-border bg-black/20 px-2 py-1.5">
-            <Search className="h-3 w-3 text-tx-3" />
-            <input placeholder="搜索整合包 / 模组…" className="w-full bg-transparent text-[11.5px] text-tx-1 outline-none placeholder:text-tx-3" />
+        <div className="space-y-3">
+          <div>
+            <div className="mb-1.5 text-[10.5px] text-tx-3">快捷</div>
+            {[
+              ['可更新（2）', 'Sodium · FerriteCore'],
+              ['已安装（333）', '当前实例模组'],
+              ['收藏（6）', '常用整合包与光影'],
+            ].map(([name, hint]) => (
+              <div key={name} className="rounded-sm px-2 py-1.5 hover:bg-white/[0.04]">
+                <div className="text-[11.5px] text-tx-2">{name}</div>
+                <div className="mt-0.5 text-[10px] text-tx-3">{hint}</div>
+              </div>
+            ))}
           </div>
-          <div className="flex items-center justify-between rounded-sm border border-border px-2 py-1.5 text-[11.5px] text-tx-2">
-            来源：Modrinth
-            <ChevronDown className="h-3 w-3 text-tx-3" />
+          <div className="border-t border-border pt-3">
+            <div className="mb-1.5 text-[10.5px] text-tx-3">最近搜索</div>
+            {['机械动力', 'shader', 'optimization'].map((q) => (
+              <div key={q} className="rounded-sm px-2 py-1 text-[11.5px] text-tx-3 hover:bg-white/[0.04] hover:text-tx-2">{q}</div>
+            ))}
           </div>
-          <div className="pt-1 text-[10.5px] text-tx-3">类型</div>
-          {['整合包', '模组', '光影', '材质包'].map((t) => (
-            <div key={t} className="rounded-sm px-2 py-1.5 text-[11.5px] text-tx-2 hover:bg-white/[0.04]">{t}</div>
-          ))}
         </div>
       ) : null}
 
-      {rail === 'mods' || rail === 'settings' ? (
+      {rail === 'settings' ? (
+        <div className="space-y-2 text-[11.5px]">
+          <div className="text-[10.5px] text-tx-3">当前配置</div>
+          {[
+            ['主题', theme === 'rock' ? '深岩' : theme === 'tundra' ? '苔原' : '琥珀'],
+            ['默认内存', '4096 MB'],
+            ['下载源', 'BMCLAPI 镜像'],
+            ['备份', '启动前 · 保留 7 份'],
+            ['数据目录', 'D:\\OrapCraft'],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between rounded-sm px-2 py-1">
+              <span className="text-tx-3">{k}</span>
+              <span className="font-mono text-[10.5px] text-tx-2">{v}</span>
+            </div>
+          ))}
+          <div className="mt-2 border-t border-border pt-2 text-[10px] leading-relaxed text-tx-3">
+            所有配置保存到 settings.json，重启后仍然有效。
+          </div>
+        </div>
+      ) : null}
+
+      {rail === 'mods' ? (
         <div className="space-y-1 text-[11.5px] text-tx-3">
           <div className="rounded-sm px-2 py-1.5 text-tx-2">占位分组</div>
-          <div className="px-2 text-[10.5px] leading-relaxed">该页面为可点击占位，本期重点实现主页 / 实例详情 / 日志。</div>
+          <div className="px-2 text-[10.5px] leading-relaxed">模组页在本期为占位，可点击切换。</div>
         </div>
       ) : null}
     </Sidebar>
@@ -161,14 +202,7 @@ export default function App() {
       {rail === 'home' ? (<Home launch={launch} setLaunch={setLaunch} sync={sync} setSync={setSync} onOpenLogs={() => setRail('logs')} />) : null}
       {rail === 'instances' ? <Instance /> : null}
       {rail === 'logs' ? <Logs /> : null}
-      {rail === 'download' ? (
-        <Placeholder
-          title="资源市场"
-          desc="搜索 + 来源切换（Modrinth / CurseForge）+ 类型筛选 + 右侧滑出详情抽屉。设计见文档中的线框与组件树。"
-          icon={<Download className="h-4 w-4 text-tx-2" />}
-          actions={['一键安装', '打开详情抽屉', '按加载器筛选']}
-        />
-      ) : null}
+      {rail === 'download' ? <DownloadPage /> : null}
       {rail === 'mods' ? (
         <Placeholder
           title="模组管理"
@@ -185,14 +219,7 @@ export default function App() {
           actions={['立即备份', '模拟同步冲突']}
         />
       ) : null}
-      {rail === 'settings' ? (
-        <Placeholder
-          title="设置"
-          desc="分组：外观、Java、下载源、备份、高级。外观提供 3 套预设主题与标题栏材质切换；联机功能暂未开放。"
-          icon={<Settings className="h-4 w-4 text-tx-2" />}
-          actions={['主题 A · 深岩', '主题 B · 苔原', '主题 C · 琥珀']}
-        />
-      ) : null}
+      {rail === 'settings' ? <SettingsPage theme={theme} onTheme={setTheme} /> : null}
 
       {/* 演示用状态切换器（不属于设计稿，仅方便评审） */}
       <Card elevated className="fixed bottom-3 right-3 z-40 flex items-center gap-1.5 border-white/10 bg-elevated/80 px-2.5 py-1.5 backdrop-blur-md">
