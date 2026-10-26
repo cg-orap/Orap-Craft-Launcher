@@ -134,11 +134,28 @@ export function Sidebar({
   children: ReactNode
   footer?: ReactNode
 }) {
+  if (collapsed) {
+    return (
+      <aside className="flex w-11 shrink-0 flex-col items-center border-r border-border bg-surface/25 pt-6">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-tx-2 transition-colors duration-150 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          aria-label="展开侧栏"
+          aria-expanded="false"
+          title="展开侧栏（Ctrl+B）"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </aside>
+    )
+  }
+
   return (
     <aside
       className={cx(
         'flex shrink-0 flex-col border-r border-border bg-surface/25 transition-[width] duration-250 ease-smooth',
-        collapsed ? 'w-0 overflow-hidden' : 'w-[280px]',
+        'w-[280px]',
       )}
     >
       <div className="flex h-11 items-center gap-1.5 px-2.5">
@@ -184,18 +201,6 @@ export function Shell({
 
         {sidebar}
         <main className="relative min-w-0 flex-1 overflow-y-auto">
-          {sidebarCollapsed ? (
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="absolute left-1 top-1 z-20 grid h-8 w-10 place-items-center rounded-md border border-primary/35 bg-elevated/92 text-primary shadow-soft backdrop-blur-sm transition-all duration-200 ease-smooth hover:border-primary/60 hover:bg-primary/10"
-              aria-label="展开侧栏"
-              aria-expanded="false"
-              title="展开侧栏（Ctrl+B）"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          ) : null}
           <div className="mx-auto w-full max-w-[1200px] px-7 pb-4 pt-6">{children}</div>
         </main>
       </div>
