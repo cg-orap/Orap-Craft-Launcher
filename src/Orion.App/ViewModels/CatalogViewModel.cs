@@ -782,10 +782,23 @@ public sealed class CatalogViewModel : ObservableObject
             var info = Core.Mods.PackArchiveInstaller.Inspect(path);
             Status = $"识别到{DescribePackKind(info.Kind)}：{info.Name}";
 
+            // 整合包里的 Forge/NeoForge/Fabric 安装器需要 Java：先解析一次，两种格式共用。
+            var installerJava = info.Kind == Core.Mods.PackArchiveKind.MinecraftZip
+                ? null
+                : await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true);
+
+            if (installerJava is null && info.Kind != Core.Mods.PackArchiveKind.MinecraftZip)
+            {
+                // PickInstallerJavaAsync 已经把"需要 Java N"的原因写进 Status。
+                _main.Activities.Finish(activity, ActivityState.Failed, Status);
+                _main.LogsPage.AppendSystem(Status);
+                return;
+            }
+
             var result = info.Kind switch
             {
                 Core.Mods.PackArchiveKind.CurseForge => await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(path, name ?? info.Name, await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true), progress, linked.Token)
+                    .InstallCurseForgeAsync(path, name ?? info.Name, installerJava, progress, linked.Token)
                     .ConfigureAwait(true),
 
                 Core.Mods.PackArchiveKind.MinecraftZip => await _main.Context.PackArchives
@@ -794,7 +807,7 @@ public sealed class CatalogViewModel : ObservableObject
 
                 // Modrinth .mrpack (and anything that declares a modrinth index).
                 _ => await _main.Context.ModPacks
-                    .InstallAsync(path, name, null, progress, linked.Token)
+                    .InstallAsync(path, name, installerJava, progress, linked.Token)
                     .ConfigureAwait(true),
             };
 

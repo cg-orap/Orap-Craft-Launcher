@@ -133,7 +133,9 @@ public abstract class InstallerBasedProvider : ILoaderProvider
             }
 
             // 3. Run the installer headless.
-            var java = request.Java ?? throw new InvalidOperationException("需要 Java 运行时来运行安装器。");
+            var java = request.Java ?? throw new InvalidOperationException(
+            $"需要 Java 运行时来运行安装器（MC {request.MinecraftVersion}）。" +
+            "请安装对应的 JDK，或在启动器的 设置 → Java 里指定 java.exe 路径后重试。");
             EnsureLauncherProfiles();
             var arguments = new List<string>();
 
