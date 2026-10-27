@@ -95,9 +95,14 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
-                    <!-- 启动器图标 -->
-                    <Image Width="22" Height="22" Margin="0,0,9,0" Source="Assets/app-icon.png"
-                           RenderOptions.BitmapScalingMode="HighQuality" />
+                    <!-- 启动器标志（图标本身由 exe 图标承担，标题栏用像素方块保持清晰） -->
+                    <Border Width="22" Height="22" CornerRadius="5" Margin="0,0,9,0"
+                            Background="{DynamicResource AccentBrush}">
+                        <Grid>
+                            <Rectangle Width="8" Height="8" HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" Fill="#1A1D24" RadiusX="1" RadiusY="1" />
+                        </Grid>
+                    </Border>
                     <TextBlock Text="Orap Craft" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                     <TextBlock Text="v0.2" FontSize="10" Margin="8,2,0,0" VerticalAlignment="Center"
                                Foreground="{DynamicResource MutedTextBrush}" />
