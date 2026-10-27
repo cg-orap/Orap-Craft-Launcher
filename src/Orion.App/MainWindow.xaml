@@ -282,7 +282,7 @@
                             </Grid>
 
                             <ListBox Grid.Row="1" ItemsSource="{Binding Home.Instances}"
-                                     SelectedItem="{Binding Home.SidebarSelection, Mode=TwoWay}"
+                                     SelectedItem="{Binding Home.SelectedLaunchInstance, Mode=TwoWay}"
                                      Background="Transparent" BorderThickness="0"
                                      ItemContainerStyle="{StaticResource SidebarInstanceStyle}"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
