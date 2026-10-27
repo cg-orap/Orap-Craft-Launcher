@@ -28,6 +28,11 @@ public partial class ModsView : UserControl
     public ModsView() => InitializeComponent();
 }
 
+public partial class BackupView : UserControl
+{
+    public BackupView() => InitializeComponent();
+}
+
 public partial class DownloadsView : UserControl
 {
     public DownloadsView() => InitializeComponent();

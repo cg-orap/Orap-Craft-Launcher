@@ -153,6 +153,7 @@ public sealed class MainViewModel : ObservableObject
         DownloadsPage = new DownloadsViewModel(this);
         SettingsPage = new SettingsViewModel(this);
         LogsPage = new LogsViewModel(this);
+        BackupPage = new BackupViewModel(this);
 
         NavigateCommand = new RelayCommand(parameter =>
         {
@@ -177,7 +178,8 @@ public sealed class MainViewModel : ObservableObject
             },
             new NavItem("mods", "Mod 管理", "\uE7B8", "资源"),
             new NavItem("downloads", "下载管理", "\uE81C", "任务"),
-            new NavItem("settings", "设置", "\uE713", "系统"),
+            new NavItem("backup", "备份", "\uE8F1", "系统"),
+        new NavItem("settings", "设置", "\uE713", "系统"),
             new NavItem("logs", "日志", "\uE8A5", "系统"),
         ]);
 
@@ -216,6 +218,8 @@ public sealed class MainViewModel : ObservableObject
     public string SidebarToggleGlyph => IsSidebarCollapsed ? "\uE76C" : "\uE76B";
 
     public ICommand ToggleSidebarCommand { get; }
+
+    public BackupViewModel BackupPage { get; }
     public HomeViewModel Home { get; }
     public VersionsViewModel VersionsPage { get; }
     public InstancesViewModel InstancesPage { get; }
@@ -499,6 +503,9 @@ public sealed class MainViewModel : ObservableObject
 
     private void NavigateCore(string key)
     {
+        // 备份总览每次进入都重新扫一遍磁盘（实例与快照都可能在别处变化）。
+        if (key == "backup") BackupPage.Refresh();
+
         // 进"版本设置"时如果还没选版本，自动选第一个，避免看到一个空详情页。
         if (key == "instances" && InstancesPage.SelectedInstance is null)
         {
@@ -525,6 +532,7 @@ public sealed class MainViewModel : ObservableObject
             "downloads" => DownloadsPage,
             "settings" => SettingsPage,
             "logs" => LogsPage,
+            "backup" => BackupPage,
             _ => Home,
         };
 
@@ -599,6 +607,7 @@ public sealed class MainViewModel : ObservableObject
     {
         var instances = Context.Instances.LoadAll();
         Instances.Replace(instances);
+        BackupPage.Refresh();
 
         var lastId = Context.Settings.LastInstanceId;
 

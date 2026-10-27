@@ -1,0 +1,142 @@
+<UserControl x:Class="Orion.App.Views.BackupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="1120">
+
+    <UserControl.Resources>
+        <Style x:Key="BackupRowItem" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Row" Background="Transparent" CornerRadius="8" Padding="10,8"
+                                BorderThickness="1" BorderBrush="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceAltBg}" />
+                                <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="24,20,24,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 头部 -->
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="备份总览" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                           Text="汇总所有版本的快照；选中一行可导出成 zip 到指定目录。" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="打开快照目录" Style="{StaticResource GhostButton}" FontSize="11.5" Padding="12,6"
+                        Command="{Binding OpenFolderCommand}" />
+                <Button Content="刷新" Style="{StaticResource GhostButton}" FontSize="11.5" Padding="12,6"
+                        Margin="8,0,0,0" Command="{Binding RefreshCommand}" />
+                <Button Content="导出所选…" Style="{StaticResource PrimaryButton}" FontSize="11.5" Padding="14,6"
+                        Margin="8,0,0,0" Command="{Binding ExportCommand}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 汇总条 -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="16,12" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,8,0"
+                             Fill="{DynamicResource SuccessBrush}" />
+                    <TextBlock Text="{Binding Summary}" Style="{StaticResource CaptionText}" />
+                </StackPanel>
+
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="10.5"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           Text="云同步未接入：目前只在本地保存与手动导出" />
+            </Grid>
+        </Border>
+
+        <!-- 快照列表 -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="6">
+            <Grid>
+                <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+                         Background="Transparent" BorderThickness="0"
+                         ItemContainerStyle="{StaticResource BackupRowItem}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Width="32" Height="32" CornerRadius="7"
+                                        Background="{DynamicResource SurfaceAltBg}" Margin="0,0,10,0"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE81C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                               FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AccentBrush}" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding InstanceName}" FontSize="12.5"
+                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4"
+                                                Padding="6,1" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding TriggerLabel}" FontSize="10"
+                                                       Foreground="{DynamicResource MutedTextBrush}" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Detail}" FontFamily="Consolas" FontSize="10"
+                                               Margin="0,2,0,0" Foreground="{DynamicResource MutedTextBrush}" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Column="2" Text="{Binding TimeText}" FontFamily="Consolas"
+                                           FontSize="10.5" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock Text="{Binding EmptyHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420"
+                           TextAlignment="Center"
+                           Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+            </Grid>
+        </Border>
+
+        <!-- 状态 -->
+        <TextBlock Grid.Row="3" Text="{Binding Status}" Style="{StaticResource CaptionText}" Margin="2,10,2,0"
+                   TextWrapping="Wrap" />
+    </Grid>
+</UserControl>

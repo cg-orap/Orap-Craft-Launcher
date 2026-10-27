@@ -148,6 +148,26 @@ public sealed class InstanceBackupService(string? backupRootOverride = null)
         return safety;
     }
 
+    /// <summary>
+    /// 把一份快照导出成 zip（单文件便于拷到移动硬盘/网盘）。目标目录不存在会自动创建，
+    /// 同名文件会被覆盖。返回 zip 的完整路径。
+    /// </summary>
+    public string Export(Instance instance, string snapshotId, string destinationDirectory)
+    {
+        var source = Path.Combine(BackupRoot(instance), snapshotId);
+        if (!Directory.Exists(source)) throw new DirectoryNotFoundException($"找不到快照 {snapshotId}");
+
+        Directory.CreateDirectory(destinationDirectory);
+
+        var safeName = string.Join("_", instance.Name.Split(Path.GetInvalidFileNameChars()));
+        var zipPath = Path.Combine(destinationDirectory, $"{safeName}-{snapshotId}.zip");
+        if (File.Exists(zipPath)) File.Delete(zipPath);
+
+        System.IO.Compression.ZipFile.CreateFromDirectory(source, zipPath);
+        AppLog.Info("backup", "snapshot-exported", ("instance", instance.Id), ("id", snapshotId), ("zip", zipPath));
+        return zipPath;
+    }
+
     /// <summary>删除一份快照；返回是否真的删掉了。</summary>
     public bool Delete(Instance instance, string snapshotId)
     {

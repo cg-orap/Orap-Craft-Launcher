@@ -95,6 +95,28 @@ public sealed class InstanceBackupTests : IDisposable
     }
 
     [Fact]
+    public async Task ExportWritesAZipContainingTheSnapshot()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+        var destination = Path.Combine(_root, "exports");
+
+        var zip = _service.Export(_instance, snapshot.Id, destination);
+
+        Assert.True(File.Exists(zip));
+        Assert.Equal(destination, Path.GetDirectoryName(zip));
+
+        using var archive = System.IO.Compression.ZipFile.OpenRead(zip);
+        Assert.Contains(archive.Entries, e => e.FullName.Replace('\\', '/').EndsWith("saves/world/level.dat"));
+        Assert.Contains(archive.Entries, e => e.FullName.EndsWith("snapshot.json"));
+    }
+
+    [Fact]
+    public void ExportOfUnknownSnapshotThrows()
+    {
+        Assert.Throws<DirectoryNotFoundException>(() => _service.Export(_instance, "nope", Path.Combine(_root, "exports")));
+    }
+
+    [Fact]
     public async Task DeleteRemovesTheSnapshot()
     {
         var snapshot = await _service.CreateAsync(_instance, "manual");
