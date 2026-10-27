@@ -183,6 +183,32 @@ public sealed class ContentManifestTests : IDisposable
         Assert.Equal("sodium", candidates[0].ProjectId);
     }
 
+    [Theory]
+    [InlineData("https://cdn.modrinth.com/data/AABBCC/versions/112233/sodium-0.6.0.jar", "AABBCC", "112233")]
+    [InlineData("https://cdn.modrinth.com/data/abc/versions/v1/file.jar?x=1", "abc", "v1")]
+    [InlineData("https://api.modrinth.com/v2/version/zzz", "", "")]
+    [InlineData("https://example.com/files/foo.jar", "", "")]
+    public void ModrinthUrlParsesCdnLinks(string url, string expectedProject, string expectedVersion)
+    {
+        var parsed = ModrinthUrl.TryParse(url, out var project, out var version);
+
+        Assert.Equal(expectedProject.Length > 0, parsed);
+        if (parsed)
+        {
+            Assert.Equal(expectedProject, project);
+            Assert.Equal(expectedVersion, version);
+        }
+    }
+
+    [Fact]
+    public void PackEntriesFromModrinthAreTracked()
+    {
+        var manifest = new ContentManifest();
+        manifest.Upsert(new ContentEntry { ProjectId = "p", VersionId = "v", FileName = "a.jar", Source = "pack" });
+
+        Assert.True(manifest.Entries[0].IsTracked);
+    }
+
     private sealed class FakeVersionSource : IVersionSource
     {
         public Dictionary<string, IReadOnlyList<ModrinthVersion>> Versions { get; } = [];

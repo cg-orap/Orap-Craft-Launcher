@@ -154,6 +154,35 @@ public sealed class MrPackInstaller
 
             var copied = await ExtractOverridesAsync(mrpackPath, instance.GameDirectory, warnings, ct).ConfigureAwait(false);
 
+            // 把整合包内容写进内容清单：只有能从 CDN 链接解析出 project/version 的才记录，
+            // overrides 里的文件与解析不出的保持不追踪。
+            try
+            {
+                var manifest = ContentManifest.Load(_paths.InstanceDir(instance.Id));
+                foreach (var request in requests)
+                {
+                    var url = request.Urls.FirstOrDefault(u => ModrinthUrl.TryParse(u.AbsoluteUri, out _, out _))?.AbsoluteUri;
+                    if (!ModrinthUrl.TryParse(url, out var projectId, out var packVersionId)) continue;
+
+                    manifest.Upsert(new ContentEntry
+                    {
+                        ProjectId = projectId,
+                        VersionId = packVersionId,
+                        FileName = Path.GetFileName(request.TargetPath),
+                        Sha1 = request.Sha1,
+                        Title = Path.GetFileNameWithoutExtension(request.TargetPath),
+                        Source = "pack",
+                        UpdatedAt = DateTimeOffset.Now,
+                    });
+                }
+
+                await manifest.SaveAsync(ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                warnings.Add("内容清单写入失败: " + ex.Message);
+            }
+
             var result2 = new MrPackResult
             {
                 Success = true,

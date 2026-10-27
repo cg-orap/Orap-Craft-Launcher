@@ -19,7 +19,37 @@ public sealed class ContentEntry
     [JsonPropertyName("source")] public string Source { get; set; } = "modrinth";
     [JsonPropertyName("updatedAt")] public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.Now;
 
-    [JsonIgnore] public bool IsTracked => Source == "modrinth" && ProjectId.Length > 0;
+    /// <summary>modrinth 安装与整合包自带的内容都能追踪更新；manual 不追踪。</summary>
+    [JsonIgnore] public bool IsTracked => ProjectId.Length > 0 && Source is "modrinth" or "pack";
+}
+
+/// <summary>从 Modrinth CDN 链接里取出 project / version id（整合包清单没有这两个字段）。</summary>
+public static class ModrinthUrl
+{
+    /// <summary>
+    /// 支持 <c>https://cdn.modrinth.com/data/{project}/versions/{version}/{file}</c>
+    /// 以及 api.modrinth.com 的同构链接。
+    /// </summary>
+    public static bool TryParse(string? url, out string projectId, out string versionId)
+    {
+        projectId = "";
+        versionId = "";
+
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+
+        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i + 3 < segments.Length; i++)
+        {
+            if (!string.Equals(segments[i], "data", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.Equals(segments[i + 2], "versions", StringComparison.OrdinalIgnoreCase)) continue;
+
+            projectId = segments[i + 1];
+            versionId = segments[i + 3];
+            return projectId.Length > 0 && versionId.Length > 0;
+        }
+
+        return false;
+    }
 }
 
 /// <summary>
