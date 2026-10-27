@@ -186,6 +186,95 @@ public sealed class InstanceBackupService(string? backupRootOverride = null)
         }
     }
 
+    /// <summary>
+    /// 列出快照里可单独恢复的顶层条目：<c>saves/*</c> 的每个世界、<c>config</c> 下的每个文件/目录、
+    /// <c>mods</c> 下的每个 jar。目录条目的大小是其内部文件之和。
+    /// </summary>
+    public IReadOnlyList<SnapshotEntry> ListEntries(Instance instance, string snapshotId)
+    {
+        var root = Path.Combine(BackupRoot(instance), snapshotId);
+        if (!Directory.Exists(root)) return [];
+
+        var entries = new List<SnapshotEntry>();
+        foreach (var folder in Folders)
+        {
+            var folderPath = Path.Combine(root, folder);
+            if (!Directory.Exists(folderPath)) continue;
+
+            foreach (var child in Directory.EnumerateFileSystemEntries(folderPath))
+            {
+                var isDirectory = Directory.Exists(child);
+                var size = isDirectory
+                    ? Directory.EnumerateFiles(child, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length)
+                    : new FileInfo(child).Length;
+
+                entries.Add(new SnapshotEntry($"{folder}/{Path.GetFileName(child)}", isDirectory, size));
+            }
+        }
+
+        return entries.OrderBy(e => e.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// 只恢复快照里的一个条目（一个世界目录 / 一个配置文件 / 一个 jar）。覆盖前会把当前的同名条目
+    /// 复制到 <c>backups/manual-restores/&lt;时间戳&gt;/</c>，所以单文件恢复同样可撤销。
+    /// 返回备份目录（没有旧文件时返回空字符串）。
+    /// </summary>
+    public string RestoreEntry(Instance instance, string snapshotId, string relativePath)
+    {
+        var source = Path.Combine(BackupRoot(instance), snapshotId, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(source) && !Directory.Exists(source))
+        {
+            throw new FileNotFoundException($"快照里没有 {relativePath}");
+        }
+
+        var target = Path.Combine(instance.GameDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var safetyRoot = Path.Combine(instance.GameDirectory, "backups", "manual-restores", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        var safetyTarget = Path.Combine(safetyRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+        var hadExisting = File.Exists(target) || Directory.Exists(target);
+        if (hadExisting)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(safetyTarget)!);
+            if (Directory.Exists(target))
+            {
+                CopyDirectory(target, safetyTarget);
+                Directory.Delete(target, recursive: true);
+            }
+            else
+            {
+                File.Copy(target, safetyTarget, overwrite: true);
+                File.Delete(target);
+            }
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        if (Directory.Exists(source))
+        {
+            CopyDirectory(source, target);
+        }
+        else
+        {
+            File.Copy(source, target, overwrite: true);
+        }
+
+        AppLog.Info("backup", "entry-restored",
+            ("instance", instance.Id), ("snapshot", snapshotId), ("entry", relativePath),
+            ("safety", hadExisting ? safetyRoot : "(none)"));
+
+        return hadExisting ? safetyRoot : "";
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var destination = Path.Combine(target, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination, overwrite: true);
+        }
+    }
     private static async Task<(long Bytes, int Files)> CopyDirectoryAsync(
         string source,
         string target,
@@ -215,4 +304,17 @@ public sealed class InstanceBackupService(string? backupRootOverride = null)
 
         return (bytes, files);
     }
+}
+/// <summary>快照里的一个可单独恢复的条目（文件或目录，如某个世界、某个 config、某个 jar）。</summary>
+public sealed record SnapshotEntry(string RelativePath, bool IsDirectory, long SizeBytes)
+{
+    public string SizeText => SizeBytes switch
+    {
+        >= 1024L * 1024 * 1024 => $"{SizeBytes / 1024.0 / 1024 / 1024:0.0} GB",
+        >= 1024L * 1024 => $"{SizeBytes / 1024.0 / 1024:0.0} MB",
+        >= 1024 => $"{SizeBytes / 1024.0:0} KB",
+        _ => $"{SizeBytes} B",
+    };
+
+    public string KindLabel => IsDirectory ? "目录" : "文件";
 }

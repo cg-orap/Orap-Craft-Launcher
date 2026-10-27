@@ -26,6 +26,7 @@ public sealed class InstancesViewModel : ObservableObject
 
     public InstancesViewModel(MainViewModel main)
     {
+        RestoreEntryCommand = new AsyncRelayCommand(RestoreEntryAsync);
         CreateSnapshotCommand = new AsyncRelayCommand(CreateSnapshotAsync);
         RestoreSnapshotCommand = new AsyncRelayCommand(RestoreSnapshotAsync);
         DeleteSnapshotCommand = new RelayCommand(DeleteSnapshot);
@@ -84,6 +85,38 @@ public sealed class InstancesViewModel : ObservableObject
 
     public string SnapshotsHint => Snapshots.Count == 0 ? "还没有快照。点「创建快照」把当前的存档、配置和模组打包存一份。" : "";
 
+    /// <summary>当前选中的快照（用于浏览内容、单条恢复）。</summary>
+    public BackupSnapshot? SelectedSnapshot
+    {
+        get => _selectedSnapshot;
+        set
+        {
+            if (!SetProperty(ref _selectedSnapshot, value)) return;
+            OnPropertyChanged(nameof(HasSelectedSnapshot));
+            LoadSnapshotEntries();
+        }
+    }
+
+    private BackupSnapshot? _selectedSnapshot;
+
+    /// <summary>选中快照里可单独恢复的条目：世界 / 配置 / jar。</summary>
+    public ObservableList<SnapshotEntry> SnapshotEntries { get; } = [];
+
+    public bool HasSelectedSnapshot => SelectedSnapshot is not null;
+
+    public bool HasSnapshotEntries => SnapshotEntries.Count > 0;
+
+    public string SnapshotEntriesHint
+    {
+        get
+        {
+            if (SelectedSnapshot is null) return "选中一份快照可以查看内容，并单独恢复某个世界、配置或模组。";
+            return SnapshotEntries.Count == 0 ? "这份快照里没有可恢复的条目。" : "";
+        }
+    }
+
+    public ICommand RestoreEntryCommand { get; }
+
     public ICommand CreateSnapshotCommand { get; }
     public ICommand RestoreSnapshotCommand { get; }
     public ICommand DeleteSnapshotCommand { get; }
@@ -118,6 +151,7 @@ public sealed class InstancesViewModel : ObservableObject
 
             OnPropertyChanged(nameof(HasSelection));
             OnPropertyChanged(nameof(SelectionDetail));
+              RefreshSnapshots();
         }
     }
 
@@ -537,6 +571,7 @@ public sealed class InstancesViewModel : ObservableObject
             Snapshots.Replace(_backups.List(instance));
         }
 
+        SelectedSnapshot = Snapshots.FirstOrDefault();
         OnPropertyChanged(nameof(HasSnapshots));
         OnPropertyChanged(nameof(SnapshotsHint));
     }
@@ -613,5 +648,55 @@ public sealed class InstancesViewModel : ObservableObject
         Status = _backups.Delete(instance, snapshot.Id) ? "快照已删除。" : "删除失败：找不到该快照。";
         RefreshSnapshots();
         _main.LogsPage.AppendSystem(Status);
+    }
+    private void LoadSnapshotEntries()
+    {
+        SnapshotEntries.Clear();
+        if (SelectedInstance is { } instance && SelectedSnapshot is { } snapshot)
+        {
+            SnapshotEntries.Replace(_backups.ListEntries(instance, snapshot.Id));
+        }
+
+        OnPropertyChanged(nameof(HasSnapshotEntries));
+        OnPropertyChanged(nameof(SnapshotEntriesHint));
+    }
+
+    /// <summary>只恢复快照里的一个世界/配置/jar；覆盖前的当前文件会另存到 backups/manual-restores。</summary>
+    private async Task RestoreEntryAsync(object? parameter)
+    {
+        if (SelectedInstance is not { } instance ||
+            SelectedSnapshot is not { } snapshot ||
+            parameter is not SnapshotEntry entry)
+        {
+            return;
+        }
+
+        var answer = System.Windows.MessageBox.Show(
+            $"只恢复「{entry.RelativePath}」？{Environment.NewLine}{Environment.NewLine}" +
+            "该路径会被快照里的版本覆盖，其它存档与配置不受影响；覆盖前的文件会另存到 backups/manual-restores。",
+            "单条恢复",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Question);
+
+        if (answer != System.Windows.MessageBoxResult.Yes) return;
+
+        var activity = _main.Activities.Begin("恢复条目", entry.RelativePath);
+        try
+        {
+            var safety = await Task.Run(() => _backups.RestoreEntry(instance, snapshot.Id, entry.RelativePath)).ConfigureAwait(true);
+            RefreshSnapshots();
+            LoadSnapshotEntries();
+            Status = safety.Length == 0
+                ? $"已恢复 {entry.RelativePath}（原本不存在，无需备份）。"
+                : $"已恢复 {entry.RelativePath}；原文件另存于 {safety}";
+            _main.Activities.Finish(activity, ActivityState.Completed);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex)
+        {
+            _main.Activities.Finish(activity, ActivityState.Failed);
+            Status = "单条恢复失败: " + ex.Message;
+            _main.LogsPage.AppendSystem(Status);
+        }
     }
 }

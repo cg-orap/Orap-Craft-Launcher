@@ -117,6 +117,52 @@ public sealed class InstanceBackupTests : IDisposable
     }
 
     [Fact]
+    public async Task ListEntriesReturnsWorldsConfigsAndJars()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+        var entries = _service.ListEntries(_instance, snapshot.Id);
+
+        Assert.Contains(entries, e => e.RelativePath == "saves/world" && e.IsDirectory);
+        Assert.Contains(entries, e => e.RelativePath == "config/sodium.json" && !e.IsDirectory);
+        Assert.Contains(entries, e => e.RelativePath == "mods/sodium.jar");
+    }
+
+    [Fact]
+    public async Task RestoreEntryBringsBackOneWorldAndKeepsTheOthers()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+
+        // 第二个世界：快照之后新建，恢复 world 时不应该被动到。
+        Directory.CreateDirectory(Path.Combine(_root, "saves", "other"));
+        File.WriteAllText(Path.Combine(_root, "saves", "other", "level.dat"), "other-world");
+
+        File.WriteAllText(Path.Combine(_root, "saves", "world", "level.dat"), "corrupted");
+
+        var safety = _service.RestoreEntry(_instance, snapshot.Id, "saves/world");
+
+        Assert.True(Directory.Exists(safety));
+        Assert.Equal("original-level", File.ReadAllText(Path.Combine(_root, "saves", "world", "level.dat")));
+        Assert.Equal("other-world", File.ReadAllText(Path.Combine(_root, "saves", "other", "level.dat")));
+    }
+
+    [Fact]
+    public async Task RestoreEntryWorksForASingleConfigFile()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+        File.WriteAllText(Path.Combine(_root, "config", "sodium.json"), "{broken}");
+
+        _service.RestoreEntry(_instance, snapshot.Id, "config/sodium.json");
+
+        Assert.Equal("{}", File.ReadAllText(Path.Combine(_root, "config", "sodium.json")));
+    }
+
+    [Fact]
+    public void RestoreEntryOfMissingPathThrows()
+    {
+        Assert.Throws<FileNotFoundException>(() => _service.RestoreEntry(_instance, "20260101-000000", "saves/nope"));
+    }
+
+    [Fact]
     public async Task DeleteRemovesTheSnapshot()
     {
         var snapshot = await _service.CreateAsync(_instance, "manual");
