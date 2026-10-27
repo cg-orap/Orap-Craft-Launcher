@@ -515,8 +515,6 @@ public sealed class ModsViewModel : ObservableObject
         var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
         Directory.CreateDirectory(modsDirectory);
 
-        var backupDir = Path.Combine(instance.GameDirectory, "backups", "mod-updates", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
-        Directory.CreateDirectory(backupDir);
 
         var activity = _main.Activities.Begin("更新模组", $"{rows.Count} 项");
         var done = 0;
@@ -526,10 +524,6 @@ public sealed class ModsViewModel : ObservableObject
             try
             {
                 var oldPath = Path.Combine(modsDirectory, candidate.CurrentFileName);
-                if (File.Exists(oldPath))
-                {
-                    File.Copy(oldPath, Path.Combine(backupDir, candidate.CurrentFileName), overwrite: true);
-                }
 
                 var newPath = await _main.Context.Modrinth.InstallAsync(candidate.Latest, modsDirectory).ConfigureAwait(true);
                 if (File.Exists(oldPath) && !string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
@@ -561,7 +555,7 @@ public sealed class ModsViewModel : ObservableObject
         await manifest.SaveAsync().ConfigureAwait(true);
         _main.Activities.Finish(activity, done == rows.Count ? ActivityState.Completed : ActivityState.Failed);
 
-        Status = $"已更新 {done}/{rows.Count} 个模组，旧文件备份在 {backupDir}";
+        Status = $"已更新 {done}/{rows.Count} 个模组（旧文件不再单独备份，避免占用空间）";
         _main.LogsPage.AppendSystem(Status);
 
         Updates.Clear();
