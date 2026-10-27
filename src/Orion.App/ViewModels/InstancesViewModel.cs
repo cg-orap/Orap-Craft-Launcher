@@ -26,6 +26,9 @@ public sealed class InstancesViewModel : ObservableObject
 
     public InstancesViewModel(MainViewModel main)
     {
+        CreateSnapshotCommand = new AsyncRelayCommand(CreateSnapshotAsync);
+        RestoreSnapshotCommand = new AsyncRelayCommand(RestoreSnapshotAsync);
+        DeleteSnapshotCommand = new RelayCommand(DeleteSnapshot);
         SelectTabCommand = new RelayCommand(parameter =>
         {
             if (parameter is int index) TabIndex = index;
@@ -71,6 +74,19 @@ public sealed class InstancesViewModel : ObservableObject
     public bool IsSettingsTab => _tabIndex == 5;
 
     public ICommand SelectTabCommand { get; }
+
+    private readonly InstanceBackupService _backups = new();
+
+    /// <summary>该版本的快照列表（saves / config / mods 的副本）。</summary>
+    public ObservableList<BackupSnapshot> Snapshots { get; } = [];
+
+    public bool HasSnapshots => Snapshots.Count > 0;
+
+    public string SnapshotsHint => Snapshots.Count == 0 ? "还没有快照。点「创建快照」把当前的存档、配置和模组打包存一份。" : "";
+
+    public ICommand CreateSnapshotCommand { get; }
+    public ICommand RestoreSnapshotCommand { get; }
+    public ICommand DeleteSnapshotCommand { get; }
 
     public ICommand ImportPackCommand { get; }
     public ICommand ExportPackCommand { get; }
@@ -503,5 +519,99 @@ public sealed class InstancesViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+    /// <summary>跟随全局当前版本（侧栏/主页切换版本时同步详情页）。</summary>
+    public void SyncSelection()
+    {
+        if (_main.CurrentInstance is { } instance && !ReferenceEquals(SelectedInstance, instance))
+        {
+            SelectedInstance = instance;
+        }
+    }
+
+    public void RefreshSnapshots()
+    {
+        Snapshots.Clear();
+        if (SelectedInstance is { } instance)
+        {
+            Snapshots.Replace(_backups.List(instance));
+        }
+
+        OnPropertyChanged(nameof(HasSnapshots));
+        OnPropertyChanged(nameof(SnapshotsHint));
+    }
+
+    private async Task CreateSnapshotAsync()
+    {
+        if (SelectedInstance is not { } instance)
+        {
+            Status = "请先选择一个版本。";
+            return;
+        }
+
+        var activity = _main.Activities.Begin("创建快照", instance.Name);
+        try
+        {
+            Status = "正在创建快照…";
+            var snapshot = await _backups.CreateAsync(instance, "manual").ConfigureAwait(true);
+            RefreshSnapshots();
+            Status = $"快照已创建：{snapshot.TimeText}（{snapshot.FileCount} 个文件 · {snapshot.SizeText}）";
+            _main.Activities.Finish(activity, ActivityState.Completed);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex)
+        {
+            _main.Activities.Finish(activity, ActivityState.Failed);
+            Status = "创建快照失败: " + ex.Message;
+            _main.LogsPage.AppendSystem(Status);
+        }
+    }
+
+    private async Task RestoreSnapshotAsync(object? parameter)
+    {
+        if (SelectedInstance is not { } instance || parameter is not BackupSnapshot snapshot) return;
+
+        var answer = System.Windows.MessageBox.Show(
+            $"要把「{instance.Name}」恢复到 {snapshot.TimeText} 的快照吗？{Environment.NewLine}{Environment.NewLine}" +
+            "当前的 saves / config / mods 会被替换。恢复前会自动把当前状态另存为一份「恢复前」快照，可再恢复回来。",
+            "恢复快照",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (answer != System.Windows.MessageBoxResult.Yes) return;
+
+        var activity = _main.Activities.Begin("恢复快照", snapshot.TimeText);
+        try
+        {
+            Status = "正在恢复快照…";
+            var safety = await _backups.RestoreAsync(instance, snapshot.Id).ConfigureAwait(true);
+            RefreshSnapshots();
+            Status = $"已恢复到 {snapshot.TimeText}；恢复前的状态存为 {safety.TimeText}";
+            _main.Activities.Finish(activity, ActivityState.Completed);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex)
+        {
+            _main.Activities.Finish(activity, ActivityState.Failed);
+            Status = "恢复快照失败: " + ex.Message;
+            _main.LogsPage.AppendSystem(Status);
+        }
+    }
+
+    private void DeleteSnapshot(object? parameter)
+    {
+        if (SelectedInstance is not { } instance || parameter is not BackupSnapshot snapshot) return;
+
+        var answer = System.Windows.MessageBox.Show(
+            $"删除 {snapshot.TimeText} 的快照（{snapshot.SizeText}）？此操作不可撤销。",
+            "删除快照",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Question);
+
+        if (answer != System.Windows.MessageBoxResult.Yes) return;
+
+        Status = _backups.Delete(instance, snapshot.Id) ? "快照已删除。" : "删除失败：找不到该快照。";
+        RefreshSnapshots();
+        _main.LogsPage.AppendSystem(Status);
     }
 }

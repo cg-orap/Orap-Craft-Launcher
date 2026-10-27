@@ -17,6 +17,10 @@ public partial class VersionsView : UserControl
 public partial class InstancesView : UserControl
 {
     public InstancesView() => InitializeComponent();
+
+    /// <summary>快照页签的"刷新"按钮。</summary>
+    private void OnRefreshSnapshots(object sender, System.Windows.RoutedEventArgs e)
+        => (DataContext as ViewModels.InstancesViewModel)?.RefreshSnapshots();
 }
 
 public partial class ModsView : UserControl

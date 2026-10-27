@@ -396,6 +396,7 @@ public sealed class MainViewModel : ObservableObject
             Home.RaisePropertyChanged(nameof(HomeViewModel.InstanceSubtitle));
             Home.RaisePropertyChanged(nameof(HomeViewModel.LaunchVersionLine));
             ModsPage.RaisePropertyChanged(nameof(ModsViewModel.SelectedInstance));
+            InstancesPage?.SyncSelection();
 
             Context.Settings.LastInstanceId = value?.Id;
             _ = Context.SettingsStore.SaveAsync(Context.Settings);
@@ -498,6 +499,12 @@ public sealed class MainViewModel : ObservableObject
 
     private void NavigateCore(string key)
     {
+        // 进"版本设置"时如果还没选版本，自动选第一个，避免看到一个空详情页。
+        if (key == "instances" && InstancesPage.SelectedInstance is null)
+        {
+            InstancesPage.SelectedInstance = Instances.FirstOrDefault();
+        }
+
         // Sub-pages such as "version-picker" are not entries of the rail: only move the highlight
         // when the key really is a rail entry, otherwise the page would silently stay on 首页.
         var item = NavItems.FirstOrDefault(n => n.Key == key);

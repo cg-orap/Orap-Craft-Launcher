@@ -35,6 +35,21 @@ public partial class MainWindow : Window
             Loaded += (_, _) => (DataContext as ViewModels.MainViewModel)?.Navigate(key);
         }
 
+        // --instance-tab <0..5>：直接打开版本详情的某个页签（概览/模组/存档/日志/快照/设置）。
+        var tabIndex = Array.FindIndex(args, a => string.Equals(a, "--instance-tab", StringComparison.OrdinalIgnoreCase));
+        if (tabIndex >= 0 && tabIndex + 1 < args.Length && int.TryParse(args[tabIndex + 1], out var tab))
+        {
+            Loaded += (_, _) =>
+            {
+                if (DataContext is ViewModels.MainViewModel main)
+                {
+                    main.Navigate("instances");
+                    main.InstancesPage.TabIndex = tab;
+                    main.InstancesPage.RefreshSnapshots();
+                }
+            };
+        }
+
         // --demo-updates：模组页填充演示用的更新候选（截图/验收，不联网）。
         if (Array.Exists(args, a => string.Equals(a, "--demo-updates", StringComparison.OrdinalIgnoreCase)))
         {
