@@ -290,6 +290,62 @@ public sealed class InstanceBackupService(string? backupRootOverride = null, boo
             File.Copy(file, destination, overwrite: true);
         }
     }
+    private string RestoreBackupRoot(Instance instance) =>
+        Path.Combine(instance.GameDirectory, "backups", "manual-restores");
+
+    /// <summary>列出单条恢复留下的旧文件备份（最新的在前）。</summary>
+    public IReadOnlyList<RestoreBackupEntry> ListRestoreBackups(Instance instance)
+    {
+        var root = RestoreBackupRoot(instance);
+        if (!Directory.Exists(root)) return [];
+
+        var entries = new List<RestoreBackupEntry>();
+        foreach (var directory in Directory.EnumerateDirectories(root))
+        {
+            var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).ToList();
+            entries.Add(new RestoreBackupEntry(
+                Path.GetFileName(directory),
+                Directory.GetCreationTime(directory),
+                files.Sum(f => new FileInfo(f).Length),
+                files.Count,
+                directory));
+        }
+
+        return entries.OrderByDescending(e => e.CreatedAt).ToList();
+    }
+
+    /// <summary>删除一份单条恢复的旧文件备份（默认进回收站）。</summary>
+    public bool DeleteRestoreBackup(Instance instance, string id)
+    {
+        var directory = Path.Combine(RestoreBackupRoot(instance), id);
+        if (!Directory.Exists(directory)) return false;
+
+        try
+        {
+            if (useRecycleBin)
+            {
+                try
+                {
+                    Game.RecycleBin.RemoveDirectory(directory);
+                    AppLog.Info("backup", "restore-backup-deleted", ("instance", instance.Id), ("id", id), ("mode", "recycle"));
+                    return true;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+                {
+                    AppLog.Warn("backup", "recycle-unavailable", ("id", id), ("error", ex.Message));
+                }
+            }
+
+            Directory.Delete(directory, recursive: true);
+            AppLog.Info("backup", "restore-backup-deleted", ("instance", instance.Id), ("id", id), ("mode", "permanent"));
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Warn("backup", "restore-backup-delete-failed", ("id", id), ("error", ex.Message));
+            return false;
+        }
+    }
     private static async Task<(long Bytes, int Files)> CopyDirectoryAsync(
         string source,
         string target,
@@ -332,4 +388,19 @@ public sealed record SnapshotEntry(string RelativePath, bool IsDirectory, long S
     };
 
     public string KindLabel => IsDirectory ? "目录" : "文件";
+}
+/// <summary>单条恢复时被覆盖的旧文件（backups/manual-restores/&lt;时间戳&gt;）。</summary>
+public sealed record RestoreBackupEntry(string Id, DateTimeOffset CreatedAt, long SizeBytes, int FileCount, string Directory)
+{
+    public string TimeText => CreatedAt.LocalDateTime.ToString("MM-dd HH:mm");
+
+    public string SizeText => SizeBytes switch
+    {
+        >= 1024L * 1024 * 1024 => $"{SizeBytes / 1024.0 / 1024 / 1024:0.0} GB",
+        >= 1024L * 1024 => $"{SizeBytes / 1024.0 / 1024:0.0} MB",
+        >= 1024 => $"{SizeBytes / 1024.0:0} KB",
+        _ => $"{SizeBytes} B",
+    };
+
+    public string Detail => $"{SizeText} · {FileCount} 个文件";
 }

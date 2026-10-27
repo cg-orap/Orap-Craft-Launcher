@@ -83,7 +83,13 @@
         </Border>
 
         <!-- 快照列表 -->
-        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="6">
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource Card}" Padding="6">
             <Grid>
                 <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
                          Background="Transparent" BorderThickness="0"
@@ -134,6 +140,50 @@
                            Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
             </Grid>
         </Border>
+
+        <!-- 单条恢复留下的旧文件 -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="14,12" Margin="0,12,0,0">
+            <StackPanel>
+                <Grid>
+                    <TextBlock Text="单条恢复的旧文件" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                    <TextBlock HorizontalAlignment="Right" FontSize="10" Foreground="{DynamicResource MutedTextBrush}"
+                               Text="backups/manual-restores · 可逐条删除" />
+                </Grid>
+
+                <TextBlock Text="{Binding RestoreBackupsHint}" Style="{StaticResource CaptionText}" Margin="0,8,0,0"
+                           Visibility="{Binding HasRestoreBackups, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+
+                <ItemsControl ItemsSource="{Binding RestoreBackups}" Margin="0,8,0,0"
+                              Visibility="{Binding HasRestoreBackups, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" FontSize="11" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap">
+                                    <Run Text="{Binding InstanceName, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding TimeText, Mode=OneWay}" />
+                                </TextBlock>
+
+                                <TextBlock Grid.Column="1" Text="{Binding Detail}" FontFamily="Consolas" FontSize="10"
+                                           Margin="10,0" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+
+                                <Button Grid.Column="2" Content="删除" Style="{StaticResource DangerButton}"
+                                        FontSize="10" Padding="10,3"
+                                        Command="{Binding DataContext.DeleteRestoreBackupCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+        </Grid>
 
         <!-- 状态 -->
         <TextBlock Grid.Row="3" Text="{Binding Status}" Style="{StaticResource CaptionText}" Margin="2,10,2,0"

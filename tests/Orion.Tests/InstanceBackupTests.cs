@@ -157,6 +157,24 @@ public sealed class InstanceBackupTests : IDisposable
     }
 
     [Fact]
+    public async Task RestoreBackupsCanBeListedAndDeleted()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+        File.WriteAllText(Path.Combine(_root, "config", "sodium.json"), "{changed}");
+
+        _service.RestoreEntry(_instance, snapshot.Id, "config/sodium.json");
+
+        var backups = _service.ListRestoreBackups(_instance);
+        var backup = Assert.Single(backups);
+        Assert.Equal(1, backup.FileCount);
+        Assert.True(backup.SizeBytes > 0);
+
+        Assert.True(_service.DeleteRestoreBackup(_instance, backup.Id));
+        Assert.Empty(_service.ListRestoreBackups(_instance));
+        Assert.False(_service.DeleteRestoreBackup(_instance, backup.Id));
+    }
+
+    [Fact]
     public void RestoreEntryOfMissingPathThrows()
     {
         Assert.Throws<FileNotFoundException>(() => _service.RestoreEntry(_instance, "20260101-000000", "saves/nope"));

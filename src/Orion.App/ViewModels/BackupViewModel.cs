@@ -6,6 +6,20 @@ using Orion.Core.Instances;
 
 namespace Orion.App.ViewModels;
 
+/// <summary>备份总览里的一行：某个实例的一次单条恢复备份。</summary>
+public sealed class RestoreBackupRow(Instance instance, RestoreBackupEntry entry)
+{
+    public Instance Instance { get; } = instance;
+
+    public RestoreBackupEntry Entry { get; } = entry;
+
+    public string InstanceName => Instance.Name;
+
+    public string TimeText => Entry.TimeText;
+
+    public string Detail => Entry.Detail;
+}
+
 /// <summary>备份总览的一行：某个实例的某一份快照。</summary>
 public sealed class BackupRow(Instance instance, BackupSnapshot snapshot)
 {
@@ -46,11 +60,23 @@ public sealed class BackupViewModel : ObservableObject
         RefreshCommand = new RelayCommand(() => Refresh());
         ExportCommand = new AsyncRelayCommand(ExportAsync);
         OpenFolderCommand = new RelayCommand(OpenFolder);
+        DeleteRestoreBackupCommand = new RelayCommand(DeleteRestoreBackup);
 
         Refresh();
     }
 
     public ObservableList<BackupRow> Rows { get; } = [];
+
+    /// <summary>单条恢复留下的旧文件备份（可逐条删除）。</summary>
+    public ObservableList<RestoreBackupRow> RestoreBackups { get; } = [];
+
+    public bool HasRestoreBackups => RestoreBackups.Count > 0;
+
+    public string RestoreBackupsHint => HasRestoreBackups
+        ? ""
+        : "还没有单条恢复留下的旧文件。";
+
+    public ICommand DeleteRestoreBackupCommand { get; }
 
     public ICommand RefreshCommand { get; }
     public ICommand ExportCommand { get; }
@@ -120,6 +146,18 @@ public sealed class BackupViewModel : ObservableObject
 
         Selected = Rows.FirstOrDefault(r => r.Snapshot.Id == previous) ?? Rows.FirstOrDefault();
 
+        RestoreBackups.Clear();
+        foreach (var instance in _main.Instances)
+        {
+            foreach (var entry in _backups.ListRestoreBackups(instance))
+            {
+                RestoreBackups.Add(new RestoreBackupRow(instance, entry));
+            }
+        }
+
+        OnPropertyChanged(nameof(HasRestoreBackups));
+        OnPropertyChanged(nameof(RestoreBackupsHint));
+
         OnPropertyChanged(nameof(HasRows));
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(EmptyHint));
@@ -171,6 +209,29 @@ public sealed class BackupViewModel : ObservableObject
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{root}\"") { UseShellExecute = true });
     }
 
+    private void DeleteRestoreBackup(object? parameter)
+    {
+        if (parameter is not RestoreBackupRow row) return;
+
+        var answer = System.Windows.MessageBox.Show(
+            $"删除 {row.TimeText} 的单条恢复备份（{row.Detail}）？{Environment.NewLine}{Environment.NewLine}" +
+            "这些是恢复时被覆盖的旧文件，删除后移入 Windows 回收站，可以从资源管理器还原。",
+            "删除恢复备份",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Question);
+
+        if (answer != System.Windows.MessageBoxResult.Yes)
+        {
+            Status = "已取消删除。";
+            return;
+        }
+
+        Status = _backups.DeleteRestoreBackup(row.Instance, row.Entry.Id)
+            ? $"已删除 {row.InstanceName} 的恢复备份 {row.TimeText}。"
+            : "删除失败：找不到该目录。";
+        _main.LogsPage.AppendSystem(Status);
+        Refresh();
+    }
     private static string FormatSize(long bytes) => bytes switch
     {
         >= 1024L * 1024 * 1024 => $"{bytes / 1024.0 / 1024 / 1024:0.0} GB",
