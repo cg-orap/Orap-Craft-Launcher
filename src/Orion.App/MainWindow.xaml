@@ -136,24 +136,22 @@
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="72" />
-                <ColumnDefinition>
-                    <ColumnDefinition.Style>
-                        <Style TargetType="ColumnDefinition">
-                            <Setter Property="Width" Value="280" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
-                                    <Setter Property="Width" Value="44" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ColumnDefinition.Style>
-                </ColumnDefinition>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- ============ 一级导航 Rail（72px，仅图标） ============ -->
             <Border Grid.Column="0" Background="{DynamicResource NavRailBg}"
                     BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
+                <Grid>
+                    <!-- 选中指示器：跟随当前导航项滑动 -->
+                    <Border x:Name="RailIndicator" Width="2" Height="20" CornerRadius="1" Opacity="0"
+                            HorizontalAlignment="Left" VerticalAlignment="Top"
+                            Background="{DynamicResource AccentBrush}" IsHitTestVisible="False">
+                        <Border.RenderTransform>
+                            <TranslateTransform Y="0" />
+                        </Border.RenderTransform>
+                    </Border>
                 <DockPanel>
                     <Button DockPanel.Dock="Bottom" Margin="12,0,12,12" Width="40" Height="40" Padding="0"
                             Cursor="Hand" Command="{Binding OpenLoginCommand}"
@@ -188,11 +186,12 @@
                         </Button.Template>
                     </Button>
 
-                    <ListBox ItemsSource="{Binding NavView}"
+                    <ListBox x:Name="NavList" ItemsSource="{Binding NavView}"
                              SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
                              Background="Transparent" BorderThickness="0" Margin="12,12,12,0"
                              ItemContainerStyle="{StaticResource RailItemStyle}"
                              PreviewMouseLeftButtonDown="OnNavClick"
+                             SelectionChanged="OnNavSelectionChanged"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Hidden">
                         <ListBox.ItemTemplate>
@@ -202,11 +201,40 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </DockPanel>
+                </Grid>
             </Border>
 
-            <!-- ============ 二级侧栏（280 / 44，可折叠） ============ -->
-            <Border Grid.Column="1" Background="{DynamicResource NavRailBg}"
-                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0">
+            <!-- ============ 二级侧栏（280 / 44，可折叠，宽度带动画） ============ -->
+            <Border x:Name="SidebarHost" Grid.Column="1" Background="{DynamicResource NavRailBg}"
+                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,1,0"
+                    ClipToBounds="True">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Width" Value="280" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Width" To="44" Duration="0:0:0.22">
+                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                                <DataTrigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Width" To="280" Duration="0:0:0.24">
+                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.ExitActions>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
                     <!-- 折叠/展开按钮：两种状态同一坐标（左 6，上 24） -->
                     <Button x:Name="SidebarToggle" HorizontalAlignment="Left" VerticalAlignment="Top"

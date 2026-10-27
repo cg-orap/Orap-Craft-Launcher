@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="760" d:DesignWidth="900">
 
@@ -201,7 +202,7 @@
                     <TextBlock Text="最近游玩" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
                 </Grid>
 
-                <ItemsControl ItemsSource="{Binding Instances}">
+                <ItemsControl ItemsSource="{Binding Instances}" anim:StaggerIn.IsEnabled="True">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Background="{DynamicResource SurfaceBg}"

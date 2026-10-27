@@ -97,6 +97,38 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>让指示条滑到当前选中的导航项旁边（200ms，CubicEase）。</summary>
+    private void OnNavSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(new Action(PositionRailIndicator), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void PositionRailIndicator()
+    {
+        if (NavList.SelectedItem is null) { RailIndicator.Opacity = 0; return; }
+
+        NavList.UpdateLayout();
+        if (NavList.ItemContainerGenerator.ContainerFromItem(NavList.SelectedItem) is not FrameworkElement container) return;
+
+        var point = container.TranslatePoint(new Point(0, 0), (UIElement)RailIndicator.Parent);
+        var target = point.Y + (container.ActualHeight - RailIndicator.Height) / 2;
+
+        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+        var duration = new Duration(TimeSpan.FromMilliseconds(200));
+
+        if (RailIndicator.RenderTransform is not System.Windows.Media.TranslateTransform translate)
+        {
+            translate = new System.Windows.Media.TranslateTransform();
+            RailIndicator.RenderTransform = translate;
+        }
+
+        translate.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(target, duration) { EasingFunction = ease });
+        RailIndicator.BeginAnimation(OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(1, duration));
+        RailIndicator.Margin = new Thickness(0, 0, 0, 0);
+    }
+
     private void OnMaximize(object sender, System.Windows.RoutedEventArgs e)
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
