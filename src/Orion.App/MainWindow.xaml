@@ -301,7 +301,12 @@
                 <Border Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource WindowBg}"
                         Visibility="{Binding IsHomeSelected, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
 
-                <ContentControl Grid.Row="0" Content="{Binding CurrentPage}" Margin="0,0,0,0" />
+                                <ContentControl x:Name="PageHost" Grid.Row="0" Content="{Binding CurrentPage}" Margin="0,0,0,0"
+                                RenderTransformOrigin="0.5,0">
+                    <ContentControl.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </ContentControl.RenderTransform>
+                </ContentControl>
 
                 <Border Grid.Row="1" Background="{DynamicResource SurfaceBg}"
                         BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"

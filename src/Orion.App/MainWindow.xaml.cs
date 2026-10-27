@@ -14,6 +14,18 @@ public partial class MainWindow : Window
         InitializeComponent();
         FitToWorkArea();
 
+        // 每次导航都播放一次页面进入动效（内容变化不会触发 Loaded，所以走属性通知）。
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is ViewModels.MainViewModel vm)
+            {
+                vm.PropertyChanged += (_, args) =>
+                {
+                    if (args.PropertyName == nameof(ViewModels.MainViewModel.CurrentPage)) AnimatePage();
+                };
+            }
+        };
+
         // 支持 --page <key> 直接打开某个页面（截图、排障、深链接都用得上）。
         var args = Environment.GetCommandLineArgs();
         var index = Array.FindIndex(args, a => string.Equals(a, "--page", StringComparison.OrdinalIgnoreCase));
@@ -68,6 +80,22 @@ public partial class MainWindow : Window
 
     private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)
         => WindowState = WindowState.Minimized;
+
+    /// <summary>页面切换动效：220ms 淡入 + 8px 上移，节奏与设计稿一致。</summary>
+    private void AnimatePage()
+    {
+        var duration = new Duration(TimeSpan.FromMilliseconds(220));
+        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, duration) { EasingFunction = ease };
+        PageHost.BeginAnimation(OpacityProperty, fade);
+
+        var slide = new System.Windows.Media.Animation.DoubleAnimation(8, 0, duration) { EasingFunction = ease };
+        if (PageHost.RenderTransform is System.Windows.Media.TranslateTransform translate)
+        {
+            translate.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, slide);
+        }
+    }
 
     private void OnMaximize(object sender, System.Windows.RoutedEventArgs e)
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
