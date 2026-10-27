@@ -638,7 +638,7 @@ public sealed class InstancesViewModel : ObservableObject
         if (SelectedInstance is not { } instance || parameter is not BackupSnapshot snapshot) return;
 
         var answer = System.Windows.MessageBox.Show(
-            $"删除 {snapshot.TimeText} 的快照（{snapshot.SizeText}）？此操作不可撤销。",
+            $"删除 {snapshot.TimeText} 的快照（{snapshot.SizeText}）？{Environment.NewLine}{Environment.NewLine}快照目录会移入 Windows 回收站，可以从资源管理器还原。",
             "删除快照",
             System.Windows.MessageBoxButton.YesNo,
             System.Windows.MessageBoxImage.Question);

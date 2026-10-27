@@ -7,7 +7,7 @@ public sealed class InstanceBackupTests : IDisposable
 {
     private readonly string _root;
     private readonly Instance _instance;
-    private readonly InstanceBackupService _service = new();
+    private readonly InstanceBackupService _service = new(useRecycleBin: false);
 
     public InstanceBackupTests()
     {

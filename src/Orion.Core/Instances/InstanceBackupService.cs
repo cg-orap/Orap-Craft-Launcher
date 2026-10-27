@@ -38,7 +38,7 @@ public sealed class BackupSnapshot
 /// 实例快照：把 saves / config / mods 复制到 <c>backups/snapshots/&lt;时间戳&gt;/</c>，恢复时先给当前状态
 /// 拍一份"恢复前"快照，所以任何一次恢复都能回到上一步。
 /// </summary>
-public sealed class InstanceBackupService(string? backupRootOverride = null)
+public sealed class InstanceBackupService(string? backupRootOverride = null, bool useRecycleBin = true)
 {
     private static readonly string[] Folders = ["saves", "config", "mods"];
 
@@ -176,6 +176,21 @@ public sealed class InstanceBackupService(string? backupRootOverride = null)
 
         try
         {
+            // 优先丢进 Windows 回收站：误删可以从资源管理器还原。
+            if (useRecycleBin)
+            {
+                try
+                {
+                    Game.RecycleBin.RemoveDirectory(directory);
+                    return true;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+                {
+                    // 网络盘等场景没有回收站，退回永久删除。
+                    AppLog.Warn("backup", "recycle-unavailable", ("id", snapshotId), ("error", ex.Message));
+                }
+            }
+
             Directory.Delete(directory, recursive: true);
             return true;
         }
