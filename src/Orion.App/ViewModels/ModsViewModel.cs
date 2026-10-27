@@ -72,6 +72,7 @@ public sealed class ModsViewModel : ObservableObject
 
     public ModsViewModel(MainViewModel main)
     {
+        CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync);
         ModsView = System.Windows.Data.CollectionViewSource.GetDefaultView(Mods);
         ModsView.Filter = MatchesFilter;
         SetModFilterCommand = new RelayCommand(parameter =>
@@ -94,6 +95,11 @@ public sealed class ModsViewModel : ObservableObject
         "DISABLED" => !row.Enabled,
         _ => true,
     };
+
+    /// <summary>检查更新：只查询，不下载；发现可更新项后弹确认，用户同意才下载。</summary>
+    public ICommand CheckUpdatesCommand { get; }
+
+    public ObservableList<ModUpdateCandidate> Updates { get; } = [];
 
     public ICommand RescanCommand { get; }
     public ICommand SearchCommand { get; }
@@ -313,6 +319,28 @@ public sealed class ModsViewModel : ObservableObject
             var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
             var path = await _main.Context.Modrinth.InstallAsync(version, modsDirectory).ConfigureAwait(true);
 
+            // 记进内容清单，之后"检查更新"才能按版本比对（而不是靠文件名猜）。
+            try
+            {
+                var manifest = LoadManifest(instance);
+                manifest.Upsert(new ContentEntry
+                {
+                    ProjectId = version.ProjectId.Length > 0 ? version.ProjectId : row.Project.ProjectId,
+                    VersionId = version.Id,
+                    FileName = Path.GetFileName(path),
+                    Sha1 = version.PrimaryFile?.Sha1,
+                    Title = row.Title,
+                    VersionNumber = version.VersionNumber,
+                    Source = "modrinth",
+                    UpdatedAt = DateTimeOffset.Now,
+                });
+                await manifest.SaveAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _main.LogsPage.AppendSystem("内容清单写入失败: " + ex.Message);
+            }
+
             Status = $"已安装 {row.Title} {version.VersionNumber} → {Path.GetFileName(path)}";
             _main.Activities.Finish(activity, ActivityState.Completed);
             _main.LogsPage.AppendSystem(Status);
@@ -344,5 +372,130 @@ public sealed class ModsViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(SearchText)) return;
         Process.Start(new ProcessStartInfo($"https://modrinth.com/mods?q={Uri.EscapeDataString(SearchText)}") { UseShellExecute = true });
+    }
+    /// <summary>内容清单文件：instances/<id>/content.json。</summary>
+    private ContentManifest LoadManifest(Instance instance)
+        => ContentManifest.Load(_main.Context.Paths.InstanceDir(instance.Id));
+
+    private async Task CheckUpdatesAsync()
+    {
+        var instance = SelectedInstance;
+        if (instance is null)
+        {
+            Status = "请先选择一个版本。";
+            return;
+        }
+
+        var activity = _main.Activities.Begin("检查模组更新", InstanceLabel);
+        Status = "正在检查更新…";
+        Updates.Clear();
+
+        try
+        {
+            var manifest = LoadManifest(instance);
+            var checker = new ModUpdateChecker(new ModrinthVersionSource(_main.Context.Modrinth));
+            var progress = new Progress<string>(message => _main.Activities.Report(activity, 0, message, ""));
+
+            var candidates = await checker.CheckAsync(
+                manifest,
+                instance.GameVersion,
+                instance.DisplayLoader,
+                progress).ConfigureAwait(true);
+
+            Updates.Replace(candidates);
+            _main.Activities.Finish(activity, ActivityState.Completed);
+
+            if (candidates.Count == 0)
+            {
+                Status = "已是最新版本，没有可更新的模组。";
+                _main.LogsPage.AppendSystem(Status);
+                return;
+            }
+
+            // 只询问，不自动下载：用户确认后才更新。
+            var lines = string.Join(Environment.NewLine, candidates.Take(12).Select(c =>
+                $"· {c.Title}  {c.CurrentVersionNumber} → {c.LatestVersionNumber}"));
+            var more = candidates.Count > 12 ? $"{Environment.NewLine}…共 {candidates.Count} 项" : "";
+
+            var answer = System.Windows.MessageBox.Show(
+                $"发现 {candidates.Count} 个可更新项：{Environment.NewLine}{Environment.NewLine}{lines}{more}" +
+                $"{Environment.NewLine}{Environment.NewLine}现在开始下载更新吗？（旧文件会先备份）",
+                "检查更新",
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question);
+
+            if (answer != System.Windows.MessageBoxResult.Yes)
+            {
+                Status = $"已取消更新（发现 {candidates.Count} 项，未下载任何文件）。";
+                _main.LogsPage.AppendSystem(Status);
+                return;
+            }
+
+            await ApplyUpdatesAsync(instance, manifest, candidates).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            _main.Activities.Finish(activity, ActivityState.Failed);
+            Status = "检查更新失败: " + ex.Message;
+            _main.LogsPage.AppendSystem(Status);
+        }
+    }
+
+    /// <summary>按确认后的列表逐个更新：备份旧文件 → 下载新文件 → 更新清单。</summary>
+    private async Task ApplyUpdatesAsync(Instance instance, ContentManifest manifest, IReadOnlyList<ModUpdateCandidate> candidates)
+    {
+        var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
+        Directory.CreateDirectory(modsDirectory);
+
+        var backupDir = Path.Combine(instance.GameDirectory, "backups", "mod-updates", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        Directory.CreateDirectory(backupDir);
+
+        var activity = _main.Activities.Begin("更新模组", $"{candidates.Count} 项");
+        var done = 0;
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var oldPath = Path.Combine(modsDirectory, candidate.CurrentFileName);
+                if (File.Exists(oldPath))
+                {
+                    File.Copy(oldPath, Path.Combine(backupDir, candidate.CurrentFileName), overwrite: true);
+                }
+
+                var newPath = await _main.Context.Modrinth.InstallAsync(candidate.Latest, modsDirectory).ConfigureAwait(true);
+                if (File.Exists(oldPath) && !string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(oldPath);
+                }
+
+                manifest.Upsert(new ContentEntry
+                {
+                    ProjectId = candidate.ProjectId,
+                    VersionId = candidate.LatestVersionId,
+                    FileName = Path.GetFileName(newPath),
+                    Sha1 = candidate.Sha1,
+                    Title = candidate.Title,
+                    VersionNumber = candidate.LatestVersionNumber,
+                    Source = "modrinth",
+                    UpdatedAt = DateTimeOffset.Now,
+                });
+
+                done++;
+                _main.Activities.Report(activity, done * 100.0 / candidates.Count,
+                    $"已更新 {candidate.Title}", "");
+            }
+            catch (Exception ex)
+            {
+                _main.LogsPage.AppendSystem($"更新 {candidate.Title} 失败: {ex.Message}");
+            }
+        }
+
+        await manifest.SaveAsync().ConfigureAwait(true);
+        _main.Activities.Finish(activity, done == candidates.Count ? ActivityState.Completed : ActivityState.Failed);
+
+        Status = $"已更新 {done}/{candidates.Count} 个模组，旧文件备份在 {backupDir}";
+        _main.LogsPage.AppendSystem(Status);
+        await LoadModsAsync().ConfigureAwait(true);
     }
 }

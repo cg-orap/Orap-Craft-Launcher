@@ -95,6 +95,9 @@
                                     Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" />
                             <Button Content="重新扫描" Style="{StaticResource SecondaryButton}"
                                     Command="{Binding RescanCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0" />
+                            <Button Content="检查更新" Style="{StaticResource GhostButton}"
+                                    Command="{Binding CheckUpdatesCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                    ToolTip="只检查，不下载；发现更新会先询问你" />
                         </StackPanel>
                     </Grid>
 
