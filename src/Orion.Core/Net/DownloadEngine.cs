@@ -105,7 +105,7 @@ public sealed class DownloadEngine
     private const int MaxChunksPerFile = 4;
 
     /// <summary>No-data budget for a single body read; see ReadWithStallGuardAsync.</summary>
-    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(25);
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(10);
 
     private readonly HttpClient _http;
     private readonly DownloadEngineOptions _options;
@@ -257,13 +257,25 @@ public sealed class DownloadEngine
         Uri? lastUrl = null;
         int? lastStatus = null;
 
+        // 同一个文件内记住试过的源：坏掉的源不再反复重试，直接把机会让给下一个候选。
+        var tried = new HashSet<Uri>();
+
         for (var attempt = 0; attempt <= _options.MaxRetries; attempt++)
         {
             ct.ThrowIfCancellationRequested();
 
             var ordered = OrderByHostHealth(request.Urls, request.Size >= LargeFileThreshold);
-            var url = ordered[Math.Min(attempt, ordered.Count - 1)];
+            var remaining = ordered.Where(u => !tried.Contains(u)).ToList();
+            if (remaining.Count == 0)
+            {
+                // 所有候选都试过了才允许重复；否则小文件会在坏源上反复卡满超时。
+                tried.Clear();
+                remaining = ordered;
+            }
+
+            var url = remaining[0];
             lastUrl = url;
+            tried.Add(url);
 
             try
             {
@@ -282,7 +294,11 @@ public sealed class DownloadEngine
                 if (ex.IsPermanent)
                 {
                     AppLog.Warn("download", "permanent-status", ("url", url.ToString()), ("status", (int)ex.StatusCode));
-                    break;
+                    // 镜像上没有这个文件（常见于比镜像新的版本）：把该主机标记一段时间，
+                    // 后续文件直接走官方源，不再一个个撞 404。
+                    _hostPenalty[url.Host] = DateTimeOffset.UtcNow + HostPenaltyDuration;
+                    if (tried.Count >= request.Urls.Count) break;
+                    continue;
                 }
 
                 if (ex.RetryAfter is { } retryAfter && retryAfter > TimeSpan.Zero)
