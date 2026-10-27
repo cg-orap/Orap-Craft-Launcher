@@ -73,6 +73,7 @@ public sealed class ModsViewModel : ObservableObject
     public ModsViewModel(MainViewModel main)
     {
         CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync);
+        InitUpdateCommands();
         ModsView = System.Windows.Data.CollectionViewSource.GetDefaultView(Mods);
         ModsView.Filter = MatchesFilter;
         SetModFilterCommand = new RelayCommand(parameter =>
@@ -99,7 +100,7 @@ public sealed class ModsViewModel : ObservableObject
     /// <summary>检查更新：只查询，不下载；发现可更新项后弹确认，用户同意才下载。</summary>
     public ICommand CheckUpdatesCommand { get; }
 
-    public ObservableList<ModUpdateCandidate> Updates { get; } = [];
+    public ObservableList<UpdateRow> Updates { get; } = [];
 
     public ICommand RescanCommand { get; }
     public ICommand SearchCommand { get; }
@@ -377,6 +378,27 @@ public sealed class ModsViewModel : ObservableObject
     private ContentManifest LoadManifest(Instance instance)
         => ContentManifest.Load(_main.Context.Paths.InstanceDir(instance.Id));
 
+    /// <summary>更新预览的一行：可勾选，默认全选。</summary>
+    public sealed class UpdateRow(ModUpdateCandidate candidate) : ObservableObject
+    {
+        private bool _isSelected = true;
+
+        public ModUpdateCandidate Candidate { get; } = candidate;
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set => SetProperty(ref _isSelected, value);
+        }
+
+        public string Title => Candidate.Title;
+
+        public string VersionLine => $"{Candidate.CurrentVersionNumber} → {Candidate.LatestVersionNumber}";
+
+        public string FileLine => $"{Candidate.CurrentFileName} → {Candidate.LatestFileName}";
+    }
+
+    /// <summary>检查更新：只查询，把结果填进页内面板，等用户勾选并确认后才下载。</summary>
     private async Task CheckUpdatesAsync()
     {
         var instance = SelectedInstance;
@@ -389,6 +411,7 @@ public sealed class ModsViewModel : ObservableObject
         var activity = _main.Activities.Begin("检查模组更新", InstanceLabel);
         Status = "正在检查更新…";
         Updates.Clear();
+        OnPropertyChanged(nameof(HasUpdates));
 
         try
         {
@@ -402,36 +425,15 @@ public sealed class ModsViewModel : ObservableObject
                 instance.DisplayLoader,
                 progress).ConfigureAwait(true);
 
-            Updates.Replace(candidates);
+            Updates.Replace(candidates.Select(c => new UpdateRow(c)));
+            OnPropertyChanged(nameof(HasUpdates));
+            OnPropertyChanged(nameof(SelectedUpdateCount));
             _main.Activities.Finish(activity, ActivityState.Completed);
 
-            if (candidates.Count == 0)
-            {
-                Status = "已是最新版本，没有可更新的模组。";
-                _main.LogsPage.AppendSystem(Status);
-                return;
-            }
-
-            // 只询问，不自动下载：用户确认后才更新。
-            var lines = string.Join(Environment.NewLine, candidates.Take(12).Select(c =>
-                $"· {c.Title}  {c.CurrentVersionNumber} → {c.LatestVersionNumber}"));
-            var more = candidates.Count > 12 ? $"{Environment.NewLine}…共 {candidates.Count} 项" : "";
-
-            var answer = System.Windows.MessageBox.Show(
-                $"发现 {candidates.Count} 个可更新项：{Environment.NewLine}{Environment.NewLine}{lines}{more}" +
-                $"{Environment.NewLine}{Environment.NewLine}现在开始下载更新吗？（旧文件会先备份）",
-                "检查更新",
-                System.Windows.MessageBoxButton.YesNo,
-                System.Windows.MessageBoxImage.Question);
-
-            if (answer != System.Windows.MessageBoxResult.Yes)
-            {
-                Status = $"已取消更新（发现 {candidates.Count} 项，未下载任何文件）。";
-                _main.LogsPage.AppendSystem(Status);
-                return;
-            }
-
-            await ApplyUpdatesAsync(instance, manifest, candidates).ConfigureAwait(true);
+            Status = candidates.Count == 0
+                ? "已是最新版本，没有可更新的内容。"
+                : $"发现 {candidates.Count} 个可更新项：勾选后点「更新所选」才会开始下载。";
+            _main.LogsPage.AppendSystem(Status);
         }
         catch (Exception ex)
         {
@@ -441,19 +443,85 @@ public sealed class ModsViewModel : ObservableObject
         }
     }
 
-    /// <summary>按确认后的列表逐个更新：备份旧文件 → 下载新文件 → 更新清单。</summary>
-    private async Task ApplyUpdatesAsync(Instance instance, ContentManifest manifest, IReadOnlyList<ModUpdateCandidate> candidates)
+    /// <summary>仅用于演示/截图：填充两条不会下载的假候选。</summary>
+    public void SeedDemoUpdates()
     {
+        ModUpdateCandidate Fake(string title, string from, string to, string file)
+        {
+            var version = new ModrinthVersion
+            {
+                Id = "demo-" + to,
+                ProjectId = "demo-" + title,
+                VersionNumber = to,
+                Files = [new ModrinthFile { Filename = file, Url = "https://example.invalid/" + file, Primary = true }],
+            };
+
+            return new ModUpdateCandidate("demo-" + title, title, "demo", from, file.Replace(to, from), "demo-" + to, to, file, null, null, [], version);
+        }
+
+        Updates.Replace(
+        [
+            new UpdateRow(Fake("Sodium", "0.5.11", "0.6.0", "sodium-0.6.0.jar")),
+            new UpdateRow(Fake("FerriteCore", "6.0.1", "6.0.2", "ferritecore-6.0.2.jar")),
+        ]);
+
+        OnPropertyChanged(nameof(HasUpdates));
+        OnPropertyChanged(nameof(SelectedUpdateCount));
+        Status = "（演示）发现 2 个可更新项：勾选后点「更新所选」才会开始下载。";
+    }
+
+    public bool HasUpdates => Updates.Count > 0;
+
+    public int SelectedUpdateCount => Updates.Count(u => u.IsSelected);
+
+    public ICommand SelectAllUpdatesCommand { get; private set; } = null!;
+    public ICommand UpdateSelectedCommand { get; private set; } = null!;
+    public ICommand DismissUpdatesCommand { get; private set; } = null!;
+
+    private void InitUpdateCommands()
+    {
+        SelectAllUpdatesCommand = new RelayCommand(_ =>
+        {
+            var select = SelectedUpdateCount < Updates.Count;
+            foreach (var row in Updates) row.IsSelected = select;
+            OnPropertyChanged(nameof(SelectedUpdateCount));
+        });
+
+        DismissUpdatesCommand = new RelayCommand(_ =>
+        {
+            Updates.Clear();
+            OnPropertyChanged(nameof(HasUpdates));
+            OnPropertyChanged(nameof(SelectedUpdateCount));
+            Status = "已收起更新列表，未下载任何文件。";
+        });
+
+        UpdateSelectedCommand = new AsyncRelayCommand(ApplySelectedUpdatesAsync, () => SelectedUpdateCount > 0);
+    }
+
+    /// <summary>只在用户确认后调用：备份旧文件 → 下载 → 删旧文件 → 更新清单。</summary>
+    private async Task ApplySelectedUpdatesAsync()
+    {
+        var instance = SelectedInstance;
+        if (instance is null) return;
+
+        var rows = Updates.Where(u => u.IsSelected).Select(u => u.Candidate).ToList();
+        if (rows.Count == 0)
+        {
+            Status = "没有勾选任何项目。";
+            return;
+        }
+
+        var manifest = LoadManifest(instance);
         var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
         Directory.CreateDirectory(modsDirectory);
 
         var backupDir = Path.Combine(instance.GameDirectory, "backups", "mod-updates", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
         Directory.CreateDirectory(backupDir);
 
-        var activity = _main.Activities.Begin("更新模组", $"{candidates.Count} 项");
+        var activity = _main.Activities.Begin("更新模组", $"{rows.Count} 项");
         var done = 0;
 
-        foreach (var candidate in candidates)
+        foreach (var candidate in rows)
         {
             try
             {
@@ -482,8 +550,7 @@ public sealed class ModsViewModel : ObservableObject
                 });
 
                 done++;
-                _main.Activities.Report(activity, done * 100.0 / candidates.Count,
-                    $"已更新 {candidate.Title}", "");
+                _main.Activities.Report(activity, done * 100.0 / rows.Count, $"已更新 {candidate.Title}", "");
             }
             catch (Exception ex)
             {
@@ -492,10 +559,14 @@ public sealed class ModsViewModel : ObservableObject
         }
 
         await manifest.SaveAsync().ConfigureAwait(true);
-        _main.Activities.Finish(activity, done == candidates.Count ? ActivityState.Completed : ActivityState.Failed);
+        _main.Activities.Finish(activity, done == rows.Count ? ActivityState.Completed : ActivityState.Failed);
 
-        Status = $"已更新 {done}/{candidates.Count} 个模组，旧文件备份在 {backupDir}";
+        Status = $"已更新 {done}/{rows.Count} 个模组，旧文件备份在 {backupDir}";
         _main.LogsPage.AppendSystem(Status);
+
+        Updates.Clear();
+        OnPropertyChanged(nameof(HasUpdates));
+        OnPropertyChanged(nameof(SelectedUpdateCount));
         await LoadModsAsync().ConfigureAwait(true);
     }
 }

@@ -35,6 +35,19 @@ public partial class MainWindow : Window
             Loaded += (_, _) => (DataContext as ViewModels.MainViewModel)?.Navigate(key);
         }
 
+        // --demo-updates：模组页填充演示用的更新候选（截图/验收，不联网）。
+        if (Array.Exists(args, a => string.Equals(a, "--demo-updates", StringComparison.OrdinalIgnoreCase)))
+        {
+            Loaded += (_, _) =>
+            {
+                if (DataContext is ViewModels.MainViewModel demo)
+                {
+                    demo.Navigate("mods");
+                    demo.ModsPage.SeedDemoUpdates();
+                }
+            };
+        }
+
         // --kind <modpack|mod|shader|resourcepack|versions>：直接定位到下载中心的某个资源分类。
         var kindIndex = Array.FindIndex(args, a => string.Equals(a, "--kind", StringComparison.OrdinalIgnoreCase));
         if (kindIndex >= 0 && kindIndex + 1 < args.Length)
