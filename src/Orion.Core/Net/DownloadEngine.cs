@@ -752,6 +752,8 @@ public sealed class DownloadEngine
 
             var indexed = healthy.Select((url, index) => (url, index)).ToList();
             healthy = indexed
+                // 镜像优先：官方源在当前网络下常常只有几 KB/s，先试镜像能少等几十秒。
+                .OrderBy(x => _mirrors.IsMirrorHost(x.url.Host) ? 0 : 1)
                 .OrderByDescending(x => Rate(x.url.Host, large) == 0 ? 50 : Rate(x.url.Host, large))
                 .ThenBy(x => x.index)
                 .Select(x => x.url)
@@ -887,6 +889,15 @@ public sealed class DownloadEngine
         }
 
         public void OnCompleted(long size) => Interlocked.Increment(ref _completedFiles);
+
+        /// <summary>失败重排前把计数退回，避免总数被重复统计（进度条会超过 100%）。</summary>
+        public void OnRetryReset(IReadOnlyList<DownloadRequest> again)
+        {
+            var files = again.Count;
+            var bytes = again.Sum(r => Math.Max(0, r.Size));
+            Interlocked.Add(ref _completedFiles, -files);
+            if (bytes > 0) Interlocked.Add(ref _precompletedBytes, -bytes);
+        }
 
         public void SetCurrentFile(string name) => _currentFile = name;
 

@@ -143,6 +143,18 @@ public sealed class ModsViewModel : ObservableObject
         }
     }
 
+    /// <summary>页面顶部下拉用：直接在本页切换版本。</summary>
+    public ObservableList<Instance> Instances => _main.Instances;
+
+    /// <summary>跟随全局当前版本（侧栏/主页切换时同步本页）。</summary>
+    public void SyncInstance()
+    {
+        if (_main.CurrentInstance is { } instance && !ReferenceEquals(SelectedInstance, instance))
+        {
+            SelectedInstance = instance;
+        }
+    }
+
     public string InstanceLabel => SelectedInstance is null
         ? "未选择版本"
         : $"{SelectedInstance.Name} · {SelectedInstance.DisplayLoader} · MC {SelectedInstance.GameVersion}";

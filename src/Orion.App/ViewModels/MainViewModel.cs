@@ -399,7 +399,7 @@ public sealed class MainViewModel : ObservableObject
             Home.RaisePropertyChanged(nameof(HomeViewModel.InstanceTitle));
             Home.RaisePropertyChanged(nameof(HomeViewModel.InstanceSubtitle));
             Home.RaisePropertyChanged(nameof(HomeViewModel.LaunchVersionLine));
-            ModsPage.RaisePropertyChanged(nameof(ModsViewModel.SelectedInstance));
+            ModsPage?.SyncInstance();
             InstancesPage?.SyncSelection();
 
             Context.Settings.LastInstanceId = value?.Id;

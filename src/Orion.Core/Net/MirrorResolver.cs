@@ -29,6 +29,17 @@ public sealed class MirrorResolver
 
     public bool IsMirrorEnabled => _options.Source != DownloadSource.Official;
 
+    /// <summary>这个主机是不是我们的镜像（用于下载排序时优先选镜像）。</summary>
+    public bool IsMirrorHost(string host)
+    {
+        if (!IsMirrorEnabled || string.IsNullOrWhiteSpace(host)) return false;
+        if (string.Equals(host, new Uri(BmclApiBase).Host, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return _options.CustomMirrorBase is { Length: > 0 } custom
+               && Uri.TryCreate(custom, UriKind.Absolute, out var uri)
+               && string.Equals(host, uri.Host, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// Returns the ordered candidate URLs for an official URL. The first entry is tried
     /// first; the remaining entries are used for retries and fallbacks.

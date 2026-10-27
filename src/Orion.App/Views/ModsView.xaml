@@ -76,7 +76,7 @@
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding InstanceLabel}" FontSize="18" FontWeight="SemiBold"
+                            <TextBlock Text="模组管理" FontSize="18" FontWeight="SemiBold"
                                        TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                 <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="6,2">
@@ -92,6 +92,20 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- 在本页直接切换版本 -->
+                            <ComboBox ItemsSource="{Binding Instances}"
+                                      SelectedItem="{Binding SelectedInstance, Mode=TwoWay}"
+                                      Width="220" Height="30" FontSize="11.5" Margin="0,0,8,0"
+                                      VerticalAlignment="Center"
+                                      ToolTip="切换要管理的版本"
+                                      AutomationProperties.AutomationId="ModsInstancePicker">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" FontSize="11.5"
+                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <Button Content="打开 mods 目录" Style="{StaticResource GhostButton}"
                                     Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" />
                             <Button Content="重新扫描" Style="{StaticResource SecondaryButton}"
