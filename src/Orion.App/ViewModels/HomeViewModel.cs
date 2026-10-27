@@ -91,7 +91,7 @@ public sealed class HomeViewModel : ObservableObject
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         ChooseBackgroundCommand = new RelayCommand(ChooseBackground);
         ClearBackgroundCommand = new RelayCommand(ClearBackground, () => HasBackgroundImage);
-        OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("version-picker"));
+        OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("instances"));
         OpenVersionSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));   // sub-page, not a rail entry
 
         _memoryTimer.Interval = TimeSpan.FromSeconds(2);

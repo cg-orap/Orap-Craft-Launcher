@@ -286,12 +286,44 @@ public sealed class InstancesViewModel : ObservableObject
         try
         {
             _main.Context.Instances.Remove(instance, out var trashPath);
+
+            // 实例目录删掉了，但共享的 versions/<版本> 仍会留着，用户会以为"没删掉"。
+            // 只有在没有其它实例使用这个版本时，才把共享版本目录一起送进回收站。
+            string? versionTrash = null;
+            var stillUsed = _main.Instances.Any(other =>
+                !ReferenceEquals(other, instance) &&
+                string.Equals(other.VersionId, instance.VersionId, StringComparison.OrdinalIgnoreCase));
+
+            if (!stillUsed && !string.IsNullOrWhiteSpace(instance.VersionId))
+            {
+                var versionDirectory = Path.Combine(_main.Context.Paths.VersionsDir, instance.VersionId);
+                if (Directory.Exists(versionDirectory))
+                {
+                    try
+                    {
+                        Core.Game.RecycleBin.RemoveDirectory(versionDirectory);
+                        versionTrash = versionDirectory;
+                        _main.LogsPage.AppendSystem($"已移除共享版本目录：{versionDirectory}");
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        _main.LogsPage.AppendSystem($"共享版本目录未能移除（可能被占用）：{ex.Message}");
+                    }
+                }
+            }
+            else if (stillUsed)
+            {
+                _main.LogsPage.AppendSystem($"版本 {instance.VersionId} 仍被其它实例使用，保留共享目录。");
+            }
+
             await _main.ReloadInstancesAsync().ConfigureAwait(true);
             SelectedInstance = _main.Instances.FirstOrDefault();
 
             Status = trashPath is null
                 ? $"已解除版本「{instance.Name}」的注册（外部版本，原目录未改动）。"
-                : $"已删除版本「{instance.Name}」，整个目录已放进 Windows 回收站：{trashPath}";
+                : versionTrash is null
+                    ? $"已删除版本「{instance.Name}」，实例目录已放进回收站：{trashPath}"
+                    : $"已删除版本「{instance.Name}」：实例目录与共享版本目录都已放进回收站。";
         }
         catch (IOException ex)
         {

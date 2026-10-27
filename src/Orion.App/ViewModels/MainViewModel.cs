@@ -163,8 +163,7 @@ public sealed class MainViewModel : ObservableObject
         NavItems.AddRange(
         [
             new NavItem("home", "首页", "\uE80F", "游戏"),
-            new NavItem("version-picker", "版本选择", "\uE8B7", "游戏"),
-            new NavItem("instances", "版本设置", "\uE713", "游戏"),
+                new NavItem("instances", "版本设置", "\uE713", "游戏"),
             new NavItem("catalog", "下载中心", "\uE896", "资源")
             {
                 SubItems =
@@ -401,6 +400,7 @@ public sealed class MainViewModel : ObservableObject
             Home.RaisePropertyChanged(nameof(HomeViewModel.LaunchVersionLine));
             ModsPage?.SyncInstance();
             InstancesPage?.SyncSelection();
+            ModsPage?.SyncInstance();
 
             Context.Settings.LastInstanceId = value?.Id;
             _ = Context.SettingsStore.SaveAsync(Context.Settings);
@@ -526,7 +526,6 @@ public sealed class MainViewModel : ObservableObject
         {
             "versions" => CatalogPage,   // legacy route: versions now live in the download centre
             "catalog" => CatalogPage,
-            "version-picker" => VersionPickerPage,
             "instances" => InstancesPage,
             "mods" => ModsPage,
             "downloads" => DownloadsPage,
@@ -537,7 +536,7 @@ public sealed class MainViewModel : ObservableObject
         };
 
         if (key == "catalog") _ = CatalogPage.InitializeAsync();
-        if (key == "version-picker") VersionPickerPage.Refresh();
+        // 版本选择已并入「版本设置」：侧栏点版本即切换当前版本。
         if (key == "instances") _ = InstancesPage.LoadAsync();
         if (key == "mods") _ = ModsPage.LoadModsAsync();
         if (key == "home") _ = Home.RefreshAsync();
