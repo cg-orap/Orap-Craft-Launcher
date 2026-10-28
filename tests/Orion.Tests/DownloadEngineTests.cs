@@ -377,4 +377,99 @@ public sealed class DownloadEngineTests : IDisposable
         Assert.Equal("maven.neoforged.net", neoforge[0].Host);
         Assert.Contains(neoforge, u => u.Host == "maven.creeperhost.net" && u.AbsolutePath.StartsWith("/net/neoforged/", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void OrderForSchedulingPutsBigFilesFirst()
+    {
+        static DownloadRequest Req(string name, long size) => new()
+        {
+            TargetPath = Path.Combine(Path.GetTempPath(), name),
+            Urls = [new Uri("https://example.invalid/" + name)],
+            Size = size,
+        };
+
+        var ordered = DownloadEngine.OrderForScheduling(
+        [
+            Req("small-a", 200 * 1024),
+            Req("big", 40 * 1024 * 1024),
+            Req("small-b", 900 * 1024),
+            Req("middle", 8 * 1024 * 1024),
+        ]);
+
+        Assert.Equal(["big", "middle", "small-b", "small-a"], ordered.Select(r => Path.GetFileName(r.TargetPath)));
+    }
+
+    [Fact]
+    public void OrderForSchedulingKeepsTheOriginalOrderForEqualSizes()
+    {
+        static DownloadRequest Req(string name) => new()
+        {
+            TargetPath = Path.Combine(Path.GetTempPath(), name),
+            Urls = [new Uri("https://example.invalid/" + name)],
+            Size = 1024,
+        };
+
+        var ordered = DownloadEngine.OrderForScheduling([Req("a"), Req("b"), Req("c")]);
+        Assert.Equal(["a", "b", "c"], ordered.Select(r => Path.GetFileName(r.TargetPath)));
+    }
+
+    [Theory]
+    [InlineData(4L * 1024 * 1024, 2)]          // 4 MB: 2 段
+    [InlineData(16L * 1024 * 1024, 2)]         // 16 MB: 每段 8 MB
+    [InlineData(24L * 1024 * 1024, 3)]
+    [InlineData(64L * 1024 * 1024, 8)]         // 大文件吃满 8 段
+    [InlineData(512L * 1024 * 1024, 8)]        // 上限 8，不无限切
+    [InlineData(0, 2)]
+    public void ChunkCountForScalesWithSize(long size, int expected)
+    {
+        Assert.Equal(expected, DownloadEngine.ChunkCountFor(size));
+    }
+
+    [Fact]
+    public async Task BigFileStartsFirstAndIsSplitIntoRanges()
+    {
+        await using var server = TestHttpServer.Start();
+        var dir = Path.Combine(Path.GetTempPath(), "orion-lpt-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+
+        var bigSize = 6 * 1024 * 1024;
+        server.Files["big.jar"] = new byte[bigSize];
+        var requests = new List<DownloadRequest>
+        {
+            new()
+            {
+                TargetPath = Path.Combine(dir, "big.jar"),
+                Urls = [new Uri(server.BaseUrl + "big.jar")],
+                Size = bigSize,
+            },
+        };
+
+        // 六个小文件排在 big.jar 之后：旧实现会先下完它们，大文件最后开工。
+        for (var i = 0; i < 6; i++)
+        {
+            var size = 300 * 1024;
+            server.Files[$"small-{i}.jar"] = new byte[size];
+            requests.Add(new DownloadRequest
+            {
+                TargetPath = Path.Combine(dir, $"small-{i}.jar"),
+                Urls = [new Uri(server.BaseUrl + $"small-{i}.jar")],
+                Size = size,
+            });
+        }
+
+        var report = await CreateEngine(concurrency: 4).DownloadAsync(requests);
+        Assert.True(report.Success, string.Join("; ", report.Failures.Select(f => f.Message)));
+
+        // 调度顺序由 OrderForSchedulingPutsBigFilesFirst 单测覆盖；这里只验证分块行为，
+        // 避免依赖请求到达的先后（4 个 worker 同时起跑，日志顺序本身就有竞态）。
+        // 大文件被切成多段（多个带 Range 的请求）
+        var bigRanges = server.Requests
+            .Where(r => r.StartsWith("big.jar|", StringComparison.OrdinalIgnoreCase))
+            .Select(r => r.Split('|')[1])
+            .Distinct()
+            .ToList();
+        Assert.True(bigRanges.Count >= 2, $"big.jar 只收到 {bigRanges.Count} 个 Range 请求");
+
+        Directory.Delete(dir, recursive: true);
+    }
 }

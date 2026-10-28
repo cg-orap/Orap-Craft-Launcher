@@ -190,6 +190,9 @@ public sealed class DownloadEngine
 
         state.StartReporterIfNeeded();
 
+        // 大文件优先（LPT）：先开工耗时最长的文件，队尾就不会只剩一两个大文件独扛带宽。
+        pending = OrderForScheduling(pending);
+
         // 3. Bounded concurrent transfer.
         //
         // Thousands of tiny asset objects are latency bound, not bandwidth bound: at the user's
@@ -375,10 +378,31 @@ public sealed class DownloadEngine
             return kbps < MinKbPerSecond;
         }
     }
+    /// <summary>
+    /// Longest-processing-time-first: 大文件先下。总耗时由最后一个文件决定，先开工大文件
+    /// 能把队尾从"只剩一两个大文件"变成"大文件和小文件一起收尾"。
+    /// </summary>
+    internal static List<DownloadRequest> OrderForScheduling(IEnumerable<DownloadRequest> requests)
+    {
+        // OrderByDescending 是稳定排序：同样大小的文件保持清单原有顺序。
+        return requests.OrderByDescending(r => r.Size).ToList();
+    }
+
+    /// <summary>每 8 MB 一段，最少 2 段、最多 8 段；单段不足 256 KB 时不值得切。</summary>
+    internal static int ChunkCountFor(long size)
+    {
+        const long segment = 8L * 1024 * 1024;
+        if (size <= 0) return 2;
+        return Math.Clamp((int)((size + segment - 1) / segment), 2, 8);
+    }
+
     private async Task<bool> TryChunkedAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct)
     {
         var size = request.Size;
-        var chunks = Math.Clamp(_options.MaxConcurrency / 8, 2, 4);
+        // 按文件大小决定分块数：每 8 MB 一段，上限 8。旧算法用「并发 ÷ 8」，
+        // 导致 40 MB 的大 jar 只开 2 条连接，末尾速度掉到两百 KB/s。
+        // 单文件分块不能超过"并发的一半"，否则低并发用户会被一个大文件占满所有连接。
+        var chunks = Math.Min(ChunkCountFor(size), Math.Max(2, _options.MaxConcurrency / 2));
         var chunkSize = size / chunks;
         if (chunkSize < 256 * 1024) return false;
 
