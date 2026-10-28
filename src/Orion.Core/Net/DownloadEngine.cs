@@ -99,7 +99,10 @@ public sealed class DownloadEngine
     private const int BufferSize = 96 * 1024;
 
     /// <summary>Files at least this large are fetched with several parallel range requests.</summary>
-    private const long LargeFileThreshold = 4L * 1024 * 1024;
+    private const long LargeFileThreshold = 1L * 1024 * 1024;
+
+    /// <summary>批次只剩少量文件时的分块上限：队尾要榨干带宽。</summary>
+    private const int TailChunksPerFile = 8;
 
     /// <summary>Upper bound on parallel connections for one large file.</summary>
     private const int MaxChunksPerFile = 4;
@@ -203,6 +206,10 @@ public sealed class DownloadEngine
         if (smallBatch) fanout = Math.Min(48, fanout * 2);
         if (smallBatch) AppLog.Debug("download", "small-batch-fanout", ("files", pending.Count), ("fanout", fanout));
 
+        // 队尾模式：只剩几个文件时，把每个文件切到最多 8 段，避免"一个文件一条连接"扛完全部带宽。
+        var tailMode = pending.Count <= Math.Max(2, fanout / 4);
+        if (tailMode) AppLog.Info("download", "tail-mode", ("files", pending.Count), ("fanout", fanout), ("chunksPerFile", TailChunksPerFile));
+
         var parallelOptions = new ParallelOptions
         {
             MaxDegreeOfParallelism = fanout,
@@ -214,7 +221,7 @@ public sealed class DownloadEngine
             await Parallel.ForEachAsync(pending, parallelOptions, async (request, ct) =>
             {
                 state.SetCurrentFile(request.DisplayName);
-                var result = await DownloadOneAsync(request, state, ct).ConfigureAwait(false);
+                var result = await DownloadOneAsync(request, state, ct, tailMode).ConfigureAwait(false);
                 if (result is null)
                 {
                     state.OnCompleted(request.Size);
@@ -237,6 +244,36 @@ public sealed class DownloadEngine
             return Finish(state, started, cancelled: true);
         }
 
+        // 失败自动重排：整批结束后把失败的文件再跑一轮（此时坏主机的惩罚已生效，会自然换源），
+        // 避免"1 个文件失败废掉整次安装"。
+        if (state.Failures.Count > 0 && !cancellationToken.IsCancellationRequested)
+        {
+            var failedPaths = state.Failures.Select(f => f.TargetPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var again = pending.Where(r => failedPaths.Contains(r.TargetPath)).ToList();
+            if (again.Count > 0)
+            {
+                AppLog.Info("download", "retry-failed-batch", ("files", again.Count));
+                state.Failures.Clear();
+                state.OnRetryReset(again);
+
+                try
+                {
+                    await Parallel.ForEachAsync(again, parallelOptions, async (request, ct) =>
+                    {
+                        state.SetCurrentFile(request.DisplayName);
+                        var result = await DownloadOneAsync(request, state, ct, tailMode: true).ConfigureAwait(false);
+                        if (result is null) state.OnCompleted(request.Size);
+                        else state.Failures.Add(result);
+                    }).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    state.StopReporter();
+                    return Finish(state, started, cancelled: true);
+                }
+            }
+        }
+
         state.StopReporter();
         state.ReportFinal();
 
@@ -254,7 +291,7 @@ public sealed class DownloadEngine
     }
 
     /// <summary>Returns null on success, or a failure record describing the last error.</summary>
-    private async Task<DownloadFailure?> DownloadOneAsync(DownloadRequest request, RunState state, CancellationToken ct)
+    private async Task<DownloadFailure?> DownloadOneAsync(DownloadRequest request, RunState state, CancellationToken ct, bool tailMode = false)
     {
         Exception? last = null;
         Uri? lastUrl = null;
@@ -282,7 +319,7 @@ public sealed class DownloadEngine
 
             try
             {
-                await TransferAsync(request, url, state, ct).ConfigureAwait(false);
+                await TransferAsync(request, url, state, ct, tailMode).ConfigureAwait(false);
                 _hostPenalty.TryRemove(url.Host, out _);
                 return null;
             }
@@ -391,18 +428,24 @@ public sealed class DownloadEngine
     /// <summary>每 8 MB 一段，最少 2 段、最多 8 段；单段不足 256 KB 时不值得切。</summary>
     internal static int ChunkCountFor(long size)
     {
-        const long segment = 8L * 1024 * 1024;
+        const long segment = 4L * 1024 * 1024;
         if (size <= 0) return 2;
         return Math.Clamp((int)((size + segment - 1) / segment), 2, 8);
     }
 
-    private async Task<bool> TryChunkedAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct)
+    private async Task<bool> TryChunkedAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct, bool tailMode = false)
     {
         var size = request.Size;
         // 按文件大小决定分块数：每 8 MB 一段，上限 8。旧算法用「并发 ÷ 8」，
         // 导致 40 MB 的大 jar 只开 2 条连接，末尾速度掉到两百 KB/s。
-        // 单文件分块不能超过"并发的一半"，否则低并发用户会被一个大文件占满所有连接。
-        var chunks = Math.Min(ChunkCountFor(size), Math.Max(2, _options.MaxConcurrency / 2));
+        // 队尾模式（批次只剩几个文件）：切到上限，让最后一个大文件也吃满多连接带宽。
+        // 否则按大小切，并受"并发的一半"约束，避免低并发用户被单个大文件占满连接。
+        var chunks = tailMode
+            ? TailChunksPerFile
+            : Math.Min(ChunkCountFor(size), Math.Max(2, _options.MaxConcurrency / 2));
+
+        // 单段至少 512 KB：太小反而被请求开销拖慢。
+        chunks = Math.Clamp(chunks, 2, Math.Max(2, (int)(size / (512 * 1024))));
         var chunkSize = size / chunks;
         if (chunkSize < 256 * 1024) return false;
 
@@ -510,7 +553,7 @@ public sealed class DownloadEngine
             throw new TaskCanceledException($"下载停滞：{StallTimeout.TotalSeconds:0} 秒没有收到数据");
         }
     }
-    private async Task TransferAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct)
+    private async Task TransferAsync(DownloadRequest request, Uri url, RunState state, CancellationToken ct, bool tailMode = false)
     {
         var target = request.TargetPath;
         var part = target + ".part";
@@ -537,7 +580,7 @@ public sealed class DownloadEngine
         var chunked = false;
         if (request.Size >= LargeFileThreshold && resumeFrom == 0)
         {
-            chunked = await TryChunkedAsync(request, url, state, ct).ConfigureAwait(false);
+            chunked = await TryChunkedAsync(request, url, state, ct, tailMode).ConfigureAwait(false);
         }
 
         if (!chunked)

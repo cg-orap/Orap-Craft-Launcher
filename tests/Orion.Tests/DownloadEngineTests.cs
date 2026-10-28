@@ -415,8 +415,8 @@ public sealed class DownloadEngineTests : IDisposable
 
     [Theory]
     [InlineData(4L * 1024 * 1024, 2)]          // 4 MB: 2 段
-    [InlineData(16L * 1024 * 1024, 2)]         // 16 MB: 每段 8 MB
-    [InlineData(24L * 1024 * 1024, 3)]
+    [InlineData(16L * 1024 * 1024, 4)]         // 16 MB: 每段 4 MB
+    [InlineData(24L * 1024 * 1024, 6)]
     [InlineData(64L * 1024 * 1024, 8)]         // 大文件吃满 8 段
     [InlineData(512L * 1024 * 1024, 8)]        // 上限 8，不无限切
     [InlineData(0, 2)]
@@ -469,6 +469,44 @@ public sealed class DownloadEngineTests : IDisposable
             .Distinct()
             .ToList();
         Assert.True(bigRanges.Count >= 2, $"big.jar 只收到 {bigRanges.Count} 个 Range 请求");
+
+        Directory.Delete(dir, recursive: true);
+    }
+
+    [Fact]
+    public async Task TwoMegabyteFilesAreChunkedToo()
+    {
+        await using var server = TestHttpServer.Start();
+        var dir = Path.Combine(Path.GetTempPath(), "orion-chunk-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+
+        // 2 MB 的文件在旧阈值（4 MB）下永远单连接，正是队尾只剩它时掉到 160 KB/s 的场景。
+        const int size = 2 * 1024 * 1024;
+        var requests = new List<DownloadRequest>();
+        for (var i = 0; i < 6; i++)
+        {
+            server.Files[$"f-{i}.jar"] = new byte[size];
+            requests.Add(new DownloadRequest
+            {
+                TargetPath = Path.Combine(dir, $"f-{i}.jar"),
+                Urls = [new Uri(server.BaseUrl + $"f-{i}.jar")],
+                Size = size,
+            });
+        }
+
+        var report = await CreateEngine(concurrency: 4).DownloadAsync(requests);
+        Assert.True(report.Success, string.Join("; ", report.Failures.Select(f => f.Message)));
+
+        // 每个文件都应被切成多段（≥2 个带 Range 的请求）
+        for (var i = 0; i < 6; i++)
+        {
+            var ranges = server.Requests
+                .Where(r => r.StartsWith($"f-{i}.jar|", StringComparison.OrdinalIgnoreCase))
+                .Select(r => r.Split('|')[1])
+                .Distinct()
+                .Count();
+            Assert.True(ranges >= 2, $"f-{i}.jar 只收到 {ranges} 个 Range 请求");
+        }
 
         Directory.Delete(dir, recursive: true);
     }
