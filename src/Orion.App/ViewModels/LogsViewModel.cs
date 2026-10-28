@@ -112,6 +112,20 @@ public sealed class LogsViewModel : ObservableObject
 
     public ICommand SetLevelCommand { get; }
 
+    /// <summary>日志级别筛选（分段控件用）。</summary>
+    public IReadOnlyList<string> LevelFilters { get; } = ["ALL", "ERROR", "WARN", "INFO"];
+
+    public int LevelIndex
+    {
+        get => _levelFilter switch { "ERROR" => 1, "WARN" => 2, "INFO" => 3, _ => 0 };
+        set
+        {
+            var key = Math.Clamp(value, 0, 3) switch { 1 => "ERROR", 2 => "WARN", 3 => "INFO", _ => "ALL" };
+            SetLevelCommand.Execute(key);
+            OnPropertyChanged();
+        }
+    }
+
     public ICommand ClearCommand { get; }
     public ICommand OpenLogFolderCommand { get; }
     public ICommand OpenGameLogCommand { get; }

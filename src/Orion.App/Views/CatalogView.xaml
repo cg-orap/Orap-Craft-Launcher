@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:Orion.App.Controls"
              xmlns:views="clr-namespace:Orion.App.Views"
              xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
@@ -118,33 +119,9 @@
                     <TextBlock Text="资源市场" FontSize="17" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
                                Text="一键安装到当前实例，或作为新版本创建。点击卡片在右侧查看详情。" />
-                    <Border Margin="0,10,0,0" HorizontalAlignment="Left" CornerRadius="10" Padding="3"
-                            Background="{DynamicResource SurfaceAltBg}"
-                            BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1">
-                        <Grid x:Name="KindTabsHost" SizeChanged="OnKindTabsHostSizeChanged">
-                            <!-- 滑块：跟随当前分类，宽度与位置由代码测量后动画移动 -->
-                            <Border x:Name="KindIndicator" CornerRadius="8" IsHitTestVisible="False"
-                                    HorizontalAlignment="Left" VerticalAlignment="Stretch" Width="0"
-                                    Background="{DynamicResource AccentBrush}" Opacity="0">
-                                <Border.RenderTransform>
-                                    <TranslateTransform />
-                                </Border.RenderTransform>
-                            </Border>
-
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="KindTabVersions" Content="游戏版本" Style="{StaticResource SegTab}"
-                                        Tag="versions" Click="OnKindTabClick" />
-                                <Button x:Name="KindTabModpack" Content="整合包" Style="{StaticResource SegTab}"
-                                        Tag="modpack" Click="OnKindTabClick" />
-                                <Button x:Name="KindTabMod" Content="模组" Style="{StaticResource SegTab}"
-                                        Tag="mod" Click="OnKindTabClick" />
-                                <Button x:Name="KindTabShader" Content="光影" Style="{StaticResource SegTab}"
-                                        Tag="shader" Click="OnKindTabClick" />
-                                <Button x:Name="KindTabResourcepack" Content="材质包" Style="{StaticResource SegTab}"
-                                        Tag="resourcepack" Click="OnKindTabClick" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
+                    <controls:SegmentedControl Margin="0,10,0,0" ItemsSource="{Binding Kinds}"
+                                               DisplayMemberPath="Name"
+                                               SelectedIndex="{Binding KindIndex, Mode=TwoWay}" />
 
                 </StackPanel>
             </Grid>

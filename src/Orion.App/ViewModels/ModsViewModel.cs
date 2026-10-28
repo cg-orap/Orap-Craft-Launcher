@@ -126,6 +126,20 @@ public sealed class ModsViewModel : ObservableObject
 
     public ICommand SetModFilterCommand { get; }
 
+    /// <summary>模组列表筛选（分段控件用）。</summary>
+    public IReadOnlyList<string> ModFilters { get; } = ["全部", "已启用", "已禁用"];
+
+    public int FilterIndex
+    {
+        get => _modFilter switch { "ENABLED" => 1, "DISABLED" => 2, _ => 0 };
+        set
+        {
+            var key = Math.Clamp(value, 0, 2) switch { 1 => "ENABLED", 2 => "DISABLED", _ => "ALL" };
+            SetModFilterCommand.Execute(key);
+            OnPropertyChanged();
+        }
+    }
+
     public int DisabledCount => Mods.Count(m => !m.Enabled);
     public ObservableList<ModrinthRow> SearchResults { get; } = [];
 

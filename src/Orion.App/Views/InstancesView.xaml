@@ -1,8 +1,9 @@
-<UserControl x:Class="Orion.App.Views.InstancesView"
+﻿<UserControl x:Class="Orion.App.Views.InstancesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:Orion.App.Controls"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1120">
 
@@ -105,21 +106,8 @@
 
                     <Border BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
                             Margin="0,16,0,0" Padding="0,10,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource DetailTab}" Content="概览"
-                                    Command="{Binding SelectTabCommand}" CommandParameter="0"
-                                    Foreground="{DynamicResource TextBrush}" />
-                            <Button Style="{StaticResource DetailTab}" Content="模组"
-                                    Command="{Binding SelectTabCommand}" CommandParameter="1" />
-                            <Button Style="{StaticResource DetailTab}" Content="存档"
-                                    Command="{Binding SelectTabCommand}" CommandParameter="2" />
-                            <Button Style="{StaticResource DetailTab}" Content="日志"
-                                    Command="{Binding SelectTabCommand}" CommandParameter="3" />
-                            <Button Style="{StaticResource DetailTab}" Content="快照"
-                                    Command="{Binding SelectTabCommand}" CommandParameter="4" />
-                            <Button Style="{StaticResource DetailTab}" Content="设置"
-                                    Command="{Binding SelectTabCommand}" CommandParameter="5" />
-                        </StackPanel>
+                        <controls:SegmentedControl ItemsSource="{Binding DetailTabs}"
+                                                   SelectedIndex="{Binding TabIndex, Mode=TwoWay}" />
                     </Border>
                 </StackPanel>
             </Border>

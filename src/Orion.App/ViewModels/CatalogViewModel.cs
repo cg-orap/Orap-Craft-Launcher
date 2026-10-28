@@ -184,6 +184,24 @@ public sealed class CatalogViewModel : ObservableObject
     public IReadOnlyList<CatalogKindOption> ResourceKinds => Kinds.Where(k => k.ProjectType is not null).ToList();
 
     /// <summary>页面顶部的分类页签用：点一下就切到该分类并加载第一页。</summary>
+    /// <summary>分类在 Kinds 里的下标（分段控件用）。</summary>
+    public int KindIndex
+    {
+        get
+        {
+            for (var i = 0; i < Kinds.Count; i++)
+            {
+                if (ReferenceEquals(Kinds[i], _kind)) return i;
+            }
+            return 0;
+        }
+        set
+        {
+            if (value >= 0 && value < Kinds.Count) Kind = Kinds[value];
+            OnPropertyChanged();
+        }
+    }
+
     public ICommand SelectKindCommand => new RelayCommand(parameter =>
     {
         if (parameter is string key)

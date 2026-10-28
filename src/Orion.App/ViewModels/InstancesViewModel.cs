@@ -49,6 +49,9 @@ public sealed class InstancesViewModel : ObservableObject
         ExportPackCommand = new AsyncRelayCommand(ExportPackAsync, () => SelectedInstance is not null && !IsBusy);
     }
 
+    /// <summary>详情页的页签标题（分段控件用）。</summary>
+    public IReadOnlyList<string> DetailTabs { get; } = ["概览", "模组", "存档", "日志", "快照", "设置"];
+
     private int _tabIndex;
 
     /// <summary>详情页当前页签：0 概览 / 1 模组 / 2 存档 / 3 日志 / 4 快照 / 5 设置。</summary>
