@@ -1,0 +1,228 @@
+﻿<UserControl x:Class="Orion.App.Views.ToolboxView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:Orion.App.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="760" d:DesignWidth="1120">
+
+    <Grid Margin="20,16,20,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头 -->
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="工具箱" Style="{StaticResource TitleText}" />
+                <TextBlock Text="种子地图、游戏截图，以及新建版本时自动套用的游戏内设置。"
+                           Style="{StaticResource CaptionText}" Margin="0,6,0,0" />
+            </StackPanel>
+
+            <TextBlock Grid.Column="1" Text="{Binding InstanceLabel}" Style="{StaticResource CaptionText}"
+                       VerticalAlignment="Center" />
+        </Grid>
+
+        <controls:SegmentedControl Grid.Row="1" Margin="0,0,0,14" ItemsSource="{Binding Tabs}"
+                                   SelectedIndex="{Binding TabIndex, Mode=TwoWay}"
+                                   AutomationProperties.AutomationId="ToolboxTabs" />
+
+        <!-- ===== 种子地图 ===== -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                      Visibility="{Binding IsSeedTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="种子地图" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="输入种子，用第三方在线地图查看地形与建筑。启动器不会上传种子，只是拼出一个浏览器链接。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+
+                        <TextBlock Text="种子（数字或任意文本）" Style="{StaticResource CaptionText}" Margin="0,14,0,0" />
+                        <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
+                                 AutomationProperties.AutomationId="SeedBox" />
+
+                        <TextBlock Text="{Binding SeedHint}" Style="{StaticResource CaptionText}" Margin="0,8,0,0"
+                                   TextWrapping="Wrap" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                            <Button Content="在 Chunkbase 打开" Style="{StaticResource PrimaryButton}" Padding="16,8"
+                                    Command="{Binding OpenChunkbaseCommand}" />
+                            <Button Content="在 Misland 打开" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                    Command="{Binding OpenMislandCommand}" />
+                            <Button Content="复制种子" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                    Command="{Binding CopySeedCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="说明" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="地图渲染由 Chunkbase / Misland 提供，需要联网并会打开浏览器；启动器暂不内置离线地图生成。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                        <TextBlock Text="想查自己存档的种子，可以在游戏里执行 /seed（需要开启作弊），再把结果填到上面。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ===== 查看截图 ===== -->
+        <Grid Grid.Row="2" Visibility="{Binding IsScreenshotsTab, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+                <TextBlock Text="{Binding ScreenshotsHint}" Style="{StaticResource CaptionText}"
+                           VerticalAlignment="Center" TextWrapping="Wrap"
+                           Visibility="{Binding HasScreenshots, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="刷新" Style="{StaticResource SecondaryButton}" Command="{Binding RefreshScreenshotsCommand}" />
+                    <Button Content="打开截图目录" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                            Command="{Binding OpenScreenshotsFolderCommand}" />
+                    <Button Content="在资源管理器显示" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                            Command="{Binding RevealScreenshotCommand}" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1" Visibility="{Binding HasScreenshots, Converter={StaticResource BoolToVisibility}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="320" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource Card}" Padding="8">
+                    <ListBox ItemsSource="{Binding Screenshots}" SelectedItem="{Binding SelectedScreenshot, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="2,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="72" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="68" Height="40" CornerRadius="5" Background="{DynamicResource SurfaceAltBg}">
+                                        <Image Source="{Binding Image}" Stretch="UniformToFill" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding TakenText}" FontSize="12" />
+                                        <TextBlock Text="{Binding SizeText}" Style="{StaticResource CaptionText}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource Card}" Padding="8">
+                    <Grid>
+                        <Image Source="{Binding SelectedScreenshot.Image}" Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" CornerRadius="6"
+                                Background="#99101318" Padding="8,4" Margin="6">
+                            <TextBlock Text="{Binding SelectedScreenshot.FileName}" FontSize="11"
+                                       Foreground="#FFF2F4F8" />
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- ===== 游戏默认设置 ===== -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                      Visibility="{Binding IsDefaultsTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="游戏默认设置" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="新建版本时把这些选项直接写进它的 options.txt，不用每次开新版本都重新调一遍。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding DefaultsSummary}" Style="{StaticResource CaptionText}"
+                                   Margin="0,8,0,0" Foreground="{DynamicResource AccentBrush}" />
+
+                        <CheckBox Content="在新建版本时写入这些设置" IsChecked="{Binding DefaultsEnabled}"
+                                  Margin="0,14,0,0" />
+
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Grid.Column="0">
+                                <TextBlock Text="视距（2–32 区块）" Style="{StaticResource CaptionText}" />
+                                <TextBox Text="{Binding RenderDistance, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="0" Grid.Column="2">
+                                <TextBlock Text="界面尺寸（0 = 自动）" Style="{StaticResource CaptionText}" />
+                                <ComboBox ItemsSource="{Binding GuiScaleOptions}" SelectedItem="{Binding GuiScale}"
+                                          Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,0,0">
+                                <TextBlock Text="视角 (FOV 30–110)" Style="{StaticResource CaptionText}" />
+                                <TextBox Text="{Binding Fov, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,12,0,0">
+                                <TextBlock Text="亮度（0.0–1.0）" Style="{StaticResource CaptionText}" />
+                                <TextBox Text="{Binding Gamma, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,12,0,0">
+                                <TextBlock Text="粒子效果" Style="{StaticResource CaptionText}" />
+                                <ComboBox ItemsSource="{Binding ParticlesOptions}" SelectedItem="{Binding Particles}"
+                                          Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,12,0,0">
+                                <TextBlock Text="开关" Style="{StaticResource CaptionText}" />
+                                <CheckBox Content="自动跳跃" IsChecked="{Binding AutoJump}" Margin="0,8,0,0" />
+                                <CheckBox Content="视角摇晃" IsChecked="{Binding BobView}" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                            <Button Content="保存默认设置" Style="{StaticResource PrimaryButton}" Padding="16,8"
+                                    Command="{Binding SaveDefaultsCommand}" />
+                            <Button Content="应用到所有现有版本" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                    Command="{Binding ApplyDefaultsCommand}" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                                   Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="写入规则" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="只改动上面这几项，其余键（按键绑定、资源包、视角、语言等）原样保留；已有值会被就地替换，不会写出重复键。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                        <TextBlock Text="写入时机：新建版本时自动写入；也可以在下面手动把当前设置应用到已存在的版本。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -167,6 +167,17 @@ public sealed class InstanceManager
             Directory.CreateDirectory(Path.Combine(gameDirectory, sub));
         }
 
+        // 工具箱里的「游戏默认设置」：新版本一建好就写进它自己的 options.txt，
+        // 省得每次开新版本都重新调视距/界面尺寸/自动跳跃。
+        try
+        {
+            Game.GameOptionsTemplate.ApplyDefaults(gameDirectory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Warn("instances", "options-default-failed", ("id", id), ("error", ex.Message));
+        }
+
         await SaveAsync(instance, ct).ConfigureAwait(false);
         AppLog.Info("instances", "created", ("id", id), ("version", versionId), ("loader", loader.ToString()));
         return instance;

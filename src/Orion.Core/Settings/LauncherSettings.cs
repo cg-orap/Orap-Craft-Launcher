@@ -49,6 +49,9 @@ public sealed class LauncherSettings
     /// </summary>
     [JsonPropertyName("curseForgeApiKey")] public string? CurseForgeApiKey { get; set; }
 
+    /// <summary>工具箱 → 游戏默认设置：新版本初始化时写入 options.txt。</summary>
+    [JsonPropertyName("defaultGameOptions")] public Game.GameOptionsTemplate DefaultGameOptions { get; set; } = new();
+
     [JsonPropertyName("showSnapshots")] public bool ShowSnapshots { get; set; } = true;
     [JsonPropertyName("showOldVersions")] public bool ShowOldVersions { get; set; } = true;
 
