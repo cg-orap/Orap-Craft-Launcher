@@ -4,229 +4,376 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="700" d:DesignWidth="960">
+             d:DesignHeight="760" d:DesignWidth="1120">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="20,16,20,20">
+    <UserControl.Resources>
+        <!-- 左侧子界面导航项 -->
+        <Style x:Key="SettingsNavItem" TargetType="ListBoxItem">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Grid Margin="0,1">
+                            <Border x:Name="Fill" CornerRadius="8" Background="Transparent" Padding="10,8">
+                                <ContentPresenter />
+                            </Border>
+                            <Border x:Name="Bar" Width="3" Height="18" CornerRadius="2" HorizontalAlignment="Left"
+                                    Background="{DynamicResource AccentBrush}" Opacity="0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceAltBg}" />
+                                <Setter TargetName="Bar" Property="Opacity" Value="1" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="20,16,20,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头 -->
+        <Grid Grid.Row="0" Margin="0,0,0,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
 
-            <!-- settings sub-tabs: two sub-pages instead of one long list -->
-            <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2">
+            <StackPanel>
                 <TextBlock Text="设置" Style="{StaticResource TitleText}" />
                 <TextBlock Text="所有设置保存在数据目录中，不会修改系统环境变量。"
-                           Style="{StaticResource CaptionText}" Margin="0,6,0,12" />
-
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                    <RadioButton Content="常规与外观" GroupName="SettingsSection"
-                                 IsChecked="{Binding IsGeneralSection, Mode=TwoWay}"
-                                 Style="{StaticResource TabRadio}" Margin="0,0,8,0"
-                                 AutomationProperties.AutomationId="SettingsTabGeneral" />
-                    <RadioButton Content="下载、账户与日志" GroupName="SettingsSection"
-                                 IsChecked="{Binding IsNetworkSection, Mode=TwoWay}"
-                                 Style="{StaticResource TabRadio}"
-                                 AutomationProperties.AutomationId="SettingsTabNetwork" />
-                </StackPanel>
-
-                <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
+                           Style="{StaticResource CaptionText}" Margin="0,6,0,0" />
             </StackPanel>
 
-            <!-- sub-page 1: general -->
-            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,0"
-                        Visibility="{Binding IsGeneralSection, Converter={StaticResource BoolToVisibility}}">
-                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="主界面外观" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Text="可以为主界面设置一张自定义背景图片（也可以在主界面右键更换）。"
-                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding DataContext.Home.BackgroundImagePath, RelativeSource={RelativeSource AncestorType=Window}}"
-                                   Style="{StaticResource MonoText}" TextWrapping="Wrap" Margin="0,8,0,0"
-                                   Visibility="{Binding DataContext.Home.BackgroundImagePath, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource StringToVisibility}}" />
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                            <Button Content="选择背景图片…" Style="{StaticResource SecondaryButton}"
-                                    Command="{Binding DataContext.Home.ChooseBackgroundCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
-                            <Button Content="恢复默认背景" Style="{StaticResource GhostButton}"
-                                    Command="{Binding DataContext.Home.ClearBackgroundCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    Margin="8,0,0,0" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="数据目录" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Text="{Binding DataRoot}" Style="{StaticResource MonoText}" TextWrapping="Wrap" />
-                        <TextBlock Text="把 portable.txt 放到 EXE 同目录即可切换为便携模式（数据保存在 data 子目录）。"
-                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                            <Button Content="打开数据目录" Style="{StaticResource SecondaryButton}" Command="{Binding OpenDataFolderCommand}" />
-                            <Button Content="打开日志目录" Style="{StaticResource GhostButton}" Command="{Binding OpenLogsCommand}" Margin="8,0,0,0" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="Java 运行时" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Text="留空表示按游戏版本自动选择（推荐）。" Style="{StaticResource CaptionText}" />
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox Text="{Binding JavaPath, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button Grid.Column="1" Content="浏览" Style="{StaticResource SecondaryButton}"
-                                    Command="{Binding BrowseJavaCommand}" Margin="8,0,0,0" />
-                            <Button Grid.Column="2" Content="重新检测" Style="{StaticResource GhostButton}"
-                                    Command="{Binding DetectJavaCommand}" Margin="4,0,0,0" />
-                        </Grid>
-
-                        <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="8" Padding="10" Margin="0,10,0,0">
-                            <ListBox ItemsSource="{Binding JavaRuntimes}" MaxHeight="150">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Margin="4,3">
-                                            <TextBlock Text="{Binding DisplayName}" FontSize="12.5" />
-                                            <TextBlock Text="{Binding Home}" Style="{StaticResource CaptionText}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Border>
-                    </StackPanel>
-                </Border>
-
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="内存" Style="{StaticResource SectionTitle}" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="16" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="最大内存 (MB)" Style="{StaticResource CaptionText}" />
-                                <TextBox Text="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="初始内存 (MB)" Style="{StaticResource CaptionText}" />
-                                <TextBox Text="{Binding MinMemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
-                            </StackPanel>
-                        </Grid>
-                        <TextBlock Text="1.21.1 + NeoForge 建议 3072–6144 MB。"
-                                   Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-
-            <!-- ===================== right column ===================== -->
-                        <!-- sub-page 2: downloads, account and logs -->
-            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,10,0"
-                        Visibility="{Binding IsNetworkSection, Converter={StaticResource BoolToVisibility}}">
-                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="下载" Style="{StaticResource SectionTitle}" />
-
-                        <TextBlock Text="下载源" Style="{StaticResource CaptionText}" />
-                        <ComboBox ItemsSource="{Binding SourceOptions}" SelectedValue="{Binding Source}"
-                                  SelectedValuePath="Source" DisplayMemberPath="Name" Margin="0,6,0,12" />
-
-                        <TextBlock Text="最大并发连接数" Style="{StaticResource CaptionText}" />
-                        <TextBox Text="{Binding MaxConcurrency, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
-
-                        <TextBlock Text="代理（例如 http://127.0.0.1:7890）" Style="{StaticResource CaptionText}" />
-                        <TextBox Text="{Binding ProxyUrl, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
-                    <TextBlock Text="CurseForge API Key（可选，用于自动下载 CF 整合包的全部模组）"
-                               Style="{StaticResource CaptionText}" Margin="0,14,0,0" />
-                    <Grid Margin="0,6,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0" Text="{Binding CurseForgeApiKey, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.AutomationId="CurseForgeKeyBox" />
-                        <Button Grid.Column="1" Content="测试 Key" Style="{StaticResource SecondaryButton}"
-                                Command="{Binding TestCurseForgeKeyCommand}" Margin="8,0,0,0" Padding="14,6"
-                                AutomationProperties.AutomationId="CurseForgeKeyTest" />
-                    </Grid>
-                    <TextBlock Text="申请入口见 CurseForge 支持文档；留空则只能靠公开 CDN 猜测，部分模组会缺失。"
-                               Style="{StaticResource CaptionText}" Margin="0,6,0,0" TextWrapping="Wrap" />
-
-                        <TextBlock Text="镜像仅作为传输替代，所有文件仍按官方 SHA-1 校验。启动器不会关闭 TLS 证书验证。"
-                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
-                    </StackPanel>
-                </Border>
-
-                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="界面与日志" Style="{StaticResource SectionTitle}" />
-
-                        <TextBlock Text="主题" Style="{StaticResource CaptionText}" />
-                        <ComboBox ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}"
-                                  SelectedValuePath="Key" DisplayMemberPath="Name" Margin="0,6,0,12" />
-
-                        <TextBlock Text="主题色" Style="{StaticResource CaptionText}" />
-                        <ItemsControl ItemsSource="{Binding Accents}" Margin="0,8,0,12">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Width="34" Height="34" Margin="0,0,8,0" Cursor="Hand"
-                                            ToolTip="{Binding Name}"
-                                            Tag="{Binding Key}"
-                                            Click="OnAccentClick"
-                                            AutomationProperties.Name="{Binding Name}">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <Grid>
-                                                    <Ellipse Width="28" Height="28" x:Name="Dot">
-                                                        <Ellipse.Fill>
-                                                            <SolidColorBrush Color="{Binding Color}" />
-                                                        </Ellipse.Fill>
-                                                    </Ellipse>
-                                                    <Ellipse x:Name="Ring" Width="34" Height="34" StrokeThickness="2"
-                                                             Stroke="Transparent" />
-                                                </Grid>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Ring" Property="Stroke" Value="{DynamicResource TextBrush}" />
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <CheckBox Content="强制游戏日志使用 UTF-8（推荐，避免中文乱码）"
-                                  IsChecked="{Binding ForceUtf8Console}" />
-                    </StackPanel>
-                </Border>
-
-                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="微软登录" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Text="如需自行发布，请填写你注册的 Azure 应用客户端 ID（留空使用内置公共客户端 ID）。"
-                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-                        <TextBox Text="{Binding MicrosoftClientId, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
-                    </StackPanel>
-                </Border>
-
-                <Button Content="保存设置" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" Padding="20,10" />
-                <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,10,0,0" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}"
+                           VerticalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis"
+                           Margin="0,0,12,0" />
+                <Button Content="保存设置" Style="{StaticResource PrimaryButton}" Padding="18,8"
+                        Command="{Binding SaveCommand}" AutomationProperties.AutomationId="SettingsSave" />
             </StackPanel>
         </Grid>
-    </ScrollViewer>
+
+        <!-- 左侧子界面 + 右侧内容 -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="216" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource Card}" Padding="8" VerticalAlignment="Top">
+                <StackPanel>
+                    <TextBlock Text="分类" Style="{StaticResource CaptionText}" Margin="8,4,0,6" />
+                    <ListBox ItemsSource="{Binding Sections}" SelectedIndex="{Binding SectionIndex, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0"
+                             ItemContainerStyle="{StaticResource SettingsNavItem}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.AutomationId="SettingsSections">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontSize="12.5" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <!-- ===== 常规 ===== -->
+                    <StackPanel Visibility="{Binding IsGeneralSection, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="常规" Style="{StaticResource SectionTitle}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SectionSubtitle}" Style="{StaticResource CaptionText}" Margin="0,0,0,12" />
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="日志" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="强制游戏日志使用 UTF-8，避免中文乱码。" Style="{StaticResource CaptionText}" />
+                                <CheckBox Content="强制游戏日志使用 UTF-8（推荐）" IsChecked="{Binding ForceUtf8Console}"
+                                          Margin="0,10,0,0" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="打开日志目录" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding OpenLogsCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="数据目录" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="{Binding DataRoot}" Style="{StaticResource MonoText}" TextWrapping="Wrap" />
+                                <TextBlock Text="把 portable.txt 放到 EXE 同目录即可切换为便携模式（数据保存在 data 子目录）。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="打开数据目录" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding OpenDataFolderCommand}" />
+                                    <Button Content="打开账户目录" Style="{StaticResource GhostButton}"
+                                            Command="{Binding OpenAccountsCommand}" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ===== 外观与主题 ===== -->
+                    <StackPanel Visibility="{Binding IsAppearanceSection, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="外观与主题" Style="{StaticResource SectionTitle}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SectionSubtitle}" Style="{StaticResource CaptionText}" Margin="0,0,0,12" />
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="主题" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="切换后立即生效，不需要重启。" Style="{StaticResource CaptionText}" />
+                                <ComboBox ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}"
+                                          SelectedValuePath="Key" DisplayMemberPath="Name" Margin="0,10,0,0"
+                                          AutomationProperties.AutomationId="ThemePicker" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="主题色" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="用于按钮、选中态与强调文字。" Style="{StaticResource CaptionText}" />
+                                <ItemsControl ItemsSource="{Binding Accents}" Margin="0,12,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Width="34" Height="34" Margin="0,0,8,8" Cursor="Hand"
+                                                    ToolTip="{Binding Name}" Tag="{Binding Key}"
+                                                    Click="OnAccentClick" AutomationProperties.Name="{Binding Name}">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Grid>
+                                                            <Ellipse Width="26" Height="26" x:Name="Dot">
+                                                                <Ellipse.Fill>
+                                                                    <SolidColorBrush Color="{Binding Color}" />
+                                                                </Ellipse.Fill>
+                                                            </Ellipse>
+                                                            <Ellipse x:Name="Ring" Width="32" Height="32" StrokeThickness="2"
+                                                                     Stroke="Transparent" />
+                                                        </Grid>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Ring" Property="Stroke"
+                                                                        Value="{DynamicResource TextBrush}" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="主界面背景" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="可以为主界面设置一张自定义背景图片（也可以在主界面右键更换）。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding DataContext.Home.BackgroundImagePath, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           Style="{StaticResource MonoText}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Visibility="{Binding DataContext.Home.BackgroundImagePath, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource StringToVisibility}}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="选择背景图片…" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding DataContext.Home.ChooseBackgroundCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                    <Button Content="恢复默认背景" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                            Command="{Binding DataContext.Home.ClearBackgroundCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ===== Java 与内存 ===== -->
+                    <StackPanel Visibility="{Binding IsJavaSection, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Java 与内存" Style="{StaticResource SectionTitle}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SectionSubtitle}" Style="{StaticResource CaptionText}" Margin="0,0,0,12" />
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Java 运行时" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="留空表示按游戏版本自动选择（推荐）。" Style="{StaticResource CaptionText}" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding JavaPath, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="1" Content="浏览" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding BrowseJavaCommand}" Margin="8,0,0,0" />
+                                    <Button Grid.Column="2" Content="重新检测" Style="{StaticResource GhostButton}"
+                                            Command="{Binding DetectJavaCommand}" Margin="4,0,0,0" />
+                                </Grid>
+
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="8" Padding="10" Margin="0,10,0,0">
+                                    <ListBox ItemsSource="{Binding JavaRuntimes}" MaxHeight="150" Background="Transparent"
+                                             BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="4,3">
+                                                    <TextBlock Text="{Binding DisplayName}" FontSize="12.5" />
+                                                    <TextBlock Text="{Binding Home}" Style="{StaticResource CaptionText}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="内存" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="这里设置的是默认值，单个版本可以在「版本设置」里单独覆盖。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="最大内存 (MB)" Style="{StaticResource CaptionText}" />
+                                        <TextBox Text="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="初始内存 (MB)" Style="{StaticResource CaptionText}" />
+                                        <TextBox Text="{Binding MinMemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="1.21.1 + NeoForge 建议 3072–6144 MB。" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ===== 网络与下载 ===== -->
+                    <StackPanel Visibility="{Binding IsNetworkSection, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="网络与下载" Style="{StaticResource SectionTitle}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SectionSubtitle}" Style="{StaticResource CaptionText}" Margin="0,0,0,12" />
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="下载" Style="{StaticResource SectionTitle}" />
+
+                                <TextBlock Text="下载源" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
+                                <ComboBox ItemsSource="{Binding SourceOptions}" SelectedValue="{Binding Source}"
+                                          SelectedValuePath="Source" DisplayMemberPath="Name" Margin="0,6,0,12" />
+
+                                <TextBlock Text="最大并发连接数" Style="{StaticResource CaptionText}" />
+                                <TextBox Text="{Binding MaxConcurrency, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
+
+                                <TextBlock Text="代理（例如 http://127.0.0.1:7890）" Style="{StaticResource CaptionText}" />
+                                <TextBox Text="{Binding ProxyUrl, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+
+                                <TextBlock Text="镜像仅作为传输替代，所有文件仍按官方 SHA-1 校验。启动器不会关闭 TLS 证书验证。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="CurseForge" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="API Key 可选，用于自动下载 CF 整合包的全部模组；留空时只能靠公开 CDN 猜测，部分模组会缺失。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding CurseForgeApiKey, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.AutomationId="CurseForgeKeyBox" />
+                                    <Button Grid.Column="1" Content="测试 Key" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding TestCurseForgeKeyCommand}" Margin="8,0,0,0" Padding="14,6"
+                                            AutomationProperties.AutomationId="CurseForgeKeyTest" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ===== 账户 ===== -->
+                    <StackPanel Visibility="{Binding IsAccountSection, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="账户" Style="{StaticResource SectionTitle}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SectionSubtitle}" Style="{StaticResource CaptionText}" Margin="0,0,0,12" />
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="微软登录" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="如需自行发布，请填写你注册的 Azure 应用客户端 ID（留空使用内置公共客户端 ID）。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                                <TextBox Text="{Binding MicrosoftClientId, UpdateSourceTrigger=PropertyChanged}" Margin="0,10,0,0" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="打开账户目录" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding OpenAccountsCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ===== 关于与维护 ===== -->
+                    <StackPanel Visibility="{Binding IsAboutSection, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="关于与维护" Style="{StaticResource SectionTitle}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SectionSubtitle}" Style="{StaticResource CaptionText}" Margin="0,0,0,12" />
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="版本信息" Style="{StaticResource SectionTitle}" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="启动器版本" Style="{StaticResource CaptionText}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding AppVersion}" Style="{StaticResource MonoText}" />
+                                    <TextBlock Grid.Row="1" Text="数据目录" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DataRoot}" Style="{StaticResource MonoText}"
+                                               TextWrapping="Wrap" Margin="0,8,0,0" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="维护" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="以下操作只会打开目录，不会改动任何文件。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="打开数据目录" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding OpenDataFolderCommand}" />
+                                    <Button Content="打开日志目录" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                            Command="{Binding OpenLogsCommand}" />
+                                    <Button Content="打开账户目录" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                            Command="{Binding OpenAccountsCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
 </UserControl>

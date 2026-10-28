@@ -18,31 +18,45 @@ public sealed class SettingsViewModel : ObservableObject
     private string _proxyUrl = "";
     private string _theme = "Dark";
     private string _accent = "Blue";
-    private string _section = "general";
+    private int _sectionIndex;
 
-    /// <summary>Active sub-tab: general (appearance, data, Java, memory) or network (download, account, logs).</summary>
-    public string Section
+    /// <summary>子界面：0 常规 / 1 外观 / 2 Java 与内存 / 3 网络与下载 / 4 账户 / 5 关于。</summary>
+    public int SectionIndex
     {
-        get => _section;
+        get => _sectionIndex;
         set
         {
-            if (!SetProperty(ref _section, value)) return;
+            var clamped = Math.Clamp(value, 0, Sections.Count - 1);
+            if (!SetProperty(ref _sectionIndex, clamped)) return;
+
             OnPropertyChanged(nameof(IsGeneralSection));
+            OnPropertyChanged(nameof(IsAppearanceSection));
+            OnPropertyChanged(nameof(IsJavaSection));
             OnPropertyChanged(nameof(IsNetworkSection));
+            OnPropertyChanged(nameof(IsAccountSection));
+            OnPropertyChanged(nameof(IsAboutSection));
+            OnPropertyChanged(nameof(SectionSubtitle));
         }
     }
 
-    public bool IsGeneralSection
-    {
-        get => _section == "general";
-        set { if (value) Section = "general"; }
-    }
+    public IReadOnlyList<SettingsSection> Sections { get; } =
+    [
+        new("general", "常规", "\uE7F4", "启动行为、数据目录与日志编码"),
+        new("appearance", "外观与主题", "\uE790", "主题、主题色与主界面背景"),
+        new("java", "Java 与内存", "\uE943", "运行时路径、内存分配"),
+        new("network", "网络与下载", "\uE896", "下载源、并发、代理与 CurseForge"),
+        new("account", "账户", "\uE77B", "微软登录客户端 ID"),
+        new("about", "关于与维护", "\uE946", "版本信息、数据位置与清理"),
+    ];
 
-    public bool IsNetworkSection
-    {
-        get => _section == "network";
-        set { if (value) Section = "network"; }
-    }
+    public string SectionSubtitle => Sections[Math.Clamp(_sectionIndex, 0, Sections.Count - 1)].Subtitle;
+
+    public bool IsGeneralSection => _sectionIndex == 0;
+    public bool IsAppearanceSection => _sectionIndex == 1;
+    public bool IsJavaSection => _sectionIndex == 2;
+    public bool IsNetworkSection => _sectionIndex == 3;
+    public bool IsAccountSection => _sectionIndex == 4;
+    public bool IsAboutSection => _sectionIndex == 5;
 
     /// <summary>Accent swatches shown in settings (colour is only for the preview dot).</summary>
     public IReadOnlyList<AccentOption> Accents { get; } =
@@ -98,6 +112,11 @@ public sealed class SettingsViewModel : ObservableObject
     ];
 
     public string DataRoot => _main.Context.Paths.Root;
+
+    /// <summary>关于页展示的启动器版本。</summary>
+    public string AppVersion => typeof(SettingsViewModel).Assembly.GetName().Version is { } v
+        ? $"v{v.Major}.{v.Minor}.{v.Build}"
+        : "v0.2";
 
     public ObservableList<JavaRuntime> JavaRuntimes => _main.JavaRuntimes;
 
@@ -284,6 +303,9 @@ public sealed class SettingsViewModel : ObservableObject
         Process.Start(new ProcessStartInfo("explorer.exe", $"\"{directory}\"") { UseShellExecute = true });
     }
 }
+
+/// <summary>设置页左侧的子界面条目。</summary>
+public sealed record SettingsSection(string Key, string Name, string Glyph, string Subtitle);
 
 public sealed class AccentOption(string key, string name, string color)
 {
