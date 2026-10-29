@@ -17,6 +17,7 @@ public partial class ToolboxView : UserControl
         InitializeComponent();
         DataContextChanged += (_, _) => Attach();
         BiomeCanvas.HoverChanged += OnMapHover;
+        BiomeCanvas.StructureClicked += OnStructureClicked;
     }
 
     private void Attach()
@@ -27,6 +28,7 @@ public partial class ToolboxView : UserControl
             _attached.LocateRequested -= OnLocateRequested;
             _attached.DimensionChanged -= OnDimensionChanged;
             _attached.SpawnRequested -= OnSpawnRequested;
+            _attached.StructureFilterChanged -= OnStructureFilterChanged;
         }
 
         _attached = DataContext as ToolboxViewModel;
@@ -40,6 +42,8 @@ public partial class ToolboxView : UserControl
             _attached.LocateRequested += OnLocateRequested;
             _attached.DimensionChanged += OnDimensionChanged;
             _attached.SpawnRequested += OnSpawnRequested;
+            _attached.StructureFilterChanged += OnStructureFilterChanged;
+            _attached.ChangeStructureFilter();
             BiomeCanvas.Dimension = DimensionOf(_attached.DimensionIndex);
             BiomeCanvas.ShowStructures = _attached.ShowStructures;
         }
@@ -80,6 +84,20 @@ public partial class ToolboxView : UserControl
     }
 
     private void OnDimensionChanged(int index) => BiomeCanvas.Dimension = DimensionOf(index);
+
+    private void OnStructureFilterChanged(IEnumerable<string>? keys) => BiomeCanvas.SetStructureFilter(keys);
+
+    /// <summary>点地图上的结构图标：把坐标填进输入框并定位过去。</summary>
+    private void OnStructureClicked(object? sender, StructureMarker marker)
+    {
+        if (_attached is not { } vm) return;
+
+        vm.LocateX = marker.BlockX.ToString();
+        vm.LocateZ = marker.BlockZ.ToString();
+        vm.NotifyLocateInputsChanged();
+        BiomeCanvas.LocateTo(marker.BlockX, marker.BlockZ);
+        vm.MapStatus = $"{marker.Label}：方块 {marker.BlockX}, {marker.BlockZ}";
+    }
 
     private static int DimensionOf(int index) => index switch
     {

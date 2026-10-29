@@ -88,6 +88,13 @@
                                     AutomationProperties.AutomationId="LocateGo" />
                         </Grid>
 
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="→ 下界坐标" Style="{StaticResource GhostButton}" FontSize="10.5"
+                                    Padding="10,4" Command="{Binding ToNetherCommand}" />
+                            <Button Content="→ 主世界坐标" Style="{StaticResource GhostButton}" FontSize="10.5"
+                                    Padding="10,4" Margin="6,0,0,0" Command="{Binding ToOverworldCommand}" />
+                        </StackPanel>
+
                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                             <Button Content="定位到出生点" Style="{StaticResource GhostButton}"
                                     Command="{Binding LocateSpawnCommand}" Padding="10,5"
@@ -98,6 +105,27 @@
 
                         <CheckBox Content="显示结构与出生点" IsChecked="{Binding ShowStructures}"
                                   Margin="0,10,0,0" />
+
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="只显示这些结构" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center" />
+                            <Button Content="全选/全不选" Style="{StaticResource GhostButton}" FontSize="10"
+                                    Padding="8,3" HorizontalAlignment="Right"
+                                    Command="{Binding ToggleAllStructuresCommand}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding StructureFilterOptions}" Margin="0,4,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                              FontSize="10.5" Margin="0,0,10,4" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <CheckBox Content="显示史莱姆区块" IsChecked="{Binding ShowSlimeOverlay}"
                                   Margin="0,6,0,0" />
                         <CheckBox Content="显示网格与坐标" IsChecked="{Binding ShowGridOverlay}"

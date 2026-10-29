@@ -58,4 +58,12 @@ public static class MapViewportMath
         if (double.IsNaN(velocityPxPerMs) || double.IsInfinity(velocityPxPerMs)) return 0;
         return Math.Clamp(velocityPxPerMs * milliseconds, -maxPixels, maxPixels);
     }
+    /// <summary>主世界坐标 → 下界坐标（1:8，向下取整，与游戏内传送门换算一致）。</summary>
+    public static (int X, int Z) ToNether(int overworldX, int overworldZ) =>
+        (FloorDiv8(overworldX), FloorDiv8(overworldZ));
+
+    /// <summary>下界坐标 → 主世界坐标（×8）。</summary>
+    public static (int X, int Z) ToOverworld(int netherX, int netherZ) => (netherX * 8, netherZ * 8);
+
+    private static int FloorDiv8(int value) => value >= 0 ? value / 8 : (value - 7) / 8;
 }

@@ -32,6 +32,15 @@ public sealed class ToolboxViewModel : ObservableObject
 
         GenerateMapCommand = new RelayCommand(GenerateMap);
         LocateCommand = new RelayCommand(LocateTo);
+        ToggleAllStructuresCommand = new RelayCommand(() =>
+        {
+            var enable = !StructureFilterOptions.All(o => o.IsEnabled);
+            foreach (var option in StructureFilterOptions) option.IsEnabled = enable;
+            ChangeStructureFilter();
+        });
+        ToNetherCommand = new RelayCommand(() => ConvertCoordinates(toNether: true));
+        ToOverworldCommand = new RelayCommand(() => ConvertCoordinates(toNether: false));
+        foreach (var option in StructureFilterOptions) option.Changed += _ => ChangeStructureFilter();
         LocateSpawnCommand = new RelayCommand(LocateSpawn);
         OpenChunkbaseCommand = new RelayCommand(OpenChunkbase);
         OpenMislandCommand = new RelayCommand(OpenMisland);
@@ -162,6 +171,35 @@ public sealed class ToolboxViewModel : ObservableObject
 
     private bool _showStructures = true;
 
+    /// <summary>结构筛选：只勾选的类型会画在地图上（空 = 全部）。</summary>
+    public ObservableList<StructureFilterOption> StructureFilterOptions { get; } =
+    [
+        new("village", "村庄"),
+        new("outpost", "前哨站"),
+        new("monument", "海底神殿"),
+        new("mansion", "林地府邸"),
+        new("temple", "神庙/神殿"),
+        new("shipwreck", "沉船"),
+        new("treasure", "宝藏"),
+        new("ruins", "废墟/传送门"),
+        new("city", "远古城市/试炼"),
+        new("stronghold", "要塞"),
+    ];
+
+    public ICommand ToggleAllStructuresCommand { get; }
+
+    public void ChangeStructureFilter() => StructureFilterChanged?.Invoke(AllowedStructureKeys());
+
+    public event Action<IEnumerable<string>?>? StructureFilterChanged;
+
+    private IEnumerable<string>? AllowedStructureKeys()
+    {
+        var enabled = StructureFilterOptions.Where(o => o.IsEnabled).ToList();
+        if (enabled.Count == StructureFilterOptions.Count) return null;   // 全选 = 不过滤
+        if (enabled.Count == 0) return ["__none__"];                      // 全不选 = 什么都不画
+        return enabled.SelectMany(o => o.Key).ToList();
+    }
+
     public bool ShowStructures
     {
         get => _showStructures;
@@ -170,6 +208,11 @@ public sealed class ToolboxViewModel : ObservableObject
 
     public ICommand LocateSpawnCommand { get; }
 
+    /// <summary>主世界 ↔ 下界坐标换算（1:8）。</summary>
+    public ICommand ToNetherCommand { get; }
+
+    public ICommand ToOverworldCommand { get; }
+
     /// <summary>出生点定位请求（画布由 View 驱动）。</summary>
     public event Action? SpawnRequested;
 
@@ -177,6 +220,14 @@ public sealed class ToolboxViewModel : ObservableObject
 
     /// <summary>坐标定位：X / Z 输入框 + 事件（画布由 View 来驱动）。</summary>
     public string LocateX { get; set; } = "0";
+
+    /// <summary>外部（点地图上的结构）改了坐标后刷新输入框显示。</summary>
+    public void NotifyLocateInputsChanged()
+    {
+        OnPropertyChanged(nameof(LocateX));
+        OnPropertyChanged(nameof(LocateZ));
+    }
+
     public string LocateZ { get; set; } = "0";
 
     public event Action<int, int>? LocateRequested;
@@ -423,6 +474,32 @@ public sealed class ToolboxViewModel : ObservableObject
         MapStatus = $"已定位到出生点 {position.X}, {position.Z}";
     }
 
+    /// <summary>把输入框里的坐标按 1:8 换算，并定位过去。</summary>
+    private void ConvertCoordinates(bool toNether)
+    {
+        if (!int.TryParse(LocateX?.Trim(), out var x) || !int.TryParse(LocateZ?.Trim(), out var z))
+        {
+            SeedError = "坐标要填整数方块坐标。";
+            return;
+        }
+
+        SeedError = "";
+        var (nx, nz) = toNether
+            ? MapViewportMath.ToNether(x, z)
+            : MapViewportMath.ToOverworld(x, z);
+
+        LocateX = nx.ToString();
+        LocateZ = nz.ToString();
+        OnPropertyChanged(nameof(LocateX));
+        OnPropertyChanged(nameof(LocateZ));
+
+        DimensionIndex = toNether ? 1 : 0;
+        LocateRequested?.Invoke(nx, nz);
+        MapStatus = toNether
+            ? $"主世界 {x}, {z} ↔ 下界 {nx}, {nz}（1:8）"
+            : $"下界 {x}, {z} ↔ 主世界 {nx}, {nz}（1:8）";
+    }
+
     private void OpenChunkbase()
     {
         var version = Uri.EscapeDataString(SeedVersion);
@@ -548,4 +625,47 @@ public sealed class ScreenshotRow
     public string SizeText { get; }
     public string TakenText { get; }
     public ImageSource Image { get; }
+}
+
+/// <summary>结构筛选选项：一个分组对应若干 cubiomes 结构 key。</summary>
+public sealed class StructureFilterOption : ObservableObject
+{
+    private bool _isEnabled = true;
+
+    public StructureFilterOption(string group, string label)
+    {
+        Group = group;
+        Label = label;
+    }
+
+    public string Group { get; }
+    public string Label { get; }
+
+    public event Action<StructureFilterOption>? Changed;
+
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            if (!SetProperty(ref _isEnabled, value)) return;
+            Changed?.Invoke(this);
+        }
+    }
+
+    /// <summary>分组覆盖的 cubiomes 结构 key。</summary>
+    public IReadOnlyList<string> Key => Group switch
+    {
+        "village" => ["village"],
+        "outpost" => ["outpost"],
+        "monument" => ["monument"],
+        "mansion" => ["mansion"],
+        "temple" => ["desert_pyramid", "jungle_temple", "swamp_hut", "igloo"],
+        "shipwreck" => ["shipwreck", "ocean_ruin"],
+        "treasure" => ["treasure"],
+        "ruins" => ["ruined_portal", "ruined_portal_nether"],
+        "city" => ["ancient_city", "trail_ruins", "trial_chambers"],
+        "stronghold" => ["stronghold"],
+        _ => [],
+    };
 }

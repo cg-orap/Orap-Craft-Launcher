@@ -74,6 +74,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
     private int _dimension = CubiomesNative.DimOverworld;
     private bool _showStructures = true;
+    private HashSet<string>? _allowedStructures;
     private readonly List<StructureMarker> _structures = [];
     private (int X, int Z)? _spawn;
     private string? _hoverStructure;
@@ -179,6 +180,19 @@ public sealed class BiomeMapCanvas : FrameworkElement
             InvalidateVisual();
         }
     }
+
+    /// <summary>只显示这些结构 key（null/空 = 全部）。</summary>
+    public void SetStructureFilter(IEnumerable<string>? keys)
+    {
+        _allowedStructures = keys is null ? null : new HashSet<string>(keys, StringComparer.OrdinalIgnoreCase);
+        InvalidateVisual();
+    }
+
+    /// <summary>点击了结构图标（用于把坐标填进输入框并定位）。</summary>
+    public event EventHandler<StructureMarker>? StructureClicked;
+
+    private bool StructureVisible(string key) => _allowedStructures is null || _allowedStructures.Count == 0
+        || _allowedStructures.Contains(key);
 
     public bool ShowSlime { get; set; } = true;
     public bool ShowGrid { get; set; } = true;
@@ -548,22 +562,14 @@ public sealed class BiomeMapCanvas : FrameworkElement
         {
             foreach (var marker in _structures)
             {
+                if (!StructureVisible(marker.Key)) continue;
+
                 var mx = (marker.BlockX - left) / (double)step;
                 var my = (marker.BlockZ - top) / (double)step;
                 if (mx < -12 || mx > width + 12 || my < -12 || my > height + 12) continue;
 
-                var brush = StructureLabels.BrushFor(marker.Key);
-                if (marker.IsStronghold)
-                {
-                    var pen = new Pen(brush, 1.6);
-                    dc.DrawEllipse(null, pen, new Point(mx, my), 6, 6);
-                    dc.DrawEllipse(null, pen, new Point(mx, my), 2, 2);
-                }
-                else
-                {
-                    dc.DrawEllipse(brush, null, new Point(mx, my), 3.5, 3.5);
-                    dc.DrawEllipse(null, new Pen(Brushes.Black, 0.6), new Point(mx, my), 3.5, 3.5);
-                }
+                StructureIconRenderer.Draw(dc, marker.Key, StructureLabels.BrushFor(marker.Key),
+                    new Point(mx, my), marker.IsStronghold ? 13 : 11);
             }
 
             if (_spawn is { } sp)
@@ -664,6 +670,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
             var bestDistance = 12.0;
             foreach (var marker in _structures)
             {
+                if (!StructureVisible(marker.Key)) continue;
                 var mx = (marker.BlockX - left) / (double)step;
                 var my = (marker.BlockZ - top) / (double)step;
                 var distance = Math.Sqrt((mx - position.X) * (mx - position.X) + (my - position.Y) * (my - position.Y));
@@ -718,6 +725,32 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _dragging = false;
         ReleaseMouseCapture();
         Cursor = Cursors.Arrow;
+
+        // 轻点（没有拖动）命中结构图标 → 交给界面定位
+        var release = e.GetPosition(this);
+        if (Math.Abs(release.X - _dragStart.X) < 4 && Math.Abs(release.Y - _dragStart.Y) < 4)
+        {
+            var step = BlocksPerPixel;
+            var left = _centerBlockX - (int)(ActualWidth / 2 * step);
+            var top = _centerBlockZ - (int)(ActualHeight / 2 * step);
+
+            StructureMarker? hit = null;
+            var best = 11.0;
+            foreach (var marker in _structures)
+            {
+                if (!StructureVisible(marker.Key)) continue;
+                var mx = (marker.BlockX - left) / (double)step;
+                var my = (marker.BlockZ - top) / (double)step;
+                var distance = Math.Sqrt((mx - release.X) * (mx - release.X) + (my - release.Y) * (my - release.Y));
+                if (distance < best)
+                {
+                    best = distance;
+                    hit = marker;
+                }
+            }
+
+            if (hit is not null) StructureClicked?.Invoke(this, hit);
+        }
 
         // 惯性：松手后中心继续按速度滑行一小段（在 140ms 内衰减），期间仍然流式请求瓦片
         _inertiaVx = _velocityX;
