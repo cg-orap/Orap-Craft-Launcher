@@ -46,8 +46,17 @@ public sealed class LauncherSettings
         /// <summary>
     /// Optional CurseForge API key. Without one, CurseForge packs can only be resolved through public
     /// CDN guesses, which misses many files; with a key the official download-url endpoint is used.
+    ///
+    /// 这个属性只存在内存里：落盘时由 <see cref="SettingsStore"/> 换成 DPAPI 密文写进
+    /// <see cref="CurseForgeApiKeyProtected"/>，明文不会再出现在 settings.json。
     /// </summary>
-    [JsonPropertyName("curseForgeApiKey")] public string? CurseForgeApiKey { get; set; }
+    [JsonIgnore] public string? CurseForgeApiKey { get; set; }
+
+    /// <summary>CurseForge API Key 的 DPAPI 密文（Base64，当前 Windows 用户才能解开）。</summary>
+    [JsonPropertyName("curseForgeKeyProtected")] public string? CurseForgeApiKeyProtected { get; set; }
+
+    /// <summary>旧版本留下的明文字段：读取后会被迁移成密文并在下次保存时清空。</summary>
+    [JsonPropertyName("curseForgeApiKey")] public string? LegacyCurseForgeApiKey { get; set; }
 
     /// <summary>工具箱 → 游戏默认设置：新版本初始化时写入 options.txt。</summary>
     [JsonPropertyName("defaultGameOptions")] public Game.GameOptionsTemplate DefaultGameOptions { get; set; } = new();
@@ -82,11 +91,44 @@ public sealed class SettingsStore
             {
                 var json = File.ReadAllText(_paths.SettingsFile);
                 var settings = JsonUtil.Deserialize<LauncherSettings>(json);
-                if (settings is not null) Current = settings;
+                if (settings is not null)
+                {
+                    // 老配置里的明文 Key 迁移到内存，下次保存会写成密文并抹掉明文
+                    settings.CurseForgeApiKey = string.IsNullOrWhiteSpace(settings.LegacyCurseForgeApiKey)
+                        ? Util.SecretProtector.Unprotect(settings.CurseForgeApiKeyProtected)
+                        : settings.LegacyCurseForgeApiKey;
+
+                    if (!string.IsNullOrWhiteSpace(settings.LegacyCurseForgeApiKey))
+                    {
+                        // 迁移绝不能拖垮启动：任何异常都只记一条日志，内存里的 Key 仍然可用
+                        try
+                        {
+                            Diagnostics.AppLog.Info("settings", "migrating plaintext CurseForge key to DPAPI");
+                            var protectedValue = Util.SecretProtector.Protect(settings.CurseForgeApiKey);
+                            if (protectedValue is not null)
+                            {
+                                settings.CurseForgeApiKeyProtected = protectedValue;
+                                settings.LegacyCurseForgeApiKey = null;
+
+                                // 立刻落盘：不让明文在磁盘上多留一次运行。
+                                // 这里必须用同步写：Load() 在 WPF 的 UI 线程上被调用，await 一个
+                                // 捕获了 Dispatcher 上下文的异步写会直接死锁（窗口永不出现）。
+                                File.WriteAllText(_paths.SettingsFile, JsonUtil.Serialize(settings));
+                            }
+                        }
+                        catch (Exception migrateError)
+                        {
+                            Diagnostics.AppLog.Warn("settings", "migrate-failed", ("error", migrateError.Message));
+                        }
+                    }
+
+                    Current = settings;
+                }
             }
         }
-        catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException)
+        catch (Exception ex)
         {
+            // 配置读失败不该阻止启动：用默认值继续，并把原因写进日志
             Diagnostics.AppLog.Warn("settings", "unreadable", ("error", ex.Message));
         }
 
@@ -96,6 +138,16 @@ public sealed class SettingsStore
     public async Task SaveAsync(LauncherSettings? settings = null, CancellationToken ct = default)
     {
         if (settings is not null) Current = settings;
+
+        // 明文只写进 DPAPI 密文；LegacyCurseForgeApiKey 一律清空，避免旧字段继续泄露
+        if (!string.IsNullOrWhiteSpace(Current.CurseForgeApiKey))
+        {
+            var protectedValue = Util.SecretProtector.Protect(Current.CurseForgeApiKey);
+            if (protectedValue is not null) Current.CurseForgeApiKeyProtected = protectedValue;
+        }
+
+        Current.LegacyCurseForgeApiKey = null;
+
         await JsonUtil.WriteFileAsync(_paths.SettingsFile, Current, ct).ConfigureAwait(false);
     }
 }
