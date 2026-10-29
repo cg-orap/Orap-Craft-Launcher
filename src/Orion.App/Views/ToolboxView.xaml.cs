@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Controls;
 using Orion.App.Controls;
 using Orion.App.ViewModels;
 using Orion.Core.World;
@@ -115,6 +117,49 @@ public partial class ToolboxView : UserControl
         var structure = e.NearStructure is { } near ? $" · 附近：{near}" : "";
         vm.MapStatus = $"方块 {e.BlockX}, {e.BlockZ} · {biome}{slime}{structure}";
     }
+
+    /// <summary>
+    /// 页面级滚轮：指针在左栏时滚动设置面板，在地图区则让画布自己缩放。
+    ///
+    /// 之所以放在页面级：左栏里的分段切换/输入框有内部滚动或会吃掉滚轮事件，
+    /// 挂在 ScrollViewer 上时经常收不到，用户就会觉得"没法滚动"。
+    /// </summary>
+    private void OnSeedPageWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not Grid page) return;
+
+        var viewer = SeedPanelScroll;
+        if (viewer is null) return;
+
+        // 指针在右半边（地图）时不做处理，交给 BiomeMapCanvas 缩放
+        var position = e.GetPosition(page);
+        var panelWidth = viewer.ActualWidth + viewer.Margin.Left + viewer.Margin.Right + 20;
+        if (position.X > panelWidth) return;
+
+        viewer.ScrollToVerticalOffset(viewer.VerticalOffset - e.Delta / 3.0);
+        e.Handled = true;
+    }
+
+    /// <summary>键盘也能滚动（PageUp/PageDown/Home/End），触控板或无滚轮时的兜底。</summary>
+    private void OnSeedPageKeyDown(object sender, KeyEventArgs e)
+    {
+        var viewer = SeedPanelScroll;
+        if (viewer is null) return;
+
+        var page = Math.Max(60, viewer.ViewportHeight * 0.9);
+        switch (e.Key)
+        {
+            case Key.PageDown: viewer.ScrollToVerticalOffset(viewer.VerticalOffset + page); break;
+            case Key.PageUp: viewer.ScrollToVerticalOffset(viewer.VerticalOffset - page); break;
+            case Key.End: viewer.ScrollToEnd(); break;
+            case Key.Home: viewer.ScrollToTop(); break;
+            default: return;
+        }
+
+        e.Handled = true;
+    }
+
+    private ScrollViewer? SeedPanelScroll => FindName("SeedPanelScroll") as ScrollViewer;
 
     private void OnZoomIn(object sender, RoutedEventArgs e)
     {

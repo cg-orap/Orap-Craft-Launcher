@@ -208,6 +208,7 @@ public sealed class ToolboxViewModel : ObservableObject
 
     public ICommand LocateSpawnCommand { get; }
 
+
     /// <summary>主世界 ↔ 下界坐标换算（1:8）。</summary>
     public ICommand ToNetherCommand { get; }
 
