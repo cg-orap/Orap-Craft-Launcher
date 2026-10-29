@@ -63,6 +63,13 @@
 
                         <TextBlock Text="{Binding MapStatus}" Style="{StaticResource CaptionText}"
                                    TextWrapping="Wrap" Margin="0,10,0,0" />
+
+                        <CheckBox Content="显示史莱姆区块" IsChecked="{Binding ShowSlimeOverlay}"
+                                  Margin="0,10,0,0" />
+                        <CheckBox Content="显示网格与坐标" IsChecked="{Binding ShowGridOverlay}"
+                                  Margin="0,6,0,0" />
+                        <TextBlock Text="{Binding MapModelNotice}" Style="{StaticResource CaptionText}"
+                                   TextWrapping="Wrap" Margin="0,10,0,0" />
                     </StackPanel>
                 </Border>
 
@@ -85,7 +92,7 @@
 
             <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
                 <Grid>
-                    <controls:SeedMapCanvas x:Name="SeedCanvas" />
+                    <controls:BiomeMapCanvas x:Name="BiomeCanvas" />
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="10">

@@ -7,7 +7,7 @@ using Orion.Core.World;
 
 namespace Orion.App.Views;
 
-/// <summary>工具箱：离线种子地图 / 查看截图 / 游戏默认设置。</summary>
+/// <summary>工具箱：简化版群系地图 / 查看截图 / 游戏默认设置。</summary>
 public partial class ToolboxView : UserControl
 {
     private ToolboxViewModel? _attached;
@@ -16,7 +16,7 @@ public partial class ToolboxView : UserControl
     {
         InitializeComponent();
         DataContextChanged += (_, _) => Attach();
-        SeedCanvas.HoverChanged += OnMapHover;
+        BiomeCanvas.HoverChanged += OnMapHover;
     }
 
     private void Attach()
@@ -27,28 +27,44 @@ public partial class ToolboxView : UserControl
         if (_attached is not null)
         {
             _attached.PropertyChanged += OnViewModelPropertyChanged;
-            SeedCanvas.Seed = _attached.SeedValue;
+            BiomeCanvas.Seed = _attached.SeedValue;
+            BiomeCanvas.ShowSlime = _attached.ShowSlimeOverlay;
+            BiomeCanvas.ShowGrid = _attached.ShowGridOverlay;
         }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ToolboxViewModel.SeedValue) && _attached is { } vm)
+        if (_attached is not { } vm) return;
+
+        switch (e.PropertyName)
         {
-            SeedCanvas.Seed = vm.SeedValue;
-            SeedCanvas.CenterOn(0, 0);
+            case nameof(ToolboxViewModel.SeedValue):
+                BiomeCanvas.Seed = vm.SeedValue;
+                BiomeCanvas.CenterOn(0, 0);
+                break;
+            case nameof(ToolboxViewModel.ShowSlimeOverlay):
+                BiomeCanvas.ShowSlime = vm.ShowSlimeOverlay;
+                BiomeCanvas.InvalidateVisual();
+                break;
+            case nameof(ToolboxViewModel.ShowGridOverlay):
+                BiomeCanvas.ShowGrid = vm.ShowGridOverlay;
+                BiomeCanvas.InvalidateVisual();
+                break;
         }
     }
 
-    private void OnMapHover(object? sender, SeedMapHoverEventArgs e)
+    private void OnMapHover(object? sender, BiomeHoverEventArgs e)
     {
         if (_attached is not { } vm) return;
-        vm.MapStatus = SeedMap.Describe(e.ChunkX, e.ChunkZ, e.Slime);
+
+        var slime = e.Slime ? " · 史莱姆区块" : "";
+        vm.MapStatus = $"方块 {e.BlockX}, {e.BlockZ} · {SimplifiedBiomeMap.DisplayName(e.Biome)}{slime}";
     }
 
-    private void OnZoomIn(object sender, RoutedEventArgs e) => SeedCanvas.Zoom(1.25);
+    private void OnZoomIn(object sender, RoutedEventArgs e) => BiomeCanvas.Zoom(1.25);
 
-    private void OnZoomOut(object sender, RoutedEventArgs e) => SeedCanvas.Zoom(0.8);
+    private void OnZoomOut(object sender, RoutedEventArgs e) => BiomeCanvas.Zoom(0.8);
 
-    private void OnCenterOrigin(object sender, RoutedEventArgs e) => SeedCanvas.CenterOn(0, 0);
+    private void OnCenterOrigin(object sender, RoutedEventArgs e) => BiomeCanvas.CenterOn(0, 0);
 }

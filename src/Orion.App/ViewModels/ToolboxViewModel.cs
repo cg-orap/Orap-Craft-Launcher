@@ -105,7 +105,26 @@ public sealed class ToolboxViewModel : ObservableObject
         set => SetProperty(ref _mapStatus, value);
     }
 
-    public string Legend => "绿色：史莱姆区块（与游戏内公式逐位一致）";
+    public string Legend => "彩色：生物群系（简化模型）· 绿色方格：史莱姆区块（精确）";
+
+    private bool _showSlimeOverlay = true;
+    private bool _showGridOverlay = true;
+
+    public bool ShowSlimeOverlay
+    {
+        get => _showSlimeOverlay;
+        set => SetProperty(ref _showSlimeOverlay, value);
+    }
+
+    public bool ShowGridOverlay
+    {
+        get => _showGridOverlay;
+        set => SetProperty(ref _showGridOverlay, value);
+    }
+
+    public string MapModelNotice =>
+        "群系由 5 通道噪声近似生成（可复现，但与游戏内实际地形不保证一致）；史莱姆区块是精确值。";
+
 
     public ICommand GenerateMapCommand { get; }
 
@@ -299,7 +318,7 @@ public sealed class ToolboxViewModel : ObservableObject
         SeedError = "";
         _seedValue = value;
         OnPropertyChanged(nameof(SeedValue));
-        MapStatus = $"种子 = {value}（拖动平移，滚轮缩放）";
+        MapStatus = $"种子 = {value} · 拖动平移，滚轮缩放，悬停看群系";
         _main.LogsPage.AppendSystem($"工具箱：已生成离线种子地图 {value}");
     }
 
