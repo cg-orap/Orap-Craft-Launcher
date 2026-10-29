@@ -99,10 +99,10 @@
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="10">
-                        <Button Content="＋" Style="{StaticResource SecondaryButton}" Width="34" Padding="0"
-                                Click="OnZoomIn" ToolTip="放大" />
-                        <Button Content="－" Style="{StaticResource SecondaryButton}" Width="34" Padding="0"
-                                Margin="6,0,0,0" Click="OnZoomOut" ToolTip="缩小" />
+                        <Button Content="放大" Style="{StaticResource SecondaryButton}" Padding="12,5"
+                                Click="OnZoomIn" ToolTip="放大一档：看清更小的范围" />
+                        <Button Content="缩小" Style="{StaticResource SecondaryButton}" Padding="12,5"
+                                Margin="6,0,0,0" Click="OnZoomOut" ToolTip="缩小一档：看到更大的范围" />
                         <Button Content="回到原点" Style="{StaticResource GhostButton}" Margin="6,0,0,0"
                                 Click="OnCenterOrigin" />
                     </StackPanel>

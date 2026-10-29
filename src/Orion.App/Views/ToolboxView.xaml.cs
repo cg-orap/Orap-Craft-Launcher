@@ -65,9 +65,9 @@ public partial class ToolboxView : UserControl
         vm.MapStatus = $"方块 {e.BlockX}, {e.BlockZ} · {biome}{slime}";
     }
 
-    private void OnZoomIn(object sender, RoutedEventArgs e) => BiomeCanvas.Zoom(1.25);
+    private void OnZoomIn(object sender, RoutedEventArgs e) => BiomeCanvas.ZoomIn();
 
-    private void OnZoomOut(object sender, RoutedEventArgs e) => BiomeCanvas.Zoom(0.8);
+    private void OnZoomOut(object sender, RoutedEventArgs e) => BiomeCanvas.ZoomOut();
 
     private void OnCenterOrigin(object sender, RoutedEventArgs e) => BiomeCanvas.CenterOn(0, 0);
 }

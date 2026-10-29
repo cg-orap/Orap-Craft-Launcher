@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using Orion.Core.World;
 
@@ -38,10 +39,16 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private static readonly Brush OriginBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xD8, 0x6B));
 
     // 与 cubiomes 的 scale 取值对齐：每格 1/4/16/64 方块
-    private static readonly int[] ZoomSteps = [1, 4, 16, 64];
+    // 细档位：每档 2 倍。cubiomes 只支持 1/4/16/64 的采样 scale，中间档用"渲染更大再缩小"实现。
+    private static readonly int[] ZoomSteps = [1, 2, 4, 8, 16, 32, 64];
+
+    // 一次点击只走一档，视觉上先缩放旧图（220ms 缓出），新图到达后再归位，避免生硬跳变。
+    private const int ZoomAnimationMs = 220;
 
     private long _seed;
-    private int _zoomIndex = 2;          // 默认 16 方块/像素
+    private int _zoomIndex = 4;          // 默认 16 方块/像素
+    private int? _pendingZoomIndex;
+    private System.Windows.Threading.DispatcherTimer? _zoomTimer;
     private int _centerBlockX;
     private int _centerBlockZ;
 
@@ -58,6 +65,17 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private Vector _dragOffset;
 
     public event EventHandler<BiomeHoverEventArgs>? HoverChanged;
+
+    /// <summary>缩放过渡用的视觉倍率（1 = 正常）。只影响绘制，不影响采样。</summary>
+    public static readonly DependencyProperty VisualScaleProperty = DependencyProperty.Register(
+        nameof(VisualScale), typeof(double), typeof(BiomeMapCanvas),
+        new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public double VisualScale
+    {
+        get => (double)GetValue(VisualScaleProperty);
+        set => SetValue(VisualScaleProperty, value);
+    }
 
     public BiomeMapCanvas()
     {
@@ -86,13 +104,53 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
     public int BlocksPerPixel => ZoomSteps[_zoomIndex];
 
+    /// <summary>放大：看清更小的范围（每像素方块数变少）。</summary>
+    public void ZoomIn() => ZoomStep(-1);
+
+    /// <summary>缩小：看到更大的范围。</summary>
+    public void ZoomOut() => ZoomStep(+1);
+
+    /// <summary>兼容旧调用：factor >= 1 视为放大。</summary>
     public void Zoom(double factor)
     {
-        var next = _zoomIndex + (factor >= 1 ? 1 : -1);
-        var clamped = Math.Clamp(next, 0, ZoomSteps.Length - 1);
-        if (clamped == _zoomIndex) return;
-        _zoomIndex = clamped;
-        RequestRender();
+        if (factor >= 1) ZoomIn();
+        else ZoomOut();
+    }
+
+    /// <summary>按档位缩放：视觉先放大/缩小，等新瓦片渲染好再归位。</summary>
+    private void ZoomStep(int delta)
+    {
+        var baseline = _pendingZoomIndex ?? _zoomIndex;
+        var target = Math.Clamp(baseline + delta, 0, ZoomSteps.Length - 1);
+        if (target == baseline) return;
+
+        _pendingZoomIndex = target;
+
+        // 过渡倍率 = 旧视野 / 新视野：放大（目标方块/像素更少）时把旧图放大，
+        // 新瓦片到达后归位，观感上就是"平滑推近"。
+        var ratio = ZoomSteps[_zoomIndex] / (double)ZoomSteps[target];
+        var animation = new DoubleAnimation(VisualScale, ratio, new Duration(TimeSpan.FromMilliseconds(ZoomAnimationMs)))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        BeginAnimation(VisualScaleProperty, animation);
+
+        _zoomTimer ??= new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(ZoomAnimationMs),
+        };
+        _zoomTimer.Stop();
+        _zoomTimer.Tick -= OnZoomTimerTick;
+        _zoomTimer.Tick += OnZoomTimerTick;
+        _zoomTimer.Start();
+    }
+
+    private void OnZoomTimerTick(object? sender, EventArgs e)
+    {
+        _zoomTimer?.Stop();
+        if (_pendingZoomIndex is not { } target || target == _zoomIndex) return;
+        _zoomIndex = target;
+        RequestRender();   // 视觉倍率保持动画终值，等新图到达后在回调里归位
     }
 
     public void CenterOn(int blockX, int blockZ)
@@ -127,14 +185,21 @@ public sealed class BiomeMapCanvas : FrameworkElement
             var centerZ = _centerBlockZ;
             var step = BlocksPerPixel;
             var versionIndex = EngineVersionIndex;
+            // cubiomes 只吃 1/4/16/64；中间档（2/8/32）用"采样 scale + 2 倍超采样"实现
+            var renderScale = step >= 64 ? 64 : step >= 16 ? 16 : step >= 4 ? 4 : 1;
+            var supersample = step / renderScale;      // 1 或 2
             var version = ++_bitmapVersion;
 
             Task.Run(() =>
             {
                 // 有原生引擎就用真算法（cubiomes），否则退回简化模型。
+                var pixelWidth = width * supersample;
+                var pixelHeight = height * supersample;
                 var pixels = CubiomesNative.RenderRgba(seed, versionIndex, CubiomesNative.DimOverworld,
-                                                       centerX, centerZ, step, width, height)
-                             ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, step, width, height);
+                                                       centerX, centerZ, renderScale, pixelWidth, pixelHeight)
+                             ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, renderScale, pixelWidth, pixelHeight);
+                width = pixelWidth;
+                height = pixelHeight;
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (version != _bitmapVersion) return;    // 已被更新的请求取代
@@ -144,6 +209,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _bitmap = bitmap;
                     _bitmapWidth = width;
                     _bitmapHeight = height;
+                    _pendingZoomIndex = null;
+                    BeginAnimation(VisualScaleProperty, null);
+                    VisualScale = 1.0;
                     InvalidateVisual();
                 }));
             });
@@ -173,16 +241,19 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
         dc.DrawRectangle(Background, null, new Rect(0, 0, width, height));
 
+        var scaling = Math.Abs(VisualScale - 1.0) > 0.001;
+        if (scaling)
+        {
+            dc.PushTransform(new ScaleTransform(VisualScale, VisualScale, width / 2, height / 2));
+        }
+
         var step = BlocksPerPixel;
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
         if (_bitmap is not null)
         {
-            // 尺寸一致时按原尺寸贴图（像素对齐），否则拉伸铺满，避免出现深色空隙。
-            var rect = _bitmapWidth == (int)Math.Round(width) && _bitmapHeight == (int)Math.Round(height)
-                ? new Rect(_dragOffset.X, _dragOffset.Y, _bitmapWidth, _bitmapHeight)
-                : new Rect(_dragOffset.X, _dragOffset.Y, width, height);
-            dc.DrawImage(_bitmap, rect);
+            // 位图可能是 2 倍超采样，统一铺满可视区域（缩小采样保持像素锐利）
+            dc.DrawImage(_bitmap, new Rect(_dragOffset.X, _dragOffset.Y, width, height));
         }
 
         var left = _centerBlockX - (int)(width / 2 * step) + (int)(_dragOffset.X * step);
@@ -251,6 +322,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
             dc.DrawLine(pen, new Point(ox - 9, oy), new Point(ox + 9, oy));
             dc.DrawLine(pen, new Point(ox, oy - 9), new Point(ox, oy + 9));
         }
+
+        if (scaling) dc.Pop();
     }
 
     // ── 交互 ───────────────────────────────────────────────
@@ -268,6 +341,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        if (Math.Abs(VisualScale - 1.0) > 0.001) return;   // 缩放过渡中不做悬停换算
         var position = e.GetPosition(this);
         var step = BlocksPerPixel;
 
@@ -312,7 +386,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         base.OnMouseWheel(e);
-        Zoom(e.Delta > 0 ? 1.25 : 0.8);
+        if (e.Delta > 0) ZoomIn(); else ZoomOut();
         e.Handled = true;
     }
 }
