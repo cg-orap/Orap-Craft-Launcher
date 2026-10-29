@@ -424,6 +424,62 @@ public sealed class PackArchiveInstaller
     /// key, fast CDN), the official redirect as a fallback. Anything still failing is queued with a
     /// browser link so the user can fetch it by hand instead of an opaque "some files failed".
     /// </summary>
+    /// <summary>调用 CurseForge 的 download-url 接口，取出真实下载地址。</summary>
+    private async Task<string?> ResolveCurseForgeUrlAsync(string apiUrl, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey))
+        {
+            request.Headers.TryAddWithoutValidation("x-api-key", _curseForgeApiKey);
+        }
+
+        request.Headers.TryAddWithoutValidation("Accept", "application/json");
+
+        using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+
+        var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("data", out var data)
+                && data.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                return data.GetString();
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // 不是 JSON：交给调用方换下一个候选
+        }
+
+        return null;
+    }
+
+    /// <summary>文件是不是真正的 zip/jar（PK 头 + 能打开中央目录）。</summary>
+    private static bool LooksLikeZip(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length < 64) return false;   // 更小的不可能是 jar，也不会是合法 zip
+
+            using (var stream = File.OpenRead(path))
+            {
+                var header = new byte[4];
+                if (stream.Read(header, 0, 4) < 4) return false;
+                if (header[0] != 0x50 || header[1] != 0x4B) return false;
+            }
+
+            using var zip = System.IO.Compression.ZipFile.OpenRead(path);
+            return zip.Entries.Count > 0;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     private async Task<bool> DownloadCurseForgeFileAsync(
         CurseForgeFile file,
         string modsDirectory,
@@ -458,8 +514,21 @@ public sealed class PackArchiveInstaller
                 using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 perFile.CancelAfter(TimeSpan.FromSeconds(60));
 
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                if (!string.IsNullOrWhiteSpace(_curseForgeApiKey)) request.Headers.TryAddWithoutValidation("x-api-key", _curseForgeApiKey);
+                // 带 Key 时第一个候选是 API 接口：返回的是 {"data":"真实地址"}，必须先解出地址再下文件，
+                // 否则会把几十字节的 JSON 当成 jar 写进 mods（这就是"zip END header not found"的来源）。
+                var downloadUrl = url;
+                if (url.Contains("/download-url", StringComparison.OrdinalIgnoreCase))
+                {
+                    downloadUrl = await ResolveCurseForgeUrlAsync(url, perFile.Token).ConfigureAwait(false) ?? "";
+                    if (string.IsNullOrWhiteSpace(downloadUrl)) continue;
+                }
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+                if (downloadUrl.StartsWith("https://api.curseforge.com", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(_curseForgeApiKey))
+                {
+                    request.Headers.TryAddWithoutValidation("x-api-key", _curseForgeApiKey);
+                }
 
                 using var response = await _http
                     .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, perFile.Token)
@@ -468,11 +537,14 @@ public sealed class PackArchiveInstaller
                 if (!response.IsSuccessStatusCode) continue;
 
                 var target = Path.Combine(modsDirectory, name);
-                await using var stream = await response.Content.ReadAsStreamAsync(perFile.Token).ConfigureAwait(false);
-                await using var destination = File.Create(target);
-                await stream.CopyToAsync(destination, perFile.Token).ConfigureAwait(false);
+                await using (var stream = await response.Content.ReadAsStreamAsync(perFile.Token).ConfigureAwait(false))
+                await using (var destination = File.Create(target))
+                {
+                    await stream.CopyToAsync(destination, perFile.Token).ConfigureAwait(false);
+                }
 
-                if (new FileInfo(target).Length == 0)
+                // 只认真正的 jar/zip：小 JSON、HTML 错误页、截断文件一律丢弃并换下一个源
+                if (!LooksLikeZip(target))
                 {
                     try { File.Delete(target); } catch (IOException) { }
                     continue;

@@ -127,6 +127,8 @@ public sealed class CatalogViewModel : ObservableObject
     private CatalogDetailViewModel? _detail;
     private int _sourceIndex;
     private string _curseForgeStatus = "";
+    private int _cfPage;
+    private int _cfTotalHits;
     private bool _detailOpen;
 
     // A search for the previous tab must never block the next one, and revisiting a tab should not
@@ -161,8 +163,10 @@ public sealed class CatalogViewModel : ObservableObject
         _kind = Kinds[0];
 
         SearchCommand = new AsyncRelayCommand(() => SearchAsync(0), () => !_busy);
-        NextPageCommand = new AsyncRelayCommand(() => SearchAsync(_page + 1), () => !_busy && HasNextPage);
-        PreviousPageCommand = new AsyncRelayCommand(() => SearchAsync(_page - 1), () => !_busy && HasPreviousPage);
+        NextPageCommand = new AsyncRelayCommand(
+            () => SearchAsync((IsCurseForgeSource ? _cfPage : _page) + 1), () => !_busy && HasNextPage);
+        PreviousPageCommand = new AsyncRelayCommand(
+            () => SearchAsync((IsCurseForgeSource ? _cfPage : _page) - 1), () => !_busy && HasPreviousPage);
         RefreshCommand = new AsyncRelayCommand(() => SearchAsync(_page, forceRefresh: true), () => !_busy);
         CloseDetailCommand = new RelayCommand(CloseDetail);
         CancelOperationCommand = new RelayCommand(CancelOperation, () => Busy);
@@ -284,6 +288,7 @@ public sealed class CatalogViewModel : ObservableObject
             // CurseForge 没有"游戏版本"这一类，切过去时自动落到模组
             if (clamped == 1 && _kind.ProjectType is null) Kind = Kinds[2];
 
+            _cfPage = 0;
             _ = SearchAsync(0);
         }
     }
@@ -421,12 +426,20 @@ public sealed class CatalogViewModel : ObservableObject
         }
     }
 
-    public string PageText => _totalHits == 0 ? "" : $"第 {_page + 1} / {TotalPages} 页 · 共 {_totalHits:N0} 个";
+    public string PageText => _totalHits == 0 && _cfTotalHits == 0
+        ? ""
+        : IsCurseForgeSource
+            ? $"第 {_cfPage + 1} / {CfTotalPages} 页 · 共 {_cfTotalHits:N0} 个"
+            : $"第 {_page + 1} / {TotalPages} 页 · 共 {_totalHits:N0} 个";
 
     public int TotalPages => _totalHits == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_totalHits / (double)PageSize));
 
-    public bool HasNextPage => _page + 1 < TotalPages;
-    public bool HasPreviousPage => _page > 0;
+    /// <summary>CurseForge 侧的总页数（按 totalCount 算）。</summary>
+    public int CfTotalPages => _cfTotalHits == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_cfTotalHits / (double)PageSize));
+
+    public bool HasNextPage => IsCurseForgeSource ? _cfPage + 1 < CfTotalPages : _page + 1 < TotalPages;
+
+    public bool HasPreviousPage => IsCurseForgeSource ? _cfPage > 0 : _page > 0;
 
     public string TargetInfo
     {
@@ -461,7 +474,7 @@ public sealed class CatalogViewModel : ObservableObject
 
         if (IsCurseForgeSource)
         {
-            await SearchCurseForgeAsync().ConfigureAwait(true);
+            await SearchCurseForgeAsync(page).ConfigureAwait(true);
             return;
         }
 
@@ -1137,7 +1150,7 @@ public sealed class CatalogViewModel : ObservableObject
     }
 
     /// <summary>CurseForge 搜索（模组/整合包/材质/光影）。</summary>
-    private async Task SearchCurseForgeAsync()
+    private async Task SearchCurseForgeAsync(int page = 0)
     {
         var kind = CurrentCurseForgeKind;
 
@@ -1154,15 +1167,20 @@ public sealed class CatalogViewModel : ObservableObject
         try
         {
             var instance = _main.CurrentInstance;
-            var packs = await _main.Context.CurseForge
-                .SearchAsync(kind, SearchText, instance?.GameVersion, PageSize)
+            var result = await _main.Context.CurseForge
+                .SearchPageAsync(kind, SearchText, instance?.GameVersion, page, PageSize)
                 .ConfigureAwait(true);
+
+            var packs = result.Packs;
+            _cfPage = page;
+            _cfTotalHits = result.TotalCount;
+            RaisePaging();
 
             var rows = packs.Select(p => new CurseForgeRow(p, this, kind)).ToList();
             CurseForgeResults.Replace(rows);
             Status = packs.Count == 0
                 ? "没有找到匹配的内容。"
-                : $"找到 {packs.Count} 个{KindNameOf(kind)}（按热度排序）";
+                : $"找到 {_cfTotalHits:N0} 个{KindNameOf(kind)}（按热度排序）";
             CurseForgeStatus = Status;
 
             await LoadCurseForgeIconsAsync(rows).ConfigureAwait(true);

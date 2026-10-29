@@ -23,6 +23,9 @@ public enum CurseForgeKind
     Shader = 6552,
 }
 
+/// <summary>一页 CurseForge 搜索结果（带总数，供翻页）。</summary>
+public sealed record CurseForgePage(IReadOnlyList<CurseForgePack> Packs, int TotalCount, int Index, int PageSize);
+
 /// <summary>CurseForge 项目详情（详情页用：描述、截图、分类、下载页链接）。</summary>
 public sealed record CurseForgeModDetail(
     int Id,
@@ -73,29 +76,42 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         _ => null,
     };
 
-    public Task<IReadOnlyList<CurseForgePack>> SearchModpacksAsync(
+    public async Task<IReadOnlyList<CurseForgePack>> SearchModpacksAsync(
         string? query, string? gameVersion, int pageSize = 20, CancellationToken ct = default) =>
-        SearchAsync(CurseForgeKind.Modpack, query, gameVersion, pageSize, ct);
+        (await SearchPageAsync(CurseForgeKind.Modpack, query, gameVersion, 0, pageSize, ct).ConfigureAwait(false)).Packs;
 
     public async Task<IReadOnlyList<CurseForgePack>> SearchAsync(
-        CurseForgeKind kind, string? query, string? gameVersion, int pageSize = 20, CancellationToken ct = default)
+        CurseForgeKind kind, string? query, string? gameVersion, int pageSize = 20, CancellationToken ct = default) =>
+        (await SearchPageAsync(kind, query, gameVersion, 0, pageSize, ct).ConfigureAwait(false)).Packs;
+
+    /// <summary>
+    /// 按页搜索。CurseForge 用 <c>index</c>（偏移条数）+ <c>pageSize</c> 分页，返回里的
+    /// <c>pagination.totalCount</c> 决定还能翻几页。
+    /// </summary>
+    public async Task<CurseForgePage> SearchPageAsync(
+        CurseForgeKind kind, string? query, string? gameVersion, int index = 0, int pageSize = 20,
+        CancellationToken ct = default)
     {
-        if (!HasKey) return [];
+        if (!HasKey) return new CurseForgePage(Array.Empty<CurseForgePack>(), 0, 0, pageSize);
+
+        var size = Math.Clamp(pageSize, 1, 50);
+        var offset = Math.Max(0, index) * size;
 
         var url = $"{Base}mods/search?gameId={GameMinecraft}&classId={(int)kind}" +
-                  $"&sortField=2&sortOrder=desc&pageSize={Math.Clamp(pageSize, 1, 50)}";
+                  $"&sortField=2&sortOrder=desc&pageSize={size}&index={offset}";
 
         if (!string.IsNullOrWhiteSpace(query)) url += "&searchFilter=" + Uri.EscapeDataString(query.Trim());
         if (!string.IsNullOrWhiteSpace(gameVersion)) url += "&gameVersion=" + Uri.EscapeDataString(gameVersion.Trim());
 
         // 搜索是 GET（官方文档：GET /v1/mods/search），用 POST 会 405 然后静默空结果
         using var response = await SendAsync(HttpMethod.Get, url, ct).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode) return [];
+        if (!response.IsSuccessStatusCode) return new CurseForgePage(Array.Empty<CurseForgePack>(), 0, index, size);
 
         var payload = await response.Content.ReadFromJsonAsync<SearchResponse>(JsonOptions, ct).ConfigureAwait(false);
-        if (payload?.Data is null) return [];
+        if (payload?.Data is null) return new CurseForgePage(Array.Empty<CurseForgePack>(), 0, index, size);
 
-        return [.. payload.Data.Select(ToPack)];
+        var total = payload.Pagination?.TotalCount ?? payload.Pagination?.ResultCount ?? payload.Data.Count;
+        return new CurseForgePage([.. payload.Data.Select(ToPack)], total, index, size);
     }
 
     /// <summary>项目详情（含描述与截图）。</summary>
@@ -334,7 +350,15 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         PropertyNameCaseInsensitive = true,
     };
 
-    private sealed record SearchResponse([property: JsonPropertyName("data")] List<ModDto>? Data);
+    private sealed record SearchResponse(
+        [property: JsonPropertyName("data")] List<ModDto>? Data,
+        [property: JsonPropertyName("pagination")] PaginationDto? Pagination);
+
+    private sealed record PaginationDto(
+        [property: JsonPropertyName("index")] int Index,
+        [property: JsonPropertyName("pageSize")] int PageSize,
+        [property: JsonPropertyName("resultCount")] int ResultCount,
+        [property: JsonPropertyName("totalCount")] int TotalCount);
     private sealed record FilesResponse([property: JsonPropertyName("data")] List<CurseForgeFileDto>? Data);
     private sealed record DataResponse<T>([property: JsonPropertyName("data")] T? Data);
 

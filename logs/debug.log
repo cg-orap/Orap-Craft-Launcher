@@ -1,0 +1,58 @@
+[2910月2026 22:31:03.569] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: ModLauncher running: args [--username, cg_orap, --version, 1.19.2-forge-43.3.5, --gameDir, D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft, --assetsDir, D:\gd\orion\assets, --assetIndex, 1.19, --uuid, d79ec5ac9df8491e8f9e552ce080007a, --accessToken, ????????, --clientId, --xuid, 5621751330997299097, --userType, msa, --versionType, release, --width, 854, --height, 480, --launchTarget, forgeclient, --fml.forgeVersion, 43.3.5, --fml.mcVersion, 1.19.2, --fml.forgeGroup, net.minecraftforge, --fml.mcpVersion, 20220805.130853]
+[2910月2026 22:31:03.573] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: ModLauncher 10.0.8+10.0.8+main.0ef7e830 starting: java version 17.0.11 by Oracle Corporation; OS Windows 10 arch amd64 version 10.0
+[2910月2026 22:31:03.595] [main/DEBUG] [cpw.mods.modlauncher.LaunchServiceHandler/MODLAUNCHER]: Found launch services [fmlclientdev,forgeclient,minecraft,forgegametestserverdev,fmlserveruserdev,fmlclient,fmldatauserdev,forgeserverdev,forgeserveruserdev,forgeclientdev,forgeclientuserdev,forgeserver,forgedatadev,fmlserver,fmlclientuserdev,fmlserverdev,forgedatauserdev,testharness,forgegametestserveruserdev]
+[2910月2026 22:31:03.611] [main/DEBUG] [cpw.mods.modlauncher.NameMappingServiceHandler/MODLAUNCHER]: Found naming services : [srgtomcp]
+[2910月2026 22:31:03.621] [main/DEBUG] [cpw.mods.modlauncher.LaunchPluginHandler/MODLAUNCHER]: Found launch plugins: [mixin,eventbus,slf4jfixer,object_holder_definalize,runtime_enum_extender,capability_token_subclass,accesstransformer,runtimedistcleaner]
+[2910月2026 22:31:03.631] [main/DEBUG] [cpw.mods.modlauncher.TransformationServicesHandler/MODLAUNCHER]: Discovering transformation services
+[2910月2026 22:31:05.139] [main/DEBUG] [cpw.mods.modlauncher.TransformationServicesHandler/MODLAUNCHER]: Found additional transformation services from discovery services: [D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\mods\hotai-1.0.jar][D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\mods\I18nUpdateMod-3.6.0-all.jar]
+[2910月2026 22:31:05.171] [main/DEBUG] [cpw.mods.modlauncher.TransformationServicesHandler/MODLAUNCHER]: Found transformer services : [mixin,fml,hotai,I18nUpdateMod]
+[2910月2026 22:31:05.171] [main/DEBUG] [cpw.mods.modlauncher.TransformationServicesHandler/MODLAUNCHER]: Transformation services loading
+[2910月2026 22:31:05.171] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loading service mixin
+[2910月2026 22:31:05.172] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loaded service mixin
+[2910月2026 22:31:05.172] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loading service fml
+[2910月2026 22:31:05.174] [main/DEBUG] [net.minecraftforge.fml.loading.LauncherVersion/CORE]: Found FMLLauncher version 1.0
+[2910月2026 22:31:05.174] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: FML 1.0 loading
+[2910月2026 22:31:05.174] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: FML found ModLauncher version : 10.0.8+10.0.8+main.0ef7e830
+[2910月2026 22:31:05.175] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: FML found AccessTransformer version : 8.0.4+66+master.c09db6d7
+[2910月2026 22:31:05.175] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: FML found EventBus version : 6.0.3+6.0.3+master.039e4ea9
+[2910月2026 22:31:05.176] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: Found Runtime Dist Cleaner
+[2910月2026 22:31:05.177] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: FML found CoreMod version : 5.0.1+15+master.dc5a2922
+[2910月2026 22:31:05.178] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: Found ForgeSPI package implementation version 6.0.0+6.0.0+master.42474703
+[2910月2026 22:31:05.178] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: Found ForgeSPI package specification 5
+[2910月2026 22:31:05.180] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loaded service fml
+[2910月2026 22:31:05.180] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loading service hotai
+[2910月2026 22:31:05.180] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loaded service hotai
+[2910月2026 22:31:05.180] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loading service I18nUpdateMod
+[2910月2026 22:31:05.180] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Loaded service I18nUpdateMod
+[2910月2026 22:31:05.183] [main/DEBUG] [cpw.mods.modlauncher.TransformationServicesHandler/MODLAUNCHER]: Configuring option handling for services
+[2910月2026 22:31:05.188] [main/DEBUG] [cpw.mods.modlauncher.TransformationServicesHandler/MODLAUNCHER]: Transformation services initializing
+[2910月2026 22:31:05.190] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Initializing transformation service mixin
+[2910月2026 22:31:05.204] [main/DEBUG] [mixin/]: MixinService [ModLauncher] was successfully booted in cpw.mods.cl.ModuleClassLoader@5d20e46
+[2910月2026 22:31:05.226] [main/INFO] [mixin/]: SpongePowered MIXIN Subsystem Version=0.8.5 Source=union:/D:/gd/orion/libraries/org/spongepowered/mixin/0.8.5/mixin-0.8.5.jar%23132!/ Service=ModLauncher Env=CLIENT
+[2910月2026 22:31:05.229] [main/DEBUG] [mixin/]: Initialising Mixin Platform Manager
+[2910月2026 22:31:05.229] [main/DEBUG] [mixin/]: Adding mixin platform agents for container ModLauncher Root Container(ModLauncher:4f56a0a2)
+[2910月2026 22:31:05.230] [main/DEBUG] [mixin/]: Instancing new MixinPlatformAgentMinecraftForge for ModLauncher Root Container(ModLauncher:4f56a0a2)
+[2910月2026 22:31:05.230] [main/DEBUG] [mixin/]: MixinPlatformAgentMinecraftForge rejected container ModLauncher Root Container(ModLauncher:4f56a0a2)
+[2910月2026 22:31:05.230] [main/DEBUG] [mixin/]: Instancing new MixinPlatformAgentDefault for ModLauncher Root Container(ModLauncher:4f56a0a2)
+[2910月2026 22:31:05.231] [main/DEBUG] [mixin/]: MixinPlatformAgentDefault accepted container ModLauncher Root Container(ModLauncher:4f56a0a2)
+[2910月2026 22:31:05.234] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Initialized transformation service mixin
+[2910月2026 22:31:05.234] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Initializing transformation service fml
+[2910月2026 22:31:05.234] [main/DEBUG] [net.minecraftforge.fml.loading.FMLServiceProvider/CORE]: Setting up basic FML game directories
+[2910月2026 22:31:05.236] [main/DEBUG] [net.minecraftforge.fml.loading.FileUtils/CORE]: Found existing GAMEDIR directory : D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft
+[2910月2026 22:31:05.236] [main/DEBUG] [net.minecraftforge.fml.loading.FMLPaths/CORE]: Path GAMEDIR is D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft
+[2910月2026 22:31:05.236] [main/DEBUG] [net.minecraftforge.fml.loading.FileUtils/CORE]: Found existing MODSDIR directory : D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\mods
+[2910月2026 22:31:05.236] [main/DEBUG] [net.minecraftforge.fml.loading.FMLPaths/CORE]: Path MODSDIR is D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\mods
+[2910月2026 22:31:05.237] [main/DEBUG] [net.minecraftforge.fml.loading.FileUtils/CORE]: Found existing CONFIGDIR directory : D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\config
+[2910月2026 22:31:05.237] [main/DEBUG] [net.minecraftforge.fml.loading.FMLPaths/CORE]: Path CONFIGDIR is D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\config
+[2910月2026 22:31:05.237] [main/DEBUG] [net.minecraftforge.fml.loading.FMLPaths/CORE]: Path FMLCONFIG is D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\config\fml.toml
+[2910月2026 22:31:05.237] [main/DEBUG] [net.minecraftforge.fml.loading.FMLServiceProvider/CORE]: Loading configuration
+[2910月2026 22:31:05.290] [main/DEBUG] [net.minecraftforge.fml.loading.FileUtils/CORE]: Found existing default config directory directory : D:\gd\orion\instances\no-flesh-within-chest-ae7617\minecraft\defaultconfigs
+[2910月2026 22:31:05.291] [main/DEBUG] [net.minecraftforge.fml.loading.FMLServiceProvider/CORE]: Preparing ModFile
+[2910月2026 22:31:05.294] [main/DEBUG] [net.minecraftforge.fml.loading.FMLServiceProvider/CORE]: Preparing launch handler
+[2910月2026 22:31:05.295] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: Using forgeclient as launch service
+[2910月2026 22:31:05.315] [main/DEBUG] [net.minecraftforge.fml.loading.FMLLoader/CORE]: Received command line version data  : VersionInfo[forgeVersion=43.3.5, mcVersion=1.19.2, mcpVersion=20220805.130853, forgeGroup=net.minecraftforge]
+[2910月2026 22:31:05.317] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Initialized transformation service fml
+[2910月2026 22:31:05.317] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Initializing transformation service hotai
+[2910月2026 22:31:05.317] [main/INFO] [Hotai/]: Reading patched classes
+[2910月2026 22:31:05.380] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Initialized transformation service hotai
+[2910月2026 22:31:05.380] [main/DEBUG] [cpw.mods.modlauncher.TransformationServiceDecorator/MODLAUNCHER]: Initializing transformation service I18nUpdateMod
