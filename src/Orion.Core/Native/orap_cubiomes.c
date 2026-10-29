@@ -188,3 +188,157 @@ ORAP_API int orap_spawn(uint64_t seed, int version_index, int *outX, int *outZ)
     if (outZ) *outZ = p.z;
     return 0;
 }
+
+// ────────────────────────────── 结构 ──────────────────────────────
+// 只暴露"值得在地图上标出来"的结构，并且按维度分组。
+
+typedef struct
+{
+    int type;        // cubiomes StructureType
+    int dim;         // DIM_OVERWORLD / DIM_NETHER / DIM_END
+    const char *key; // 稳定标识，供界面做图标/中文名映射
+} OrapStructure;
+
+static const OrapStructure ORAP_STRUCTURES[] = {
+    {Village,        DIM_OVERWORLD, "village"},
+    {Outpost,        DIM_OVERWORLD, "outpost"},
+    {Monument,       DIM_OVERWORLD, "monument"},
+    {Mansion,        DIM_OVERWORLD, "mansion"},
+    {Desert_Pyramid, DIM_OVERWORLD, "desert_pyramid"},
+    {Jungle_Temple,  DIM_OVERWORLD, "jungle_temple"},
+    {Swamp_Hut,      DIM_OVERWORLD, "swamp_hut"},
+    {Igloo,          DIM_OVERWORLD, "igloo"},
+    {Ocean_Ruin,     DIM_OVERWORLD, "ocean_ruin"},
+    {Shipwreck,      DIM_OVERWORLD, "shipwreck"},
+    {Treasure,       DIM_OVERWORLD, "treasure"},
+    {Ruined_Portal,  DIM_OVERWORLD, "ruined_portal"},
+    {Ancient_City,   DIM_OVERWORLD, "ancient_city"},
+    {Trail_Ruins,    DIM_OVERWORLD, "trail_ruins"},
+    {Trial_Chambers, DIM_OVERWORLD, "trial_chambers"},
+    {Fortress,       DIM_NETHER,    "fortress"},
+    {Bastion,        DIM_NETHER,    "bastion"},
+    {Ruined_Portal_N,DIM_NETHER,    "ruined_portal_nether"},
+    {End_City,       DIM_END,       "end_city"},
+    {End_Gateway,    DIM_END,       "end_gateway"},
+};
+
+static const int ORAP_STRUCTURE_COUNT = (int)(sizeof(ORAP_STRUCTURES) / sizeof(ORAP_STRUCTURES[0]));
+
+ORAP_API int orap_structure_count(void)
+{
+    return ORAP_STRUCTURE_COUNT;
+}
+
+ORAP_API const char *orap_structure_key(int index)
+{
+    if (index < 0 || index >= ORAP_STRUCTURE_COUNT) return "";
+    return ORAP_STRUCTURES[index].key;
+}
+
+ORAP_API int orap_structure_dim(int index)
+{
+    if (index < 0 || index >= ORAP_STRUCTURE_COUNT) return DIM_OVERWORLD;
+    return ORAP_STRUCTURES[index].dim;
+}
+
+/**
+ * 在区块矩形内查找结构。
+ *
+ * 输出为每个结构 3 个 int：结构表下标、方块 x、方块 z。
+ * 返回写入个数（可能小于实际命中数，见 *outTotal），负数表示出错。
+ *
+ * 说明：先用 getStructurePos() 拿生成尝试点（快），再用 isViableStructurePos()
+ * 做群系校验（较慢但准确）——只保留确实会生成的点。
+ */
+ORAP_API int orap_find_structures(uint64_t seed, int version_index, int dim,
+                                  int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
+                                  int *outBuf, int capacity, int *outTotal)
+{
+    if (outTotal) *outTotal = 0;
+    if (!outBuf || capacity <= 0) return -2;
+
+    int mc = orap_mc_from_index(version_index);
+
+    Generator g;
+    memset(&g, 0, sizeof(g));
+    if (run_generator(&g, version_index, 0, dim, seed) != 0) return -3;
+
+    if (minChunkX > maxChunkX) { int t = minChunkX; minChunkX = maxChunkX; maxChunkX = t; }
+    if (minChunkZ > maxChunkZ) { int t = minChunkZ; minChunkZ = maxChunkZ; maxChunkZ = t; }
+
+    int written = 0;
+    int total = 0;
+
+    for (int si = 0; si < ORAP_STRUCTURE_COUNT; si++)
+    {
+        const OrapStructure *entry = &ORAP_STRUCTURES[si];
+        if (entry->dim != dim) continue;
+
+        StructureConfig sconf;
+        if (!getStructureConfig(entry->type, mc, &sconf)) continue;
+        if (sconf.dim != dim) continue;
+        if (sconf.regionSize <= 0) continue;
+
+        int regX0 = minChunkX / sconf.regionSize - 1;
+        int regX1 = maxChunkX / sconf.regionSize + 1;
+        int regZ0 = minChunkZ / sconf.regionSize - 1;
+        int regZ1 = maxChunkZ / sconf.regionSize + 1;
+
+        // 区域太多就跳过该类型，避免拖一下卡死（正常视口远小于这个上限）
+        long regions = (long)(regX1 - regX0 + 1) * (long)(regZ1 - regZ0 + 1);
+        if (regions > 40000) continue;
+
+        for (int rz = regZ0; rz <= regZ1; rz++)
+        {
+            for (int rx = regX0; rx <= regX1; rx++)
+            {
+                Pos p;
+                if (!getStructurePos(entry->type, mc, seed, rx, rz, &p)) continue;
+
+                int chunkX = p.x >> 4;
+                int chunkZ = p.z >> 4;
+                if (chunkX < minChunkX || chunkX > maxChunkX) continue;
+                if (chunkZ < minChunkZ || chunkZ > maxChunkZ) continue;
+
+                if (!isViableStructurePos(entry->type, &g, p.x, p.z, 0)) continue;
+
+                total++;
+                if (written < capacity)
+                {
+                    outBuf[written * 3 + 0] = si;
+                    outBuf[written * 3 + 1] = p.x;
+                    outBuf[written * 3 + 2] = p.z;
+                    written++;
+                }
+            }
+        }
+    }
+
+    if (outTotal) *outTotal = total;
+    return written;
+}
+
+/** 要塞（含末地传送门）：只在下界之外的 Overworld，最多 limit 个。输出每个 2 个 int: x, z */
+ORAP_API int orap_find_strongholds(uint64_t seed, int version_index, int *outBuf, int capacity)
+{
+    if (!outBuf || capacity <= 0) return -2;
+
+    int mc = orap_mc_from_index(version_index);
+
+    Generator g;
+    memset(&g, 0, sizeof(g));
+    if (run_generator(&g, version_index, 0, DIM_OVERWORLD, seed) != 0) return -3;
+
+    StrongholdIter sh;
+    initFirstStronghold(&sh, mc, seed);
+
+    int written = 0;
+    while (written < capacity && nextStronghold(&sh, &g) >= 0)
+    {
+        outBuf[written * 2 + 0] = sh.pos.x;
+        outBuf[written * 2 + 1] = sh.pos.z;
+        written++;
+    }
+
+    return written;
+}

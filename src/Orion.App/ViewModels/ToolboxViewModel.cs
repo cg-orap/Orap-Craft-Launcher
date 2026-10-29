@@ -32,6 +32,7 @@ public sealed class ToolboxViewModel : ObservableObject
 
         GenerateMapCommand = new RelayCommand(GenerateMap);
         LocateCommand = new RelayCommand(LocateTo);
+        LocateSpawnCommand = new RelayCommand(LocateSpawn);
         OpenChunkbaseCommand = new RelayCommand(OpenChunkbase);
         OpenMislandCommand = new RelayCommand(OpenMisland);
         CopySeedCommand = new RelayCommand(CopySeed);
@@ -133,6 +134,46 @@ public sealed class ToolboxViewModel : ObservableObject
             ? "群系由 cubiomes 按原版算法生成（与 Chunkbase / Amidst 同源）；史莱姆区块同样是精确值。"
             : "群系由 5 通道噪声近似生成（可复现，但与游戏内实际地形不保证一致）；史莱姆区块是精确值。";
 
+
+    /// <summary>维度：0 主世界 / 1 下界 / 2 末地。</summary>
+    public IReadOnlyList<string> Dimensions { get; } = ["主世界", "下界", "末地"];
+
+    private int _dimensionIndex;
+
+    public int DimensionIndex
+    {
+        get => _dimensionIndex;
+        set
+        {
+            if (!SetProperty(ref _dimensionIndex, Math.Clamp(value, 0, 2))) return;
+            OnPropertyChanged(nameof(DimensionHint));
+            DimensionChanged?.Invoke(_dimensionIndex);
+        }
+    }
+
+    public string DimensionHint => _dimensionIndex switch
+    {
+        1 => "下界：坐标与主世界 1:8，要塞/村庄等主世界结构不会显示。",
+        2 => "末地：显示末地城与末地折跃门。",
+        _ => "主世界：村庄、神殿、要塞等都在这一层。",
+    };
+
+    public event Action<int>? DimensionChanged;
+
+    private bool _showStructures = true;
+
+    public bool ShowStructures
+    {
+        get => _showStructures;
+        set => SetProperty(ref _showStructures, value);
+    }
+
+    public ICommand LocateSpawnCommand { get; }
+
+    /// <summary>出生点定位请求（画布由 View 驱动）。</summary>
+    public event Action? SpawnRequested;
+
+    public string SpawnText { get; private set; } = "";
 
     /// <summary>坐标定位：X / Z 输入框 + 事件（画布由 View 来驱动）。</summary>
     public string LocateX { get; set; } = "0";
@@ -351,6 +392,35 @@ public sealed class ToolboxViewModel : ObservableObject
         LocateRequested?.Invoke(x, z);
         MapStatus = $"已定位到方块 {x}, {z}（拖动平移，滚轮缩放）";
         _main.LogsPage.AppendSystem($"工具箱：种子地图定位到 {x}, {z}");
+    }
+
+    /// <summary>定位到出生点（主世界）。</summary>
+    private void LocateSpawn()
+    {
+        if (!CubiomesNative.Available)
+        {
+            MapStatus = "原生引擎未加载，算不出出生点。";
+            return;
+        }
+
+        var version = CubiomesNative.VersionIndexFor(SeedVersion);
+        var spawn = CubiomesNative.Spawn(SeedValue, version);
+        if (spawn is not { } position)
+        {
+            MapStatus = "出生点计算失败。";
+            return;
+        }
+
+        SpawnText = $"出生点 {position.X}, {position.Z}";
+        OnPropertyChanged(nameof(SpawnText));
+        LocateX = position.X.ToString();
+        LocateZ = position.Z.ToString();
+        OnPropertyChanged(nameof(LocateX));
+        OnPropertyChanged(nameof(LocateZ));
+
+        if (_dimensionIndex != 0) DimensionIndex = 0;
+        SpawnRequested?.Invoke();
+        MapStatus = $"已定位到出生点 {position.X}, {position.Z}";
     }
 
     private void OpenChunkbase()

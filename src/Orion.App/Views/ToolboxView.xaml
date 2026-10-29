@@ -64,7 +64,13 @@
                         <TextBlock Text="{Binding MapStatus}" Style="{StaticResource CaptionText}"
                                    TextWrapping="Wrap" Margin="0,10,0,0" />
 
-                        <TextBlock Text="定位到坐标（方块）" Style="{StaticResource CaptionText}" Margin="0,14,0,0" />
+                        <TextBlock Text="维度" Style="{StaticResource CaptionText}" Margin="0,14,0,0" />
+                        <controls:SegmentedControl Margin="0,6,0,0" ItemsSource="{Binding Dimensions}"
+                                                   SelectedIndex="{Binding DimensionIndex, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding DimensionHint}" Style="{StaticResource CaptionText}"
+                                   TextWrapping="Wrap" Margin="0,6,0,0" />
+
+                        <TextBlock Text="定位到坐标（方块）" Style="{StaticResource CaptionText}" Margin="0,12,0,0" />
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -82,8 +88,18 @@
                                     AutomationProperties.AutomationId="LocateGo" />
                         </Grid>
 
-                        <CheckBox Content="显示史莱姆区块" IsChecked="{Binding ShowSlimeOverlay}"
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <Button Content="定位到出生点" Style="{StaticResource GhostButton}"
+                                    Command="{Binding LocateSpawnCommand}" Padding="10,5"
+                                    AutomationProperties.AutomationId="LocateSpawn" />
+                            <TextBlock Text="{Binding SpawnText}" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center" Margin="10,0,0,0" />
+                        </StackPanel>
+
+                        <CheckBox Content="显示结构与出生点" IsChecked="{Binding ShowStructures}"
                                   Margin="0,10,0,0" />
+                        <CheckBox Content="显示史莱姆区块" IsChecked="{Binding ShowSlimeOverlay}"
+                                  Margin="0,6,0,0" />
                         <CheckBox Content="显示网格与坐标" IsChecked="{Binding ShowGridOverlay}"
                                   Margin="0,6,0,0" />
                         <TextBlock Text="{Binding MapEngineLabel}" Style="{StaticResource CaptionText}"

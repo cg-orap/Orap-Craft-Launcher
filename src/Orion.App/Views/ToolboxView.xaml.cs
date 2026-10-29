@@ -25,6 +25,8 @@ public partial class ToolboxView : UserControl
         {
             _attached.PropertyChanged -= OnViewModelPropertyChanged;
             _attached.LocateRequested -= OnLocateRequested;
+            _attached.DimensionChanged -= OnDimensionChanged;
+            _attached.SpawnRequested -= OnSpawnRequested;
         }
 
         _attached = DataContext as ToolboxViewModel;
@@ -36,6 +38,10 @@ public partial class ToolboxView : UserControl
             BiomeCanvas.ShowGrid = _attached.ShowGridOverlay;
             BiomeCanvas.EngineVersionIndex = CubiomesNative.VersionIndexFor(_attached.SeedVersion);
             _attached.LocateRequested += OnLocateRequested;
+            _attached.DimensionChanged += OnDimensionChanged;
+            _attached.SpawnRequested += OnSpawnRequested;
+            BiomeCanvas.Dimension = DimensionOf(_attached.DimensionIndex);
+            BiomeCanvas.ShowStructures = _attached.ShowStructures;
         }
     }
 
@@ -54,6 +60,9 @@ public partial class ToolboxView : UserControl
                 BiomeCanvas.ShowSlime = vm.ShowSlimeOverlay;
                 BiomeCanvas.InvalidateVisual();
                 break;
+            case nameof(ToolboxViewModel.ShowStructures):
+                BiomeCanvas.ShowStructures = vm.ShowStructures;
+                break;
             case nameof(ToolboxViewModel.ShowGridOverlay):
                 BiomeCanvas.ShowGrid = vm.ShowGridOverlay;
                 BiomeCanvas.InvalidateVisual();
@@ -63,13 +72,30 @@ public partial class ToolboxView : UserControl
 
     private void OnLocateRequested(int blockX, int blockZ) => BiomeCanvas.LocateTo(blockX, blockZ);
 
+    private void OnSpawnRequested()
+    {
+        if (_attached is not { } vm) return;
+        var spawn = CubiomesNative.Spawn(vm.SeedValue, CubiomesNative.VersionIndexFor(vm.SeedVersion));
+        if (spawn is { } position) BiomeCanvas.LocateTo(position.X, position.Z);
+    }
+
+    private void OnDimensionChanged(int index) => BiomeCanvas.Dimension = DimensionOf(index);
+
+    private static int DimensionOf(int index) => index switch
+    {
+        1 => CubiomesNative.DimNether,
+        2 => CubiomesNative.DimEnd,
+        _ => CubiomesNative.DimOverworld,
+    };
+
     private void OnMapHover(object? sender, BiomeHoverEventArgs e)
     {
         if (_attached is not { } vm) return;
 
         var slime = e.Slime ? " · 史莱姆区块" : "";
         var biome = e.NativeName ?? SimplifiedBiomeMap.DisplayName(e.FallbackBiome);
-        vm.MapStatus = $"方块 {e.BlockX}, {e.BlockZ} · {biome}{slime}";
+        var structure = e.NearStructure is { } near ? $" · 附近：{near}" : "";
+        vm.MapStatus = $"方块 {e.BlockX}, {e.BlockZ} · {biome}{slime}{structure}";
     }
 
     private void OnZoomIn(object sender, RoutedEventArgs e)

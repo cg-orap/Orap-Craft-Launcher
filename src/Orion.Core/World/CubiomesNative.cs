@@ -162,6 +162,95 @@ public static class CubiomesNative
         return orap_biome_at(unchecked((ulong)seed), versionIndex, dimension, scale, blockX, y, blockZ);
     }
 
+    /// <summary>结构类型（key 稳定，供界面映射图标与中文名）。</summary>
+    public sealed record StructureType(string Key, int Dimension);
+
+    private static StructureType[]? _structureTypes;
+
+    public static IReadOnlyList<StructureType> StructureTypes
+    {
+        get
+        {
+            EnsureProbed();
+            if (!_available) return [];
+
+            if (_structureTypes is null)
+            {
+                var list = new List<StructureType>();
+                var count = orap_structure_count();
+                for (var i = 0; i < count; i++)
+                {
+                    var keyPtr = orap_structure_key(i);
+                    var key = keyPtr == IntPtr.Zero ? $"#{i}" : Marshal.PtrToStringAnsi(keyPtr) ?? $"#{i}";
+                    list.Add(new StructureType(key, orap_structure_dim(i)));
+                }
+
+                _structureTypes = [.. list];
+            }
+
+            return _structureTypes;
+        }
+    }
+
+    /// <summary>在区块矩形内查找结构（已做群系校验）。</summary>
+    public static IReadOnlyList<(string Key, int X, int Z)> FindStructures(long seed, int versionIndex,
+        int dimension, int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ, int capacity = 4000)
+    {
+        EnsureProbed();
+        if (!_available) return [];
+
+        var buffer = new int[capacity * 3];
+        var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+        int written;
+        try
+        {
+            written = orap_find_structures(unchecked((ulong)seed), versionIndex, dimension,
+                minChunkX, minChunkZ, maxChunkX, maxChunkZ, handle.AddrOfPinnedObject(), capacity, out var total);
+            if (written < 0) return [];
+            written = Math.Min(written, Math.Min(capacity, total));
+        }
+        finally
+        {
+            handle.Free();
+        }
+
+        var types = StructureTypes;
+        var result = new List<(string, int, int)>(written);
+        for (var i = 0; i < written; i++)
+        {
+            var typeIndex = buffer[i * 3];
+            if (typeIndex < 0 || typeIndex >= types.Count) continue;
+            result.Add((types[typeIndex].Key, buffer[i * 3 + 1], buffer[i * 3 + 2]));
+        }
+
+        return result;
+    }
+
+    /// <summary>要塞坐标（Overworld，最多 capacity 个）。</summary>
+    public static IReadOnlyList<(int X, int Z)> FindStrongholds(long seed, int versionIndex, int capacity = 128)
+    {
+        EnsureProbed();
+        if (!_available) return [];
+
+        var buffer = new int[capacity * 2];
+        var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+        int written;
+        try
+        {
+            written = orap_find_strongholds(unchecked((ulong)seed), versionIndex,
+                handle.AddrOfPinnedObject(), capacity);
+            if (written < 0) return [];
+        }
+        finally
+        {
+            handle.Free();
+        }
+
+        var result = new List<(int, int)>(written);
+        for (var i = 0; i < written; i++) result.Add((buffer[i * 2], buffer[i * 2 + 1]));
+        return result;
+    }
+
     /// <summary>群系 id → 英文名（cubiomes 提供），用于映射到中文。</summary>
     public static string? BiomeName(int versionIndex, int biomeId)
     {
@@ -203,4 +292,21 @@ public static class CubiomesNative
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int orap_spawn(ulong seed, int versionIndex, out int outX, out int outZ);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_structure_count();
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr orap_structure_key(int index);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_structure_dim(int index);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_find_structures(ulong seed, int versionIndex, int dim,
+        int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
+        IntPtr outBuf, int capacity, out int outTotal);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_find_strongholds(ulong seed, int versionIndex, IntPtr outBuf, int capacity);
 }

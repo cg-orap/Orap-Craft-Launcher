@@ -10,7 +10,7 @@ using Orion.Core.World;
 namespace Orion.App.Controls;
 
 /// <summary>悬停信息：方块坐标、群系、是否史莱姆区块。</summary>
-public sealed class BiomeHoverEventArgs(int blockX, int blockZ, string? nativeName, int nativeId, BiomeKind fallback, bool slime) : EventArgs
+public sealed class BiomeHoverEventArgs(int blockX, int blockZ, string? nativeName, int nativeId, BiomeKind fallback, bool slime, string? nearStructure) : EventArgs
 {
     public int BlockX { get; } = blockX;
     public int BlockZ { get; } = blockZ;
@@ -21,7 +21,13 @@ public sealed class BiomeHoverEventArgs(int blockX, int blockZ, string? nativeNa
     public int NativeId { get; } = nativeId;
     public BiomeKind FallbackBiome { get; } = fallback;
     public bool Slime { get; } = slime;
+
+    /// <summary>指针附近的结构名（12px 内），没有则为 null。</summary>
+    public string? NearStructure { get; } = nearStructure;
 }
+
+/// <summary>地图上的一个结构标记（结构点或要塞）。</summary>
+public sealed record StructureMarker(string Key, string Label, int BlockX, int BlockZ, bool IsStronghold = false);
 
 /// <summary>
 /// 简化版群系地图画布：把 <see cref="SimplifiedBiomeMap"/> 渲染成位图，再叠格子、史莱姆区块与坐标。
@@ -65,6 +71,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private int _locateX;
     private int _locateZ;
     private bool _hasLocateMark;
+
+    private int _dimension = CubiomesNative.DimOverworld;
+    private bool _showStructures = true;
+    private readonly List<StructureMarker> _structures = [];
+    private (int X, int Z)? _spawn;
+    private string? _hoverStructure;
 
     private bool _dragging;
     private Point _dragStart;
@@ -140,6 +152,33 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
     /// <summary>cubiomes 版本表下标（0 = 最新）。原生引擎不可用时忽略。</summary>
     public int EngineVersionIndex { get; set; }
+
+    /// <summary>当前维度（主世界 / 下界 / 末地）。切换会清空地图重画。</summary>
+    public int Dimension
+    {
+        get => _dimension;
+        set
+        {
+            if (_dimension == value) return;
+            _dimension = value;
+            _structures.Clear();
+            _spawn = null;
+            RequestRender();
+        }
+    }
+
+    /// <summary>是否在地图上标出结构与出生点。</summary>
+    public bool ShowStructures
+    {
+        get => _showStructures;
+        set
+        {
+            if (_showStructures == value) return;
+            _showStructures = value;
+            if (value) _structures.Clear();
+            InvalidateVisual();
+        }
+    }
 
     public bool ShowSlime { get; set; } = true;
     public bool ShowGrid { get; set; } = true;
@@ -302,6 +341,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
             var centerZ = _centerBlockZ;
             var step = BlocksPerPixel;
             var versionIndex = EngineVersionIndex;
+            var dimension = _dimension;
+            var showStructures = _showStructures;
             // cubiomes 只吃 1/4/16/64；中间档（2/8/32）用"采样 scale + 2 倍超采样"实现
             var renderScale = step >= 64 ? 64 : step >= 16 ? 16 : step >= 4 ? 4 : 1;
             var supersample = step / renderScale;      // 1 或 2
@@ -316,10 +357,38 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 // 注意：cubiomes 在 scale>1 时的采样相位与"被渲染区间的起点/宽度"有关，
                 // 把一屏切成条带或瓦片都会在接缝处出现色块错位（实测过）。所以整屏必须一次调用，
                 // 平滑靠"手势期间只做位移 + 停下后再渲染"来保证。
-                var pixels = CubiomesNative.RenderRgba(seed, versionIndex, CubiomesNative.DimOverworld,
+                var pixels = CubiomesNative.RenderRgba(seed, versionIndex, dimension,
                                                        centerX, centerZ, renderScale, pixelWidth, pixelHeight)
                              ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, renderScale, pixelWidth, pixelHeight)
                              ?? new byte[pixelWidth * pixelHeight * 4];
+
+                // 结构与出生点跟着同一次渲染取，避免额外的时序问题
+                List<StructureMarker> markers = [];
+                (int X, int Z)? spawn = null;
+                if (showStructures && CubiomesNative.Available)
+                {
+                    var step = BlocksPerPixel;
+                    var leftChunk = (centerX - width / 2 * step) >> 4;
+                    var rightChunk = (centerX + width / 2 * step) >> 4;
+                    var topChunk = (centerZ - height / 2 * step) >> 4;
+                    var bottomChunk = (centerZ + height / 2 * step) >> 4;
+
+                    foreach (var (key, x, z) in CubiomesNative.FindStructures(seed, versionIndex, dimension,
+                                 leftChunk, topChunk, rightChunk, bottomChunk))
+                    {
+                        markers.Add(new StructureMarker(key, StructureLabels.Resolve(key), x, z));
+                    }
+
+                    if (dimension == CubiomesNative.DimOverworld)
+                    {
+                        foreach (var (x, z) in CubiomesNative.FindStrongholds(seed, versionIndex))
+                        {
+                            markers.Add(new StructureMarker("stronghold", StructureLabels.Resolve("stronghold"), x, z, true));
+                        }
+
+                        spawn = CubiomesNative.Spawn(seed, versionIndex);
+                    }
+                }
 
                 width = pixelWidth;
                 height = pixelHeight;
@@ -334,6 +403,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _bitmapHeight = height;
                     _bitmapCenterX = centerX;
                     _bitmapCenterZ = centerZ;
+                    _structures.Clear();
+                    _structures.AddRange(markers);
+                    _spawn = spawn;
                     _bitmapStep = step;
                     _loading = false;
                     _pendingZoomIndex = null;
@@ -472,6 +544,42 @@ public sealed class BiomeMapCanvas : FrameworkElement
         }
 
         // 定位标记
+        if (_showStructures)
+        {
+            foreach (var marker in _structures)
+            {
+                var mx = (marker.BlockX - left) / (double)step;
+                var my = (marker.BlockZ - top) / (double)step;
+                if (mx < -12 || mx > width + 12 || my < -12 || my > height + 12) continue;
+
+                var brush = StructureLabels.BrushFor(marker.Key);
+                if (marker.IsStronghold)
+                {
+                    var pen = new Pen(brush, 1.6);
+                    dc.DrawEllipse(null, pen, new Point(mx, my), 6, 6);
+                    dc.DrawEllipse(null, pen, new Point(mx, my), 2, 2);
+                }
+                else
+                {
+                    dc.DrawEllipse(brush, null, new Point(mx, my), 3.5, 3.5);
+                    dc.DrawEllipse(null, new Pen(Brushes.Black, 0.6), new Point(mx, my), 3.5, 3.5);
+                }
+            }
+
+            if (_spawn is { } sp)
+            {
+                var sx = (sp.X - left) / (double)step;
+                var sy = (sp.Z - top) / (double)step;
+                if (sx > -12 && sx < width + 12 && sy > -12 && sy < height + 12)
+                {
+                    var pen = new Pen(Brushes.White, 1.8);
+                    dc.DrawLine(pen, new Point(sx - 6, sy), new Point(sx + 6, sy));
+                    dc.DrawLine(pen, new Point(sx, sy - 6), new Point(sx, sy + 6));
+                    dc.DrawEllipse(null, pen, new Point(sx, sy), 4, 4);
+                }
+            }
+        }
+
         if (_hasLocateMark)
         {
             var mx = (_locateX - left) / (double)step;
@@ -549,12 +657,33 @@ public sealed class BiomeMapCanvas : FrameworkElement
             ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, CubiomesNative.DimOverworld, step, blockX, 63, blockZ)
             : -1;
 
+        // 命中附近的结构（12px 内取最近的一个）
+        string? nearStructure = null;
+        if (_showStructures)
+        {
+            var bestDistance = 12.0;
+            foreach (var marker in _structures)
+            {
+                var mx = (marker.BlockX - left) / (double)step;
+                var my = (marker.BlockZ - top) / (double)step;
+                var distance = Math.Sqrt((mx - position.X) * (mx - position.X) + (my - position.Y) * (my - position.Y));
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    nearStructure = marker.Label;
+                }
+            }
+        }
+
+        _hoverStructure = nearStructure;
+
         HoverChanged?.Invoke(this, new BiomeHoverEventArgs(
             blockX, blockZ,
             nativeId >= 0 ? BiomeCatalog.FromCubiomesName(CubiomesNative.BiomeName(EngineVersionIndex, nativeId)) : null,
             nativeId,
             SimplifiedBiomeMap.Sample(_seed, blockX, blockZ),
-            SeedMap.IsSlimeChunk(_seed, blockX >> 4, blockZ >> 4)));
+            SeedMap.IsSlimeChunk(_seed, blockX >> 4, blockZ >> 4),
+            nearStructure));
     }
 
     /// <summary>惯性：中心按松手速度继续滑行，16ms 衰减 12%（约 140ms 停住），期间持续流式取图。</summary>
