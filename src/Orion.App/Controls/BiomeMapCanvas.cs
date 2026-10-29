@@ -58,6 +58,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private int _bitmapHeight;
     private int _bitmapVersion;
     private bool _renderQueued;
+    private DispatcherTimer? _renderDebounce;
     private bool _renderAgainAfterLoad;
     private long _lastRenderStarted;
 
@@ -223,6 +224,25 @@ public sealed class BiomeMapCanvas : FrameworkElement
         RequestRender();
     }
 
+    /// <summary>
+    /// 手势期间不渲染：只靠位移把旧图挪过去（O(1)，天然 60fps）。
+    /// 停下来 140ms 后再渲染一次，避免"边拖边算"导致的卡顿与请求堆积。
+    /// </summary>
+    private void ScheduleRenderAfterGesture()
+    {
+        _renderDebounce ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
+        _renderDebounce.Stop();
+        _renderDebounce.Tick -= OnRenderDebounceTick;
+        _renderDebounce.Tick += OnRenderDebounceTick;
+        _renderDebounce.Start();
+    }
+
+    private void OnRenderDebounceTick(object? sender, EventArgs e)
+    {
+        _renderDebounce?.Stop();
+        RequestRender();
+    }
+
     /// <summary>拖动/惯性期间用节流渲染：最多每 90ms 发起一次，避免堆积请求。</summary>
     private void RequestRenderThrottled()
     {
@@ -274,8 +294,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
             InvalidateVisual();
 
             // 位图尺寸必须与元素一致，否则右侧/底部会留下未绘制的深色条。
-            var width = Math.Max(2, (int)Math.Round(ActualWidth));
-            var height = Math.Max(2, (int)Math.Round(ActualHeight));
+            var downscale = BlocksPerPixel >= 8 ? 2 : 1;
+            var width = Math.Max(2, (int)Math.Round(ActualWidth) / downscale);
+            var height = Math.Max(2, (int)Math.Round(ActualHeight) / downscale);
             var seed = _seed;
             var centerX = _centerBlockX;
             var centerZ = _centerBlockZ;
@@ -291,9 +312,15 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 // 有原生引擎就用真算法（cubiomes），否则退回简化模型。
                 var pixelWidth = width * supersample;
                 var pixelHeight = height * supersample;
+
+                // 注意：cubiomes 在 scale>1 时的采样相位与"被渲染区间的起点/宽度"有关，
+                // 把一屏切成条带或瓦片都会在接缝处出现色块错位（实测过）。所以整屏必须一次调用，
+                // 平滑靠"手势期间只做位移 + 停下后再渲染"来保证。
                 var pixels = CubiomesNative.RenderRgba(seed, versionIndex, CubiomesNative.DimOverworld,
                                                        centerX, centerZ, renderScale, pixelWidth, pixelHeight)
-                             ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, renderScale, pixelWidth, pixelHeight);
+                             ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, renderScale, pixelWidth, pixelHeight)
+                             ?? new byte[pixelWidth * pixelHeight * 4];
+
                 width = pixelWidth;
                 height = pixelHeight;
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -509,7 +536,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 position.X - _dragStart.X, position.Y - _dragStart.Y, step);
             _centerBlockX = centerX;
             _centerBlockZ = centerZ;
-            RequestRenderThrottled();
+            ScheduleRenderAfterGesture();
             return;
         }
 
@@ -544,7 +571,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _inertiaVx *= 0.88;
         _inertiaVy *= 0.88;
 
-        RequestRenderThrottled();
+        ScheduleRenderAfterGesture();
         InvalidateVisual();
 
         if (Math.Abs(_inertiaVx) < 0.02 && Math.Abs(_inertiaVy) < 0.02)
@@ -568,7 +595,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _inertiaVy = _velocityY;
         if (Math.Abs(_inertiaVx) < 0.05 && Math.Abs(_inertiaVy) < 0.05)
         {
-            RequestRenderThrottled();
+            ScheduleRenderAfterGesture();
             return;
         }
 
