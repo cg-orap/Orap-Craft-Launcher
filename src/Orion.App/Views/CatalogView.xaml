@@ -119,7 +119,18 @@
                     <TextBlock Text="资源市场" FontSize="17" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
                                Text="一键安装到当前实例，或作为新版本创建。点击卡片在右侧查看详情。" />
-                    <controls:SegmentedControl Margin="0,10,0,0" ItemsSource="{Binding Kinds}"
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="来源" Style="{StaticResource CaptionText}" VerticalAlignment="Center"
+                                   Margin="0,0,10,0" />
+                        <controls:SegmentedControl Grid.Column="1" ItemsSource="{Binding Sources}"
+                                                   SelectedIndex="{Binding SourceIndex, Mode=TwoWay}"
+                                                   AutomationProperties.AutomationId="CatalogSourceSwitch" />
+                    </Grid>
+                    <controls:SegmentedControl Margin="0,8,0,0" ItemsSource="{Binding Kinds}"
                                                DisplayMemberPath="Name"
                                                SelectedIndex="{Binding KindIndex, Mode=TwoWay}" />
 
@@ -178,7 +189,8 @@
 
             </Grid>
 
-            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6">
+            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6"
+                    Visibility="{Binding IsModrinthSource, Converter={StaticResource BoolToVisibility}}">
                 <ListBox ItemsSource="{Binding Results}" Background="Transparent" BorderThickness="0"
                          anim:StaggerIn.IsEnabled="True"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -269,6 +281,69 @@
                 </ListBox>
             </Border>
 
+            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6"
+                    Visibility="{Binding IsCurseForgeSource, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="{Binding CurseForgeStatus}" Style="{StaticResource CaptionText}"
+                               TextWrapping="Wrap" Margin="6,4,6,8" />
+
+                    <ListBox Grid.Row="1" ItemsSource="{Binding CurseForgeResults}" Background="Transparent"
+                             BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.AutomationId="CatalogCurseForgeList">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Margin" Value="0,0,0,2" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="8"
+                                        Padding="12,10" Margin="0,0,0,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            <TextBlock Text="{Binding Description}" FontSize="11.5"
+                                                       Foreground="{DynamicResource MutedTextBrush}"
+                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                                       Margin="0,3,0,0" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                <TextBlock Text="{Binding KindLabel}" FontSize="10.5"
+                                                           Foreground="{DynamicResource AccentBrush}" />
+                                                <TextBlock Text="{Binding DownloadsText}" FontSize="10.5"
+                                                           FontFamily="Consolas"
+                                                           Foreground="{DynamicResource MutedTextBrush}"
+                                                           Margin="10,0,0,0" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="安装" Style="{StaticResource GhostButton}"
+                                                FontSize="11" Padding="12,4" VerticalAlignment="Center"
+                                                Command="{Binding InstallCommand}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
             <Grid Grid.Row="2" Margin="2,10,2,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -278,7 +353,18 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Ellipse Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,8,0"
                              Fill="{DynamicResource SuccessBrush}" />
-                    <TextBlock Text="来源 Modrinth（无需 Key）" Style="{StaticResource CaptionText}" />
+                    <TextBlock>
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+                                <Setter Property="Text" Value="来源 Modrinth（无需 Key）" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurseForgeSource}" Value="True">
+                                        <Setter Property="Text" Value="来源 CurseForge（需要 API Key）" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <TextBlock Text="·" Style="{StaticResource CaptionText}" Margin="8,0" />
                     <TextBlock Text="{Binding PageText}" Style="{StaticResource CaptionText}" />
                     <Button Content="取消任务" Style="{StaticResource DangerButton}" Padding="10,3" Margin="12,0,0,0"

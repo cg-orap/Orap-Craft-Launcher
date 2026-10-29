@@ -14,7 +14,16 @@ public sealed record CurseForgePack(
     long Downloads,
     DateTimeOffset? Updated);
 
-/// <summary>CurseForge 文件（这里只需要整合包的 zip）。</summary>
+/// <summary>下载中心里可浏览的 CurseForge 内容类型（classId 来自官方分类）。</summary>
+public enum CurseForgeKind
+{
+    Mod = 6,
+    Modpack = 4471,
+    ResourcePack = 12,
+    Shader = 6552,
+}
+
+/// <summary>CurseForge 文件（整合包是 zip，模组是 jar，材质/光影是 zip）。</summary>
 public sealed record CurseForgeFile(
     int ModId,
     int FileId,
@@ -42,12 +51,25 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
     /// <summary>设置页填了 Key 之后立刻生效，不必重启。</summary>
     public void SetApiKey(string? key) => _key = string.IsNullOrWhiteSpace(key) ? null : key.Trim();
 
-    public async Task<IReadOnlyList<CurseForgePack>> SearchModpacksAsync(
-        string? query, string? gameVersion, int pageSize = 20, CancellationToken ct = default)
+    /// <summary>内容类型 → 实例里的目录名（模组/材质/光影）；整合包没有目录。</summary>
+    public static string? InstallFolderOf(CurseForgeKind kind) => kind switch
+    {
+        CurseForgeKind.Mod => "mods",
+        CurseForgeKind.ResourcePack => "resourcepacks",
+        CurseForgeKind.Shader => "shaderpacks",
+        _ => null,
+    };
+
+    public Task<IReadOnlyList<CurseForgePack>> SearchModpacksAsync(
+        string? query, string? gameVersion, int pageSize = 20, CancellationToken ct = default) =>
+        SearchAsync(CurseForgeKind.Modpack, query, gameVersion, pageSize, ct);
+
+    public async Task<IReadOnlyList<CurseForgePack>> SearchAsync(
+        CurseForgeKind kind, string? query, string? gameVersion, int pageSize = 20, CancellationToken ct = default)
     {
         if (!HasKey) return [];
 
-        var url = $"{Base}mods/search?gameId={GameMinecraft}&classId={ClassModpacks}" +
+        var url = $"{Base}mods/search?gameId={GameMinecraft}&classId={(int)kind}" +
                   $"&sortField=2&sortOrder=desc&pageSize={Math.Clamp(pageSize, 1, 50)}";
 
         if (!string.IsNullOrWhiteSpace(query)) url += "&searchFilter=" + Uri.EscapeDataString(query.Trim());
@@ -67,7 +89,8 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
     /// 选一个和当前实例匹配的文件：优先"目标 MC 版本 + 相同加载器"，退而求其次取最新文件。
     /// </summary>
     public async Task<CurseForgeFile?> GetBestFileAsync(
-        CurseForgePack pack, string? gameVersion, int? modLoaderType, CancellationToken ct = default)
+        CurseForgePack pack, string? gameVersion, int? modLoaderType,
+        CurseForgeKind kind = CurseForgeKind.Modpack, CancellationToken ct = default)
     {
         if (!HasKey) return null;
 
@@ -79,9 +102,9 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         var files = payload?.Data;
         if (files is null || files.Count == 0) return null;
 
+        var extension = kind == CurseForgeKind.Mod ? ".jar" : ".zip";
         var candidates = files
-            .Where(f => f.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
-                        || f.GameVersions.Count > 0)
+            .Where(f => f.FileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (candidates.Count == 0) candidates = files;
@@ -92,6 +115,7 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
             .ThenByDescending(x => x.File.FileDate)
             .ToList();
 
+        if (scored.Count == 0) return null;
         var best = scored[0].File;
         return new CurseForgeFile(best.ModId, best.Id, best.FileName, best.DisplayName, best.DownloadUrl,
             best.GameVersions);
@@ -110,6 +134,36 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
 
         var payload = await response.Content.ReadFromJsonAsync<DataResponse<string>>(JsonOptions, ct).ConfigureAwait(false);
         return string.IsNullOrWhiteSpace(payload?.Data) ? null : payload!.Data;
+    }
+
+    /// <summary>把单个文件（.jar / .zip）下载到目标目录，返回落地路径。</summary>
+    public async Task<string> DownloadFileAsync(CurseForgeFile file, string targetDirectory,
+        IProgress<long>? progress = null, CancellationToken ct = default)
+    {
+        var url = await GetDownloadUrlAsync(file, ct).ConfigureAwait(false)
+                  ?? throw new InvalidOperationException("CurseForge 没有返回可用下载地址（Key 可能已失效）");
+
+        Directory.CreateDirectory(targetDirectory);
+        var target = Path.Combine(targetDirectory, Sanitize(file.FileName, "curseforge-file"));
+
+        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var total = response.Content.Headers.ContentLength ?? -1;
+        await using var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        await using var destination = File.Create(target);
+
+        var buffer = new byte[81920];
+        long written = 0;
+        int read;
+        while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+        {
+            await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+            written += read;
+            if (total > 0) progress?.Report((long)(written * 100.0 / total));
+        }
+
+        return target;
     }
 
     /// <summary>把整包 zip 下到临时文件，交给整合包安装器处理。</summary>

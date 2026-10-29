@@ -70,6 +70,22 @@ public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, 
     public ICommand ShowDetailsCommand => new AsyncRelayCommand(() => owner.ShowDetailsAsync(this));
 }
 
+/// <summary>下载中心里的一条 CurseForge 结果。</summary>
+public sealed class CurseForgeRow(Orion.Core.Mods.CurseForgePack pack, CatalogViewModel owner,
+    Orion.Core.Mods.CurseForgeKind kind) : ObservableObject
+{
+    public Orion.Core.Mods.CurseForgePack Pack { get; } = pack;
+    public Orion.Core.Mods.CurseForgeKind Kind { get; } = kind;
+
+    public string Title => Pack.Name;
+    public string Description => Pack.Summary;
+    public string DownloadsText => Pack.Downloads > 0 ? $"{Pack.Downloads:N0} 次下载" : "";
+    public string KindLabel => owner.KindNameOf(Kind);
+
+    public ICommand InstallCommand => new AsyncRelayCommand(() => owner.InstallCurseForgeItemAsync(this), null,
+        ex => owner.Status = "安装失败: " + ex.Message);
+}
+
 /// <summary>
 /// 下载中心: Minecraft versions (hosted view) plus Modrinth modpacks, mods, shaders and resource packs.
 ///
@@ -93,6 +109,8 @@ public sealed class CatalogViewModel : ObservableObject
     private string _targetInfo = "";
     private bool _dropActive;
     private CatalogDetailViewModel? _detail;
+    private int _sourceIndex;
+    private string _curseForgeStatus = "";
     private bool _detailOpen;
 
     // A search for the previous tab must never block the next one, and revisiting a tab should not
@@ -230,6 +248,56 @@ public sealed class CatalogViewModel : ObservableObject
 
     public ObservableList<CatalogRow> Results { get; } = [];
 
+    // ── 来源滑块：0 = Modrinth，1 = CurseForge ─────────────
+    public IReadOnlyList<string> Sources { get; } = ["Modrinth", "CurseForge"];
+
+    public int SourceIndex
+    {
+        get => _sourceIndex;
+        set
+        {
+            var clamped = Math.Clamp(value, 0, 1);
+            if (!SetProperty(ref _sourceIndex, clamped)) return;
+
+            OnPropertyChanged(nameof(IsModrinthSource));
+            OnPropertyChanged(nameof(IsCurseForgeSource));
+
+            // CurseForge 没有"游戏版本"这一类，切过去时自动落到模组
+            if (clamped == 1 && _kind.ProjectType is null) Kind = Kinds[2];
+
+            _ = SearchAsync(0);
+        }
+    }
+
+    public bool IsModrinthSource => _sourceIndex == 0;
+
+    public bool IsCurseForgeSource => _sourceIndex == 1;
+
+    public ObservableList<CurseForgeRow> CurseForgeResults { get; } = [];
+
+    public string CurseForgeStatus
+    {
+        get => _curseForgeStatus;
+        set => SetProperty(ref _curseForgeStatus, value);
+    }
+
+    public string KindNameOf(Orion.Core.Mods.CurseForgeKind kind) => kind switch
+    {
+        Orion.Core.Mods.CurseForgeKind.Modpack => "整合包",
+        Orion.Core.Mods.CurseForgeKind.ResourcePack => "材质包",
+        Orion.Core.Mods.CurseForgeKind.Shader => "光影",
+        _ => "模组",
+    };
+
+    /// <summary>当前分类对应的 CurseForge 类型。</summary>
+    private Orion.Core.Mods.CurseForgeKind CurrentCurseForgeKind => _kind.Key switch
+    {
+        "modpack" => Orion.Core.Mods.CurseForgeKind.Modpack,
+        "resourcepack" => Orion.Core.Mods.CurseForgeKind.ResourcePack,
+        "shader" => Orion.Core.Mods.CurseForgeKind.Shader,
+        _ => Orion.Core.Mods.CurseForgeKind.Mod,
+    };
+
     /// <summary>The Minecraft version list page is hosted inside the download centre.</summary>
     public VersionsViewModel VersionsPage => _main.VersionsPage;
 
@@ -349,6 +417,12 @@ public sealed class CatalogViewModel : ObservableObject
     public async Task SearchAsync(int page, bool forceRefresh = false)
     {
         if (IsVersionsTab) return;
+
+        if (IsCurseForgeSource)
+        {
+            await SearchCurseForgeAsync().ConfigureAwait(true);
+            return;
+        }
 
         page = Math.Clamp(page, 0, Math.Max(0, TotalPages - 1));
         UpdateTargetInfo();
@@ -893,6 +967,143 @@ public sealed class CatalogViewModel : ObservableObject
             default:
                 Status = "无法识别该压缩包：" + (info.Note ?? "缺少 manifest.json / modrinth.index.json / .minecraft");
                 return;
+        }
+    }
+
+    /// <summary>CurseForge 搜索（模组/整合包/材质/光影）。</summary>
+    private async Task SearchCurseForgeAsync()
+    {
+        var kind = CurrentCurseForgeKind;
+
+        if (!_main.Context.CurseForge.HasKey)
+        {
+            CurseForgeStatus = "还没有 CurseForge API Key：设置 → 网络与下载 → CurseForge 里填一个。";
+            return;
+        }
+
+        Busy = true;
+        CurseForgeResults.Clear();
+        CurseForgeStatus = $"正在搜索 CurseForge {KindNameOf(kind)}…";
+
+        try
+        {
+            var instance = _main.CurrentInstance;
+            var packs = await _main.Context.CurseForge
+                .SearchAsync(kind, SearchText, instance?.GameVersion, PageSize)
+                .ConfigureAwait(true);
+
+            CurseForgeResults.Replace(packs.Select(p => new CurseForgeRow(p, this, kind)));
+            Status = packs.Count == 0
+                ? "没有找到匹配的内容。"
+                : $"找到 {packs.Count} 个{KindNameOf(kind)}（按热度排序）";
+            CurseForgeStatus = Status;
+        }
+        catch (Exception ex)
+        {
+            CurseForgeStatus = "搜索失败: " + ex.Message;
+            Status = CurseForgeStatus;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>
+    /// 安装一条 CurseForge 结果：整合包走"新建实例"的整包流程，模组/材质/光影直接落到当前实例对应目录。
+    /// </summary>
+    public async Task InstallCurseForgeItemAsync(CurseForgeRow row)
+    {
+        var instance = _main.CurrentInstance;
+        var kind = row.Kind;
+
+        if (kind != Orion.Core.Mods.CurseForgeKind.Modpack && instance is null)
+        {
+            Status = "请先选择一个版本，再安装" + KindNameOf(kind) + "。";
+            return;
+        }
+
+        Busy = true;
+        var activity = _main.Activities.Begin($"安装 {row.Title}", KindNameOf(kind));
+        _installCts = new CancellationTokenSource();
+
+        try
+        {
+            var loaderType = kind == Orion.Core.Mods.CurseForgeKind.Mod && instance is { Loader: not global::Orion.Core.Instances.LoaderKind.Vanilla }
+                ? Orion.Core.Mods.CurseForgeClient.LoaderTypeOf(instance.Loader)
+                : (int?)null;
+
+            Status = $"正在解析 {row.Title} 的文件…";
+            var file = await _main.Context.CurseForge
+                .GetBestFileAsync(row.Pack, instance?.GameVersion, loaderType, kind, _installCts.Token)
+                .ConfigureAwait(true);
+
+            if (file is null)
+            {
+                Status = "这个项目没有可下载的文件（Key 可能已失效）。";
+                _main.Activities.Finish(activity, ActivityState.Failed, "没有可用文件");
+                return;
+            }
+
+            if (kind == Orion.Core.Mods.CurseForgeKind.Modpack)
+            {
+                var cache = Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+                Status = $"正在下载 {file.FileName}…";
+                var progress = new Progress<long>(percent => Status = $"正在下载 {file.FileName}… {percent}%");
+                var zip = await _main.Context.CurseForge
+                    .DownloadPackAsync(row.Pack, file, cache, progress, _installCts.Token)
+                    .ConfigureAwait(true);
+
+                Status = "下载完成，开始安装（加载器 + 清单模组）…";
+                var result = await _main.Context.PackArchives
+                    .InstallCurseForgeAsync(zip, row.Title, output: new Progress<string>(line => Status = line),
+                        ct: _installCts.Token)
+                    .ConfigureAwait(true);
+
+                if (result.Success)
+                {
+                    Status = $"已安装整合包 {row.Title}";
+                    _main.Activities.Finish(activity, ActivityState.Completed);
+                    _main.LogsPage.AppendSystem(Status);
+                    await _main.ReloadInstancesAsync().ConfigureAwait(true);
+                }
+                else
+                {
+                    Status = "安装失败: " + (result.Error ?? "未知错误");
+                    _main.Activities.Finish(activity, ActivityState.Failed, result.Error);
+                }
+
+                return;
+            }
+
+            var folder = Orion.Core.Mods.CurseForgeClient.InstallFolderOf(kind)!;
+            var target = Path.Combine(instance!.GameDirectory, folder);
+            Status = $"正在下载 {file.FileName}…";
+            var saved = await _main.Context.CurseForge
+                .DownloadFileAsync(file, target,
+                    new Progress<long>(percent => Status = $"正在下载 {file.FileName}… {percent}%"),
+                    _installCts.Token)
+                .ConfigureAwait(true);
+
+            Status = $"已安装 {row.Title} → {folder}/{Path.GetFileName(saved)}";
+            _main.Activities.Finish(activity, ActivityState.Completed);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (OperationCanceledException)
+        {
+            Status = "已取消。";
+            _main.Activities.Finish(activity, ActivityState.Failed, "已取消");
+        }
+        catch (Exception ex)
+        {
+            Status = "安装失败: " + ex.Message;
+            _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+            _installCts?.Dispose();
+            _installCts = null;
         }
     }
 
