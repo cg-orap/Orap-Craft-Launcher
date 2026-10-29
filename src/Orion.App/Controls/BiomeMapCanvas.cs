@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using System.Windows.Media.Imaging;
 using Orion.Core.World;
 
@@ -48,7 +49,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private long _seed;
     private int _zoomIndex = 4;          // 默认 16 方块/像素
     private int? _pendingZoomIndex;
-    private System.Windows.Threading.DispatcherTimer? _zoomTimer;
+    private DispatcherTimer? _zoomTimer;
     private int _centerBlockX;
     private int _centerBlockZ;
 
@@ -57,11 +58,28 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private int _bitmapHeight;
     private int _bitmapVersion;
     private bool _renderQueued;
+    private bool _renderAgainAfterLoad;
+    private long _lastRenderStarted;
+
+    private int _locateX;
+    private int _locateZ;
+    private bool _hasLocateMark;
 
     private bool _dragging;
     private Point _dragStart;
     private int _dragCenterX;
     private int _dragCenterZ;
+
+    // 当前位图对应的中心与采样步长：拖动时旧图按中心差平移，避免空白/跳变
+    private int _bitmapCenterX;
+    private int _bitmapCenterZ;
+    private int _bitmapStep = 16;
+
+    private bool _loading;
+    private DispatcherTimer? _inertiaTimer;
+    private double _inertiaVx;
+    private double _inertiaVy;
+    private long _lastInertiaTick;
 
     // 惯性：记录最近两次移动的时间与位置，松手时换算成额外滑行像素
     private Point _lastMovePoint;
@@ -87,27 +105,6 @@ public sealed class BiomeMapCanvas : FrameworkElement
     {
         get => (double)GetValue(VisualScaleProperty);
         set => SetValue(VisualScaleProperty, value);
-    }
-
-    /// <summary>拖动/惯性期间位图相对元素的像素偏移。</summary>
-    public static readonly DependencyProperty DragOffsetXProperty = DependencyProperty.Register(
-        nameof(DragOffsetX), typeof(double), typeof(BiomeMapCanvas),
-        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
-
-    public static readonly DependencyProperty DragOffsetYProperty = DependencyProperty.Register(
-        nameof(DragOffsetY), typeof(double), typeof(BiomeMapCanvas),
-        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
-
-    public double DragOffsetX
-    {
-        get => (double)GetValue(DragOffsetXProperty);
-        set => SetValue(DragOffsetXProperty, value);
-    }
-
-    public double DragOffsetY
-    {
-        get => (double)GetValue(DragOffsetYProperty);
-        set => SetValue(DragOffsetYProperty, value);
     }
 
     /// <summary>新位图到达时的淡入透明度（拖动松手后用，避免硬切）。</summary>
@@ -196,7 +193,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         };
         BeginAnimation(VisualScaleProperty, animation);
 
-        _zoomTimer ??= new System.Windows.Threading.DispatcherTimer
+        _zoomTimer ??= new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(ZoomAnimationMs),
         };
@@ -226,6 +223,41 @@ public sealed class BiomeMapCanvas : FrameworkElement
         RequestRender();
     }
 
+    /// <summary>拖动/惯性期间用节流渲染：最多每 90ms 发起一次，避免堆积请求。</summary>
+    private void RequestRenderThrottled()
+    {
+        if (_loading)
+        {
+            // 已经有一次在飞：只标记"还需要再刷一次"，等它回来再发
+            _renderAgainAfterLoad = true;
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        if (now - _lastRenderStarted < 90)
+        {
+            _renderAgainAfterLoad = true;
+            return;
+        }
+
+        RequestRender();
+    }
+
+    /// <summary>定位到指定方块坐标（输入框跳转用），并在图上标一个十字。</summary>
+    public void LocateTo(int blockX, int blockZ, bool mark = true)
+    {
+        _centerBlockX = blockX;
+        _centerBlockZ = blockZ;
+        if (mark)
+        {
+            _locateX = blockX;
+            _locateZ = blockZ;
+            _hasLocateMark = true;
+        }
+
+        RequestRender();
+    }
+
     // ── 渲染（后台线程算像素，UI 线程建位图） ─────────────
     private void RequestRender()
     {
@@ -236,6 +268,10 @@ public sealed class BiomeMapCanvas : FrameworkElement
         {
             _renderQueued = false;
             if (ActualWidth < 2 || ActualHeight < 2) return;
+
+            _loading = true;
+            _lastRenderStarted = Environment.TickCount64;
+            InvalidateVisual();
 
             // 位图尺寸必须与元素一致，否则右侧/底部会留下未绘制的深色条。
             var width = Math.Max(2, (int)Math.Round(ActualWidth));
@@ -269,6 +305,10 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _bitmap = bitmap;
                     _bitmapWidth = width;
                     _bitmapHeight = height;
+                    _bitmapCenterX = centerX;
+                    _bitmapCenterZ = centerZ;
+                    _bitmapStep = step;
+                    _loading = false;
                     _pendingZoomIndex = null;
                     BeginAnimation(VisualScaleProperty, null);
                     VisualScale = 1.0;
@@ -276,15 +316,21 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     if (_fadeNextBitmap)
                     {
                         _fadeNextBitmap = false;
-                        BitmapOpacity = 0.55;
+                        BitmapOpacity = 0.80;
                         BeginAnimation(BitmapOpacityProperty, new DoubleAnimation(1.0,
                             new Duration(TimeSpan.FromMilliseconds(120))) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
                     }
 
                     InvalidateVisual();
+
+                    if (_renderAgainAfterLoad)
+                    {
+                        _renderAgainAfterLoad = false;
+                        RequestRenderThrottled();
+                    }
                 }));
             });
-        }), System.Windows.Threading.DispatcherPriority.Background);
+        }), DispatcherPriority.Background);
     }
 
     /// <summary>渲染层输出 RGBA，WPF 的 Bgra32 需要交换 R/B 两个通道。</summary>
@@ -321,14 +367,18 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
         if (_bitmap is not null)
         {
-            // 位图可能是 2 倍超采样，统一铺满可视区域（缩小采样保持像素锐利）
+            // 旧图按"位图中心 vs 当前中心"的差平移：拖动时画面跟着走，
+            // 新瓦片到达前不会出现空白，也不会在替换瞬间跳位。
+            var dx = _bitmapStep > 0 ? (_bitmapCenterX - _centerBlockX) / (double)_bitmapStep : 0;
+            var dz = _bitmapStep > 0 ? (_bitmapCenterZ - _centerBlockZ) / (double)_bitmapStep : 0;
+
             dc.PushOpacity(BitmapOpacity);
-            dc.DrawImage(_bitmap, new Rect(DragOffsetX, DragOffsetY, width, height));
+            dc.DrawImage(_bitmap, new Rect(dx, dz, width, height));
             dc.Pop();
         }
 
-        var left = _centerBlockX - (int)(width / 2 * step) + (int)Math.Round(DragOffsetX * step);
-        var top = _centerBlockZ - (int)(height / 2 * step) + (int)Math.Round(DragOffsetY * step);
+        var left = _centerBlockX - (int)(width / 2 * step);
+        var top = _centerBlockZ - (int)(height / 2 * step);
 
         // 网格与坐标：每 16 区块（256 方块）一条主线
         if (ShowGrid)
@@ -394,7 +444,30 @@ public sealed class BiomeMapCanvas : FrameworkElement
             dc.DrawLine(pen, new Point(ox, oy - 9), new Point(ox, oy + 9));
         }
 
+        // 定位标记
+        if (_hasLocateMark)
+        {
+            var mx = (_locateX - left) / (double)step;
+            var my = (_locateZ - top) / (double)step;
+            if (mx > -40 && mx < width + 40 && my > -40 && my < height + 40)
+            {
+                var pinPen = new Pen(OriginBrush, 2);
+                dc.DrawEllipse(null, pinPen, new Point(mx, my), 7, 7);
+                dc.DrawLine(pinPen, new Point(mx - 12, my), new Point(mx + 12, my));
+                dc.DrawLine(pinPen, new Point(mx, my - 12), new Point(mx, my + 12));
+            }
+        }
+
         if (scaling) dc.Pop();
+
+        if (_loading)
+        {
+            var text = new FormattedText("正在加载…", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                new Typeface("Microsoft YaHei UI"), 11, TextBrush, dpi);
+            var rect = new Rect(width - text.Width - 26, 10, text.Width + 16, text.Height + 8);
+            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(0xCC, 0x14, 0x18, 0x1F)), null, rect, 6, 6);
+            dc.DrawText(text, new Point(rect.X + 8, rect.Y + 4));
+        }
     }
 
     // ── 交互 ───────────────────────────────────────────────
@@ -409,8 +482,6 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _lastMoveTicks = Environment.TickCount64;
         _velocityX = 0;
         _velocityY = 0;
-        BeginAnimation(DragOffsetXProperty, null);
-        BeginAnimation(DragOffsetYProperty, null);
         CaptureMouse();
         Cursor = Cursors.SizeAll;
     }
@@ -433,8 +504,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
             _lastMovePoint = position;
             _lastMoveTicks = now;
 
-            DragOffsetX = position.X - _dragStart.X;
-            DragOffsetY = position.Y - _dragStart.Y;
+            // 中心实时跟随指针：地图"跟手"，未加载区域在拖动过程中持续流式补齐
+            var (centerX, centerZ) = MapViewportMath.DraggedCenter(_dragCenterX, _dragCenterZ,
+                position.X - _dragStart.X, position.Y - _dragStart.Y, step);
+            _centerBlockX = centerX;
+            _centerBlockZ = centerZ;
+            RequestRenderThrottled();
             return;
         }
 
@@ -455,20 +530,28 @@ public sealed class BiomeMapCanvas : FrameworkElement
             SeedMap.IsSlimeChunk(_seed, blockX >> 4, blockZ >> 4)));
     }
 
-    /// <summary>惯性滑行结束：把位移折算成新的中心，归位后重绘并淡入。</summary>
-    private void CommitDrag(double offsetX, double offsetY)
+    /// <summary>惯性：中心按松手速度继续滑行，16ms 衰减 12%（约 140ms 停住），期间持续流式取图。</summary>
+    private void OnInertiaTick(object? sender, EventArgs e)
     {
-        var (centerX, centerZ) = MapViewportMath.DraggedCenter(_dragCenterX, _dragCenterZ, offsetX, offsetY, BlocksPerPixel);
-        _centerBlockX = centerX;
-        _centerBlockZ = centerZ;
+        var now = Environment.TickCount64;
+        var dt = Math.Max(1, now - _lastInertiaTick);
+        _lastInertiaTick = now;
 
-        BeginAnimation(DragOffsetXProperty, null);
-        BeginAnimation(DragOffsetYProperty, null);
-        DragOffsetX = 0;
-        DragOffsetY = 0;
+        var step = BlocksPerPixel;
+        _centerBlockX -= (int)Math.Round(_inertiaVx * dt * step);
+        _centerBlockZ -= (int)Math.Round(_inertiaVy * dt * step);
 
-        _fadeNextBitmap = true;
-        RequestRender();
+        _inertiaVx *= 0.88;
+        _inertiaVy *= 0.88;
+
+        RequestRenderThrottled();
+        InvalidateVisual();
+
+        if (Math.Abs(_inertiaVx) < 0.02 && Math.Abs(_inertiaVy) < 0.02)
+        {
+            _inertiaTimer?.Stop();
+            RequestRender();
+        }
     }
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
@@ -480,20 +563,20 @@ public sealed class BiomeMapCanvas : FrameworkElement
         ReleaseMouseCapture();
         Cursor = Cursors.Arrow;
 
-        // 惯性：按松手瞬间的速度再滑 90ms（限制在 ±160px，避免甩飞）
-        var inertialX = MapViewportMath.InertiaOffset(_velocityX);
-        var inertialY = MapViewportMath.InertiaOffset(_velocityY);
-        var slideToX = DragOffsetX + inertialX;
-        var slideToY = DragOffsetY + inertialY;
+        // 惯性：松手后中心继续按速度滑行一小段（在 140ms 内衰减），期间仍然流式请求瓦片
+        _inertiaVx = _velocityX;
+        _inertiaVy = _velocityY;
+        if (Math.Abs(_inertiaVx) < 0.05 && Math.Abs(_inertiaVy) < 0.05)
+        {
+            RequestRenderThrottled();
+            return;
+        }
 
-        // 关键：先把"旧图"滑完惯性（120ms），滑到位后再换新图并淡入，
-        // 否则一步到位会看到整幅图的跳变。
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var duration = new Duration(TimeSpan.FromMilliseconds(120));
-        var slideX = new DoubleAnimation(slideToX, duration) { EasingFunction = ease };
-        slideX.Completed += (_, _) => CommitDrag(slideToX, slideToY);
-        BeginAnimation(DragOffsetXProperty, slideX);
-        BeginAnimation(DragOffsetYProperty, new DoubleAnimation(slideToY, duration) { EasingFunction = ease });
+        _lastInertiaTick = Environment.TickCount64;
+        _inertiaTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _inertiaTimer.Tick -= OnInertiaTick;
+        _inertiaTimer.Tick += OnInertiaTick;
+        _inertiaTimer.Start();
     }
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)

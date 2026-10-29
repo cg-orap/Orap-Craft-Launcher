@@ -21,7 +21,11 @@ public partial class ToolboxView : UserControl
 
     private void Attach()
     {
-        if (_attached is not null) _attached.PropertyChanged -= OnViewModelPropertyChanged;
+        if (_attached is not null)
+        {
+            _attached.PropertyChanged -= OnViewModelPropertyChanged;
+            _attached.LocateRequested -= OnLocateRequested;
+        }
 
         _attached = DataContext as ToolboxViewModel;
         if (_attached is not null)
@@ -31,6 +35,7 @@ public partial class ToolboxView : UserControl
             BiomeCanvas.ShowSlime = _attached.ShowSlimeOverlay;
             BiomeCanvas.ShowGrid = _attached.ShowGridOverlay;
             BiomeCanvas.EngineVersionIndex = CubiomesNative.VersionIndexFor(_attached.SeedVersion);
+            _attached.LocateRequested += OnLocateRequested;
         }
     }
 
@@ -55,6 +60,8 @@ public partial class ToolboxView : UserControl
                 break;
         }
     }
+
+    private void OnLocateRequested(int blockX, int blockZ) => BiomeCanvas.LocateTo(blockX, blockZ);
 
     private void OnMapHover(object? sender, BiomeHoverEventArgs e)
     {

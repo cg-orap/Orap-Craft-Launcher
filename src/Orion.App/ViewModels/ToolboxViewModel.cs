@@ -31,6 +31,7 @@ public sealed class ToolboxViewModel : ObservableObject
         _main = main;
 
         GenerateMapCommand = new RelayCommand(GenerateMap);
+        LocateCommand = new RelayCommand(LocateTo);
         OpenChunkbaseCommand = new RelayCommand(OpenChunkbase);
         OpenMislandCommand = new RelayCommand(OpenMisland);
         CopySeedCommand = new RelayCommand(CopySeed);
@@ -132,6 +133,14 @@ public sealed class ToolboxViewModel : ObservableObject
             ? "群系由 cubiomes 按原版算法生成（与 Chunkbase / Amidst 同源）；史莱姆区块同样是精确值。"
             : "群系由 5 通道噪声近似生成（可复现，但与游戏内实际地形不保证一致）；史莱姆区块是精确值。";
 
+
+    /// <summary>坐标定位：X / Z 输入框 + 事件（画布由 View 来驱动）。</summary>
+    public string LocateX { get; set; } = "0";
+    public string LocateZ { get; set; } = "0";
+
+    public event Action<int, int>? LocateRequested;
+
+    public ICommand LocateCommand { get; }
 
     public ICommand GenerateMapCommand { get; }
 
@@ -327,6 +336,21 @@ public sealed class ToolboxViewModel : ObservableObject
         OnPropertyChanged(nameof(SeedValue));
         MapStatus = $"种子 = {value} · 拖动平移，滚轮缩放，悬停看群系";
         _main.LogsPage.AppendSystem($"工具箱：已生成离线种子地图 {value}");
+    }
+
+    /// <summary>把地图跳到输入的方块坐标。</summary>
+    private void LocateTo()
+    {
+        if (!int.TryParse(LocateX?.Trim(), out var x) || !int.TryParse(LocateZ?.Trim(), out var z))
+        {
+            SeedError = "坐标要填整数方块坐标，例如 1200 和 -800。";
+            return;
+        }
+
+        SeedError = "";
+        LocateRequested?.Invoke(x, z);
+        MapStatus = $"已定位到方块 {x}, {z}（拖动平移，滚轮缩放）";
+        _main.LogsPage.AppendSystem($"工具箱：种子地图定位到 {x}, {z}");
     }
 
     private void OpenChunkbase()
