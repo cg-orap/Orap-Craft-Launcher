@@ -62,7 +62,19 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private Point _dragStart;
     private int _dragCenterX;
     private int _dragCenterZ;
-    private Vector _dragOffset;
+
+    // 惯性：记录最近两次移动的时间与位置，松手时换算成额外滑行像素
+    private Point _lastMovePoint;
+    private long _lastMoveTicks;
+    private double _velocityX;   // px/ms
+    private double _velocityY;
+    private bool _fadeNextBitmap;
+
+    // 缩放锚点：以鼠标位置为中心缩放（按钮/滚轮都有锚点，默认面板中心）
+    private Point _zoomAnchor;
+    private bool _hasZoomAnchor;
+    private int _anchorBlockX;
+    private int _anchorBlockZ;
 
     public event EventHandler<BiomeHoverEventArgs>? HoverChanged;
 
@@ -75,6 +87,38 @@ public sealed class BiomeMapCanvas : FrameworkElement
     {
         get => (double)GetValue(VisualScaleProperty);
         set => SetValue(VisualScaleProperty, value);
+    }
+
+    /// <summary>拖动/惯性期间位图相对元素的像素偏移。</summary>
+    public static readonly DependencyProperty DragOffsetXProperty = DependencyProperty.Register(
+        nameof(DragOffsetX), typeof(double), typeof(BiomeMapCanvas),
+        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty DragOffsetYProperty = DependencyProperty.Register(
+        nameof(DragOffsetY), typeof(double), typeof(BiomeMapCanvas),
+        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public double DragOffsetX
+    {
+        get => (double)GetValue(DragOffsetXProperty);
+        set => SetValue(DragOffsetXProperty, value);
+    }
+
+    public double DragOffsetY
+    {
+        get => (double)GetValue(DragOffsetYProperty);
+        set => SetValue(DragOffsetYProperty, value);
+    }
+
+    /// <summary>新位图到达时的淡入透明度（拖动松手后用，避免硬切）。</summary>
+    public static readonly DependencyProperty BitmapOpacityProperty = DependencyProperty.Register(
+        nameof(BitmapOpacity), typeof(double), typeof(BiomeMapCanvas),
+        new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public double BitmapOpacity
+    {
+        get => (double)GetValue(BitmapOpacityProperty);
+        set => SetValue(BitmapOpacityProperty, value);
     }
 
     public BiomeMapCanvas()
@@ -117,6 +161,16 @@ public sealed class BiomeMapCanvas : FrameworkElement
         else ZoomOut();
     }
 
+    /// <summary>清除锚点：下一次缩放以面板中心为准（按钮点击时用）。</summary>
+    public void ClearZoomAnchor() => _hasZoomAnchor = false;
+
+    /// <summary>把某点设为缩放锚点（元素坐标）。鼠标滚轮会把指针位置传进来。</summary>
+    public void SetZoomAnchor(Point point)
+    {
+        _zoomAnchor = point;
+        _hasZoomAnchor = true;
+    }
+
     /// <summary>按档位缩放：视觉先放大/缩小，等新瓦片渲染好再归位。</summary>
     private void ZoomStep(int delta)
     {
@@ -125,6 +179,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
         if (target == baseline) return;
 
         _pendingZoomIndex = target;
+
+        // 锚点：优先用鼠标位置；没有的话用面板中心
+        _zoomAnchor = _hasZoomAnchor ? _zoomAnchor : new Point(ActualWidth / 2, ActualHeight / 2);
+        var (anchorBlockX, anchorBlockZ) = MapViewportMath.BlockAt(_centerBlockX, _centerBlockZ,
+            (int)ActualWidth, (int)ActualHeight, BlocksPerPixel, _zoomAnchor.X, _zoomAnchor.Y);
+        _anchorBlockX = anchorBlockX;
+        _anchorBlockZ = anchorBlockZ;
 
         // 过渡倍率 = 旧视野 / 新视野：放大（目标方块/像素更少）时把旧图放大，
         // 新瓦片到达后归位，观感上就是"平滑推近"。
@@ -149,8 +210,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     {
         _zoomTimer?.Stop();
         if (_pendingZoomIndex is not { } target || target == _zoomIndex) return;
-        _zoomIndex = target;
-        RequestRender();   // 视觉倍率保持动画终值，等新图到达后在回调里归位
+   // 视觉倍率保持动画终值，等新图到达后在回调里归位
     }
 
     public void CenterOn(int blockX, int blockZ)
@@ -212,6 +272,15 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _pendingZoomIndex = null;
                     BeginAnimation(VisualScaleProperty, null);
                     VisualScale = 1.0;
+
+                    if (_fadeNextBitmap)
+                    {
+                        _fadeNextBitmap = false;
+                        BitmapOpacity = 0.55;
+                        BeginAnimation(BitmapOpacityProperty, new DoubleAnimation(1.0,
+                            new Duration(TimeSpan.FromMilliseconds(120))) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+                    }
+
                     InvalidateVisual();
                 }));
             });
@@ -244,7 +313,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var scaling = Math.Abs(VisualScale - 1.0) > 0.001;
         if (scaling)
         {
-            dc.PushTransform(new ScaleTransform(VisualScale, VisualScale, width / 2, height / 2));
+            dc.PushTransform(new ScaleTransform(VisualScale, VisualScale, _zoomAnchor.X, _zoomAnchor.Y));
         }
 
         var step = BlocksPerPixel;
@@ -253,11 +322,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
         if (_bitmap is not null)
         {
             // 位图可能是 2 倍超采样，统一铺满可视区域（缩小采样保持像素锐利）
-            dc.DrawImage(_bitmap, new Rect(_dragOffset.X, _dragOffset.Y, width, height));
+            dc.PushOpacity(BitmapOpacity);
+            dc.DrawImage(_bitmap, new Rect(DragOffsetX, DragOffsetY, width, height));
+            dc.Pop();
         }
 
-        var left = _centerBlockX - (int)(width / 2 * step) + (int)(_dragOffset.X * step);
-        var top = _centerBlockZ - (int)(height / 2 * step) + (int)(_dragOffset.Y * step);
+        var left = _centerBlockX - (int)(width / 2 * step) + (int)Math.Round(DragOffsetX * step);
+        var top = _centerBlockZ - (int)(height / 2 * step) + (int)Math.Round(DragOffsetY * step);
 
         // 网格与坐标：每 16 区块（256 方块）一条主线
         if (ShowGrid)
@@ -334,6 +405,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _dragStart = e.GetPosition(this);
         _dragCenterX = _centerBlockX;
         _dragCenterZ = _centerBlockZ;
+        _lastMovePoint = _dragStart;
+        _lastMoveTicks = Environment.TickCount64;
+        _velocityX = 0;
+        _velocityY = 0;
+        BeginAnimation(DragOffsetXProperty, null);
+        BeginAnimation(DragOffsetYProperty, null);
         CaptureMouse();
         Cursor = Cursors.SizeAll;
     }
@@ -347,10 +424,17 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
         if (_dragging)
         {
-            _dragOffset = position - _dragStart;
-            _centerBlockX = _dragCenterX - (int)(_dragOffset.X * step);
-            _centerBlockZ = _dragCenterZ - (int)(_dragOffset.Y * step);
-            InvalidateVisual();
+            var now = Environment.TickCount64;
+            var dx = position.X - _lastMovePoint.X;
+            var dy = position.Y - _lastMovePoint.Y;
+            var dt = Math.Max(1, now - _lastMoveTicks);
+            _velocityX = dx / (double)dt;
+            _velocityY = dy / (double)dt;
+            _lastMovePoint = position;
+            _lastMoveTicks = now;
+
+            DragOffsetX = position.X - _dragStart.X;
+            DragOffsetY = position.Y - _dragStart.Y;
             return;
         }
 
@@ -371,6 +455,22 @@ public sealed class BiomeMapCanvas : FrameworkElement
             SeedMap.IsSlimeChunk(_seed, blockX >> 4, blockZ >> 4)));
     }
 
+    /// <summary>惯性滑行结束：把位移折算成新的中心，归位后重绘并淡入。</summary>
+    private void CommitDrag(double offsetX, double offsetY)
+    {
+        var (centerX, centerZ) = MapViewportMath.DraggedCenter(_dragCenterX, _dragCenterZ, offsetX, offsetY, BlocksPerPixel);
+        _centerBlockX = centerX;
+        _centerBlockZ = centerZ;
+
+        BeginAnimation(DragOffsetXProperty, null);
+        BeginAnimation(DragOffsetYProperty, null);
+        DragOffsetX = 0;
+        DragOffsetY = 0;
+
+        _fadeNextBitmap = true;
+        RequestRender();
+    }
+
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
@@ -379,13 +479,27 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _dragging = false;
         ReleaseMouseCapture();
         Cursor = Cursors.Arrow;
-        _dragOffset = default;
-        RequestRender();
+
+        // 惯性：按松手瞬间的速度再滑 90ms（限制在 ±160px，避免甩飞）
+        var inertialX = MapViewportMath.InertiaOffset(_velocityX);
+        var inertialY = MapViewportMath.InertiaOffset(_velocityY);
+        var slideToX = DragOffsetX + inertialX;
+        var slideToY = DragOffsetY + inertialY;
+
+        // 关键：先把"旧图"滑完惯性（120ms），滑到位后再换新图并淡入，
+        // 否则一步到位会看到整幅图的跳变。
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var duration = new Duration(TimeSpan.FromMilliseconds(120));
+        var slideX = new DoubleAnimation(slideToX, duration) { EasingFunction = ease };
+        slideX.Completed += (_, _) => CommitDrag(slideToX, slideToY);
+        BeginAnimation(DragOffsetXProperty, slideX);
+        BeginAnimation(DragOffsetYProperty, new DoubleAnimation(slideToY, duration) { EasingFunction = ease });
     }
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         base.OnMouseWheel(e);
+        SetZoomAnchor(e.GetPosition(this));   // 以鼠标位置为中心缩放
         if (e.Delta > 0) ZoomIn(); else ZoomOut();
         e.Handled = true;
     }
