@@ -833,19 +833,7 @@ public sealed class CatalogViewModel : ObservableObject
         ("整合包已安装",       1.00, 1.00),
     ];
 
-    private static double PackPhaseProgress(string line)
-    {
-        foreach (var phase in PackPhases)
-        {
-            if (!line.Contains(phase.Keyword, StringComparison.Ordinal)) continue;
-
-            var inner = ParseRatio(line) ?? 0;
-            return Math.Clamp(phase.From + ((phase.To - phase.From) * inner), 0, 1);
-        }
-
-        // Unknown line: keep whatever the caller already had (no jump backwards).
-        return -1;
-    }
+    private static double PackPhaseProgress(string line) => Core.Mods.PackInstallProgress.FromLine(line);
     /// <summary>Human label for the archive kind shown before the install starts.</summary>
     private static string DescribePackKind(Core.Mods.PackArchiveKind kind) => kind switch
     {
@@ -872,16 +860,17 @@ public sealed class CatalogViewModel : ObservableObject
         return null;
     }
 
-    /// <summary>Fallback rule when version metadata is not available yet.</summary>
-    private static int GuessRequiredJava(string minecraftVersion)
-    {
-        var parts = minecraftVersion.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2 || !int.TryParse(parts[0], out var major) || !int.TryParse(parts[1], out var minor)) return 17;
+    /// <summary>整合包/加载器安装需要的 Java 主版本（规则在 Core，便于单测）。</summary>
+    public static int RequiredJavaFor(string? minecraftVersion) =>
+        Core.Java.JavaVersionRules.RequiredMajorFor(minecraftVersion);
 
-        if (major >= 26) return 25;
-        if (major > 1) return 21;
-        return minor >= 21 ? 21 : minor >= 18 ? 17 : 8;
-    }
+    /// <summary>把安装器输出行换算成 0-1 的进度（规则在 Core）。</summary>
+    public static double PackPhaseProgressFor(string line) =>
+        Core.Mods.PackInstallProgress.FromLine(line);
+
+    /// <summary>Fallback rule when version metadata is not available yet.</summary>
+    private static int GuessRequiredJava(string minecraftVersion) =>
+        Core.Java.JavaVersionRules.RequiredMajorFor(minecraftVersion);
 
     private static double? ParseRatio(string line)
     {
@@ -1110,14 +1099,34 @@ public sealed class CatalogViewModel : ObservableObject
             {
                 var cache = Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
                 Status = $"正在下载 {file.FileName}…";
+                var downloadProgress = new Progress<long>(percent =>
+                {
+                    Status = $"正在下载 {file.FileName}… {percent}%";
+                    _main.Activities.Report(activity, percent / 100.0 * 0.25, $"下载整合包 {percent}%", "");
+                });
+
                 var zip = await _main.Context.CurseForge
-                    .DownloadPackAsync(row.Pack, file, cache,
-                        new Progress<long>(p => Status = $"正在下载 {file.FileName}… {p}%"))
+                    .DownloadPackAsync(row.Pack, file, cache, downloadProgress)
                     .ConfigureAwait(true);
 
+                var info = Orion.Core.Mods.PackArchiveInstaller.Inspect(zip);
+                var installerJava = await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true);
+                if (installerJava is null && info.Loader != Orion.Core.Instances.LoaderKind.Vanilla)
+                {
+                    _main.Activities.Finish(activity, ActivityState.Failed, Status);
+                    return;
+                }
+
                 Status = "下载完成，开始安装…";
+                var installProgress = new Progress<string>(line =>
+                {
+                    Status = line;
+                    var fraction = PackPhaseProgress(line);
+                    if (fraction >= 0) _main.Activities.Report(activity, 0.25 + (fraction * 0.75), line, "");
+                });
+
                 var result = await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(zip, row.Title, output: new Progress<string>(l => Status = l))
+                    .InstallCurseForgeAsync(zip, row.Title, installerJava, installProgress)
                     .ConfigureAwait(true);
 
                 Status = result.Success ? $"已安装整合包 {row.Title}" : "安装失败: " + (result.Error ?? "未知错误");
@@ -1236,15 +1245,38 @@ public sealed class CatalogViewModel : ObservableObject
             {
                 var cache = Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
                 Status = $"正在下载 {file.FileName}…";
-                var progress = new Progress<long>(percent => Status = $"正在下载 {file.FileName}… {percent}%");
+
+                // 进度同时写进活动条目：任务面板上能看到百分比，而不是一直"进行中"
+                var progress = new Progress<long>(percent =>
+                {
+                    Status = $"正在下载 {file.FileName}… {percent}%";
+                    _main.Activities.Report(activity, percent / 100.0 * 0.25, $"下载整合包 {percent}%", "");
+                });
+
                 var zip = await _main.Context.CurseForge
                     .DownloadPackAsync(row.Pack, file, cache, progress, _installCts.Token)
                     .ConfigureAwait(true);
 
+                // Forge/NeoForge 的安装器需要对应版本的 Java：之前这里少了一步，才会报
+                // "需要 Java 运行时来运行安装器（MC x.y）"
+                var info = Orion.Core.Mods.PackArchiveInstaller.Inspect(zip);
+                var installerJava = await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true);
+                if (installerJava is null && info.Loader != Orion.Core.Instances.LoaderKind.Vanilla)
+                {
+                    _main.Activities.Finish(activity, ActivityState.Failed, Status);
+                    return;
+                }
+
                 Status = "下载完成，开始安装（加载器 + 清单模组）…";
+                var installProgress = new Progress<string>(line =>
+                {
+                    Status = line;
+                    var fraction = PackPhaseProgress(line);
+                    if (fraction >= 0) _main.Activities.Report(activity, 0.25 + (fraction * 0.75), line, "");
+                });
+
                 var result = await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(zip, row.Title, output: new Progress<string>(line => Status = line),
-                        ct: _installCts.Token)
+                    .InstallCurseForgeAsync(zip, row.Title, installerJava, installProgress, _installCts.Token)
                     .ConfigureAwait(true);
 
                 if (result.Success)

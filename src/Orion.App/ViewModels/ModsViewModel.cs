@@ -393,6 +393,23 @@ public sealed class ModsViewModel : ObservableObject
         }
     }
 
+    /// <summary>整合包安装器（Forge/NeoForge）需要的 Java：按 MC 版本挑一个可用运行时。</summary>
+    private async Task<Core.Java.JavaRuntime?> PickInstallerJavaAsync(string? minecraftVersion)
+    {
+        var runtimes = _main.JavaRuntimes.Count > 0
+            ? _main.JavaRuntimes.ToList()
+            : (await _main.Context.JavaDetector.DiscoverAsync().ConfigureAwait(true)).ToList();
+
+        var required = CatalogViewModel.RequiredJavaFor(minecraftVersion);
+        var java = Core.Java.JavaDetector.SelectFor(required, runtimes);
+        if (java is not null) return java;
+
+        var detected = string.Join("、", runtimes.Select(r => "Java " + r.MajorVersion).Distinct());
+        PackStatus = $"安装这个加载器需要 Java {required}，但只检测到 {(detected.Length == 0 ? "无" : detected)}。"
+                     + "请在「设置 → Java」指定路径后重试。";
+        return null;
+    }
+
     /// <summary>下载整合包 zip 并交给整合包安装器（新建实例、装加载器、按清单补模组）。</summary>
     public async Task InstallCurseForgePackAsync(CurseForgePackRow row)
     {
@@ -422,9 +439,25 @@ public sealed class ModsViewModel : ObservableObject
             var zip = await _main.Context.CurseForge.DownloadPackAsync(row.Pack, file, cache, progress)
                 .ConfigureAwait(true);
 
+            // Forge/NeoForge 安装器需要对应版本的 Java（缺了就会报"需要 Java 运行时来运行安装器"）
+            var info = Orion.Core.Mods.PackArchiveInstaller.Inspect(zip);
+            var installerJava = await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true);
+            if (installerJava is null && info.Loader != LoaderKind.Vanilla)
+            {
+                PackStatus = "加载器安装需要对应版本的 Java，请在「设置 → Java」指定后重试。";
+                _main.Activities.Finish(activity, ActivityState.Failed, PackStatus);
+                return;
+            }
+
             PackStatus = "下载完成，开始安装（加载器 + 清单模组）…";
             var result = await _main.Context.PackArchives
-                .InstallCurseForgeAsync(zip, row.Title, output: new Progress<string>(line => PackStatus = line))
+                .InstallCurseForgeAsync(zip, row.Title, installerJava,
+                    new Progress<string>(line =>
+                    {
+                        PackStatus = line;
+                        var fraction = CatalogViewModel.PackPhaseProgressFor(line);
+                        if (fraction >= 0) _main.Activities.Report(activity, 0.2 + fraction * 0.8, line, "");
+                    }))
                 .ConfigureAwait(true);
 
             if (result.Success)

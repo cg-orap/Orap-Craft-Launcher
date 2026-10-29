@@ -245,6 +245,13 @@ public sealed class PackArchiveInstaller
                 warnings.AddRange(unresolved.Take(20));
             }
 
+            // 收尾自检：坏 jar 留一个就会让 Forge 启动失败，宁可这里删掉并提示
+            var pruned = PruneBrokenJars(Path.Combine(instance.GameDirectory, "mods"), warnings);
+            if (pruned > 0)
+            {
+                output?.Report($"已移除 {pruned} 个损坏的模组文件，请重新安装缺失的模组。");
+            }
+
             output?.Report($"整合包已安装：{name}（{downloaded} 个模组，{overridesCopied} 个配置文件）");
 
             var result = new MrPackResult
@@ -424,6 +431,40 @@ public sealed class PackArchiveInstaller
     /// key, fast CDN), the official redirect as a fallback. Anything still failing is queued with a
     /// browser link so the user can fetch it by hand instead of an opaque "some files failed".
     /// </summary>
+    /// <summary>删除下载失败留下的半截文件（失败也无所谓）。</summary>
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 删不掉就让后续的校验兜底
+        }
+    }
+
+    /// <summary>
+    /// 安装收尾自检：把 mods 里打不开的 jar 删掉并记进 warnings。
+    /// 这样"下载被截断/残留 JSON"最多是少一个模组，而不是启动时 zip END header not found。
+    /// </summary>
+    private static int PruneBrokenJars(string modsDirectory, List<string> warnings)
+    {
+        if (!Directory.Exists(modsDirectory)) return 0;
+
+        var removed = 0;
+        foreach (var file in Directory.EnumerateFiles(modsDirectory, "*.jar"))
+        {
+            if (LooksLikeZip(file)) continue;
+
+            TryDeleteFile(file);
+            removed++;
+            warnings.Add($"已移除损坏的模组文件：{Path.GetFileName(file)}（下载不完整，已重新排队时可再装）");
+        }
+
+        return removed;
+    }
+
     /// <summary>调用 CurseForge 的 download-url 接口，取出真实下载地址。</summary>
     private async Task<string?> ResolveCurseForgeUrlAsync(string apiUrl, CancellationToken ct)
     {
@@ -507,12 +548,15 @@ public sealed class PackArchiveInstaller
             candidates.Insert(0, $"https://api.curseforge.com/v1/mods/{file.ProjectId}/files/{file.FileId}/download-url");
         }
 
+        var target = Path.Combine(modsDirectory, name);
+
         foreach (var url in candidates)
         {
             try
             {
                 using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                perFile.CancelAfter(TimeSpan.FromSeconds(60));
+                // 大整合包的模组能有几十 MB，60s 在慢速 CDN 上会把文件截断（留下打不开的 jar）
+                perFile.CancelAfter(TimeSpan.FromSeconds(240));
 
                 // 带 Key 时第一个候选是 API 接口：返回的是 {"data":"真实地址"}，必须先解出地址再下文件，
                 // 否则会把几十字节的 JSON 当成 jar 写进 mods（这就是"zip END header not found"的来源）。
@@ -536,7 +580,6 @@ public sealed class PackArchiveInstaller
 
                 if (!response.IsSuccessStatusCode) continue;
 
-                var target = Path.Combine(modsDirectory, name);
                 await using (var stream = await response.Content.ReadAsStreamAsync(perFile.Token).ConfigureAwait(false))
                 await using (var destination = File.Create(target))
                 {
@@ -554,7 +597,8 @@ public sealed class PackArchiveInstaller
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
             {
-                // next endpoint
+                // 半截文件（超时/断流）必须删掉，否则会留在 mods 里让 Forge 启动失败
+                TryDeleteFile(target);
             }
         }
 
