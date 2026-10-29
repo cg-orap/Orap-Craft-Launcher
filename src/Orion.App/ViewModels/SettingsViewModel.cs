@@ -263,6 +263,7 @@ public sealed class SettingsViewModel : ObservableObject
         settings.ForceUtf8Console = ForceUtf8Console;
         settings.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();
         settings.CurseForgeApiKey = string.IsNullOrWhiteSpace(CurseForgeApiKey) ? null : CurseForgeApiKey.Trim();
+        _main.Context.CurseForge.SetApiKey(settings.CurseForgeApiKey);
 
         await _main.Context.SettingsStore.SaveAsync(settings).ConfigureAwait(true);
 

@@ -63,6 +63,7 @@ public sealed class LauncherContext : IAsyncDisposable
         // Declared but never constructed: the CurseForge/zip dispatch threw a
         // NullReferenceException the first time it ran.
         PackArchives = new Mods.PackArchiveInstaller(paths, Instances, Loaders, Importer, http, settings.CurseForgeApiKey);
+        CurseForge = new Mods.CurseForgeClient(http, settings.CurseForgeApiKey);
     }
 
     public GamePaths Paths { get; }
@@ -90,6 +91,9 @@ public sealed class LauncherContext : IAsyncDisposable
 
     /// <summary>CurseForge / plain-zip modpack importer (drag &amp; drop).</summary>
     public PackArchiveInstaller PackArchives { get; }
+
+    /// <summary>CurseForge 整合包浏览/下载（没有 Key 时 HasKey 为 false）。</summary>
+    public CurseForgeClient CurseForge { get; }
 
     /// <summary>Set once <see cref="InitializeAsync"/> has run.</summary>
     public bool IsInitialized { get; private set; }

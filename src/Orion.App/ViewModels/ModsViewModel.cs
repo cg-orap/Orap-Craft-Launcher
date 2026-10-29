@@ -60,6 +60,17 @@ public sealed class ModrinthRow(ModrinthProject project, ModsViewModel owner)
 }
 
 /// <summary>Mod management page: local mods + Modrinth search.</summary>
+/// <summary>CurseForge 整合包搜索结果行。</summary>
+public sealed class CurseForgePackRow(Orion.Core.Mods.CurseForgePack pack, ModsViewModel owner)
+{
+    public Orion.Core.Mods.CurseForgePack Pack { get; } = pack;
+    public string Title => Pack.Name;
+    public string Summary => Pack.Summary;
+    public string Downloads => Pack.Downloads.ToString("N0") + " 次下载";
+    public ICommand InstallCommand => new AsyncRelayCommand(() => owner.InstallCurseForgePackAsync(this), null,
+        ex => owner.PackStatus = "安装失败: " + ex.Message);
+}
+
 public sealed class ModsViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
@@ -84,6 +95,8 @@ public sealed class ModsViewModel : ObservableObject
 
         RescanCommand = new AsyncRelayCommand(LoadModsAsync, () => SelectedInstance is not null);
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !string.IsNullOrWhiteSpace(SearchText) && !IsSearching);
+        SearchCurseForgeCommand = new AsyncRelayCommand(SearchCurseForgeAsync, () => !IsPackSearching);
+        RefreshCurseForgeKeyCommand = new RelayCommand(() => OnPropertyChanged(nameof(HasCurseForgeKey)));
         OpenFolderCommand = new RelayCommand(OpenModsFolder);
         OpenModrinthPageCommand = new RelayCommand(OpenModrinthPage);
     }
@@ -142,6 +155,36 @@ public sealed class ModsViewModel : ObservableObject
 
     public int DisabledCount => Mods.Count(m => !m.Enabled);
     public ObservableList<ModrinthRow> SearchResults { get; } = [];
+
+    // ── CurseForge 整合包 ────────────────────────────────
+    public ObservableList<CurseForgePackRow> CurseForgePacks { get; } = [];
+
+    private string _curseForgeSearchText = "";
+    private bool _isPackSearching;
+    private string _packStatus = "";
+
+    public string CurseForgeSearchText
+    {
+        get => _curseForgeSearchText;
+        set => SetProperty(ref _curseForgeSearchText, value);
+    }
+
+    public bool IsPackSearching
+    {
+        get => _isPackSearching;
+        set => SetProperty(ref _isPackSearching, value);
+    }
+
+    public string PackStatus
+    {
+        get => _packStatus;
+        set => SetProperty(ref _packStatus, value);
+    }
+
+    public bool HasCurseForgeKey => _main.Context.CurseForge.HasKey;
+
+    public ICommand SearchCurseForgeCommand { get; private set; } = null!;
+    public ICommand RefreshCurseForgeKeyCommand { get; private set; } = null!;
 
     public Instance? SelectedInstance
     {
@@ -312,6 +355,101 @@ public sealed class ModsViewModel : ObservableObject
         finally
         {
             IsSearching = false;
+        }
+    }
+
+    /// <summary>搜索 CurseForge 整合包（需要设置里填过 API Key）。</summary>
+    private async Task SearchCurseForgeAsync()
+    {
+        OnPropertyChanged(nameof(HasCurseForgeKey));
+
+        if (!_main.Context.CurseForge.HasKey)
+        {
+            PackStatus = "还没有 CurseForge API Key：设置 → 网络与下载 → CurseForge 里填一个。";
+            return;
+        }
+
+        IsPackSearching = true;
+        PackStatus = "正在搜索 CurseForge 整合包…";
+
+        try
+        {
+            var instance = SelectedInstance ?? _main.CurrentInstance;
+            var packs = await _main.Context.CurseForge.SearchModpacksAsync(
+                CurseForgeSearchText, instance?.GameVersion).ConfigureAwait(true);
+
+            CurseForgePacks.Replace(packs.Select(p => new CurseForgePackRow(p, this)));
+            PackStatus = packs.Count == 0
+                ? "没有找到匹配的整合包。"
+                : $"找到 {packs.Count} 个整合包（按热度排序）";
+        }
+        catch (Exception ex)
+        {
+            PackStatus = "搜索失败: " + ex.Message;
+        }
+        finally
+        {
+            IsPackSearching = false;
+        }
+    }
+
+    /// <summary>下载整合包 zip 并交给整合包安装器（新建实例、装加载器、按清单补模组）。</summary>
+    public async Task InstallCurseForgePackAsync(CurseForgePackRow row)
+    {
+        IsBusy = true;
+        var activity = _main.Activities.Begin($"下载整合包 {row.Title}", "CurseForge");
+        PackStatus = $"正在解析 {row.Title} 的可用文件…";
+
+        try
+        {
+            var instance = SelectedInstance ?? _main.CurrentInstance;
+            LoaderKind? loader = instance is null || instance.Loader == LoaderKind.Vanilla ? null : instance.Loader;
+            var loaderType = loader is null ? (int?)null : Orion.Core.Mods.CurseForgeClient.LoaderTypeOf(loader.Value);
+
+            var file = await _main.Context.CurseForge.GetBestFileAsync(row.Pack, instance?.GameVersion, loaderType)
+                .ConfigureAwait(true);
+
+            if (file is null)
+            {
+                PackStatus = "这个整合包没有可下载的文件（Key 可能已失效）。";
+                _main.Activities.Finish(activity, ActivityState.Failed, "没有可用文件");
+                return;
+            }
+
+            PackStatus = $"正在下载 {file.FileName}…";
+            var cache = Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+            var progress = new Progress<long>(percent => PackStatus = $"正在下载 {file.FileName}… {percent}%");
+            var zip = await _main.Context.CurseForge.DownloadPackAsync(row.Pack, file, cache, progress)
+                .ConfigureAwait(true);
+
+            PackStatus = "下载完成，开始安装（加载器 + 清单模组）…";
+            var result = await _main.Context.PackArchives
+                .InstallCurseForgeAsync(zip, row.Title, output: new Progress<string>(line => PackStatus = line))
+                .ConfigureAwait(true);
+
+            if (result.Success)
+            {
+                PackStatus = $"已安装 {row.Title}" + (result.Warnings.Count > 0
+                    ? $"（{result.Warnings.Count} 条提示）"
+                    : "");
+                _main.Activities.Finish(activity, ActivityState.Completed);
+                _main.LogsPage.AppendSystem(PackStatus);
+                await _main.ReloadInstancesAsync().ConfigureAwait(true);
+            }
+            else
+            {
+                PackStatus = "安装失败: " + (result.Error ?? "未知错误");
+                _main.Activities.Finish(activity, ActivityState.Failed, result.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            PackStatus = "安装失败: " + ex.Message;
+            _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
