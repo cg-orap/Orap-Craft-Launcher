@@ -39,6 +39,40 @@ public partial class CatalogView : UserControl
     /// A left click anywhere on a result row opens its detail page (the row is the affordance, no
     /// separate 详情 button). Clicks on the 安装 button are handled by the button and never bubble here.
     /// </summary>
+    /// <summary>点击 CurseForge 卡片（不是「安装」按钮）→ 打开详情页。</summary>
+    private async void OnCurseForgeRowClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel is not { } vm) return;
+
+        // 点到行内按钮时不打开详情
+        for (var node = e.OriginalSource as DependencyObject; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ButtonBase) return;
+        }
+
+        if (sender is FrameworkElement element && element.DataContext is CurseForgeRow row)
+        {
+            await vm.OpenCurseForgeDetailAsync(row);
+        }
+    }
+
+    /// <summary>CurseForge 列表：点卡片主体（非按钮）→ 打开详情。</summary>
+    private async void OnCurseForgeListClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel is not { } vm || e.OriginalSource is not DependencyObject source) return;
+
+        for (var node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ButtonBase) return;
+        }
+
+        var container = ItemsControl.ContainerFromElement((ItemsControl)sender, source) as ListBoxItem;
+        if (container?.DataContext is CurseForgeRow row)
+        {
+            await vm.OpenCurseForgeDetailAsync(row);
+        }
+    }
+
     private async void OnResultClick(object sender, MouseButtonEventArgs e)
     {
         if (ViewModel is not { } vm) return;

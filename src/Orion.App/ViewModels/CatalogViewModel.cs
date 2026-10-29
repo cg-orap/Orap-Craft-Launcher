@@ -74,8 +74,24 @@ public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, 
 public sealed class CurseForgeRow(Orion.Core.Mods.CurseForgePack pack, CatalogViewModel owner,
     Orion.Core.Mods.CurseForgeKind kind) : ObservableObject
 {
+    private System.Windows.Media.ImageSource? _icon;
+
     public Orion.Core.Mods.CurseForgePack Pack { get; } = pack;
     public Orion.Core.Mods.CurseForgeKind Kind { get; } = kind;
+
+    /// <summary>项目头像（从 CurseForge logo 下载，失败就留占位）。</summary>
+    public System.Windows.Media.ImageSource? Icon
+    {
+        get => _icon;
+        set
+        {
+            if (SetProperty(ref _icon, value)) OnPropertyChanged(nameof(HasIcon));
+        }
+    }
+
+    public bool HasIcon => _icon is not null;
+
+    public ICommand ShowDetailsCommand => new AsyncRelayCommand(() => owner.OpenCurseForgeDetailAsync(this));
 
     public string Title => Pack.Name;
     public string Description => Pack.Summary;
@@ -248,6 +264,9 @@ public sealed class CatalogViewModel : ObservableObject
 
     public ObservableList<CatalogRow> Results { get; } = [];
 
+    /// <summary>详情页需要读 CurseForge/Instances，这里开一个小口子。</summary>
+    public Orion.Core.LauncherContext Context => _main.Context;
+
     // ── 来源滑块：0 = Modrinth，1 = CurseForge ─────────────
     public IReadOnlyList<string> Sources { get; } = ["Modrinth", "CurseForge"];
 
@@ -280,6 +299,28 @@ public sealed class CatalogViewModel : ObservableObject
         get => _curseForgeStatus;
         set => SetProperty(ref _curseForgeStatus, value);
     }
+
+    // ── CurseForge 详情 ────────────────────────────────────
+    private CurseForgeDetailViewModel? _cfDetail;
+    private bool _cfDetailOpen;
+
+    public CurseForgeDetailViewModel? CurseForgeDetail
+    {
+        get => _cfDetail;
+        private set => SetProperty(ref _cfDetail, value);
+    }
+
+    public bool IsCurseForgeDetailOpen
+    {
+        get => _cfDetailOpen;
+        private set => SetProperty(ref _cfDetailOpen, value);
+    }
+
+    public ICommand CloseCurseForgeDetailCommand => new RelayCommand(() =>
+    {
+        IsCurseForgeDetailOpen = false;
+        CurseForgeDetail = null;
+    });
 
     public string KindNameOf(Orion.Core.Mods.CurseForgeKind kind) => kind switch
     {
@@ -970,6 +1011,131 @@ public sealed class CatalogViewModel : ObservableObject
         }
     }
 
+    /// <summary>并发下载 CurseForge 头像，复用 Modrinth 那套内存缓存。</summary>
+    private async Task LoadCurseForgeIconsAsync(IReadOnlyList<CurseForgeRow> rows)
+    {
+        using var gate = new SemaphoreSlim(6);
+        var tasks = rows.Select(async row =>
+        {
+            var url = row.Pack.LogoUrl;
+            if (string.IsNullOrWhiteSpace(url)) return;
+
+            if (_iconCache.TryGetValue(url, out var cached))
+            {
+                row.Icon = cached;
+                return;
+            }
+
+            await gate.WaitAsync().ConfigureAwait(true);
+            try
+            {
+                var bytes = await _main.Context.Http.GetByteArrayAsync(url).ConfigureAwait(true);
+                var icon = DecodeIcon(bytes);
+                _iconCache[url] = icon;
+                row.Icon = icon;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException
+                                           or NotSupportedException)
+            {
+                _iconCache[url] = null;
+                AppLog.Debug("catalog", "cf-icon-failed", ("error", ex.Message));
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks).ConfigureAwait(true);
+    }
+
+    /// <summary>打开 CurseForge 详情（描述 + 历史版本）。</summary>
+    public async Task OpenCurseForgeDetailAsync(CurseForgeRow row)
+    {
+        var instance = _main.CurrentInstance;
+
+        Busy = true;
+        try
+        {
+            var icon = row.Icon;
+            if (icon is null && !string.IsNullOrWhiteSpace(row.Pack.LogoUrl)
+                && _iconCache.TryGetValue(row.Pack.LogoUrl, out var cached))
+            {
+                icon = cached;
+            }
+
+            var detail = new CurseForgeDetailViewModel(row, this, instance, icon);
+            CurseForgeDetail = detail;
+            IsCurseForgeDetailOpen = true;
+
+            await detail.LoadAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>安装 CurseForge 的某个具体文件（历史版本）。</summary>
+    public async Task InstallCurseForgeVersionAsync(CurseForgeRow row, Orion.Core.Mods.CurseForgeFile file)
+    {
+        var instance = _main.CurrentInstance;
+        var kind = row.Kind;
+
+        if (kind != Orion.Core.Mods.CurseForgeKind.Modpack && instance is null)
+        {
+            Status = "请先选择一个版本，再安装" + KindNameOf(kind) + "。";
+            return;
+        }
+
+        Busy = true;
+        var activity = _main.Activities.Begin($"安装 {row.Title}", file.FileName);
+
+        try
+        {
+            if (kind == Orion.Core.Mods.CurseForgeKind.Modpack)
+            {
+                var cache = Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+                Status = $"正在下载 {file.FileName}…";
+                var zip = await _main.Context.CurseForge
+                    .DownloadPackAsync(row.Pack, file, cache,
+                        new Progress<long>(p => Status = $"正在下载 {file.FileName}… {p}%"))
+                    .ConfigureAwait(true);
+
+                Status = "下载完成，开始安装…";
+                var result = await _main.Context.PackArchives
+                    .InstallCurseForgeAsync(zip, row.Title, output: new Progress<string>(l => Status = l))
+                    .ConfigureAwait(true);
+
+                Status = result.Success ? $"已安装整合包 {row.Title}" : "安装失败: " + (result.Error ?? "未知错误");
+                _main.Activities.Finish(activity,
+                    result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
+                if (result.Success) await _main.ReloadInstancesAsync().ConfigureAwait(true);
+                return;
+            }
+
+            var folder = Orion.Core.Mods.CurseForgeClient.InstallFolderOf(kind)!;
+            var target = Path.Combine(instance!.GameDirectory, folder);
+            Status = $"正在下载 {file.FileName}…";
+            var saved = await _main.Context.CurseForge
+                .DownloadFileAsync(file, target, new Progress<long>(p => Status = $"正在下载 {file.FileName}… {p}%"))
+                .ConfigureAwait(true);
+
+            Status = $"已安装 {row.Title} → {folder}/{Path.GetFileName(saved)}";
+            _main.Activities.Finish(activity, ActivityState.Completed);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex)
+        {
+            Status = "安装失败: " + ex.Message;
+            _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
     /// <summary>CurseForge 搜索（模组/整合包/材质/光影）。</summary>
     private async Task SearchCurseForgeAsync()
     {
@@ -992,11 +1158,14 @@ public sealed class CatalogViewModel : ObservableObject
                 .SearchAsync(kind, SearchText, instance?.GameVersion, PageSize)
                 .ConfigureAwait(true);
 
-            CurseForgeResults.Replace(packs.Select(p => new CurseForgeRow(p, this, kind)));
+            var rows = packs.Select(p => new CurseForgeRow(p, this, kind)).ToList();
+            CurseForgeResults.Replace(rows);
             Status = packs.Count == 0
                 ? "没有找到匹配的内容。"
                 : $"找到 {packs.Count} 个{KindNameOf(kind)}（按热度排序）";
             CurseForgeStatus = Status;
+
+            await LoadCurseForgeIconsAsync(rows).ConfigureAwait(true);
         }
         catch (Exception ex)
         {

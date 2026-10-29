@@ -23,6 +23,19 @@ public enum CurseForgeKind
     Shader = 6552,
 }
 
+/// <summary>CurseForge 项目详情（详情页用：描述、截图、分类、下载页链接）。</summary>
+public sealed record CurseForgeModDetail(
+    int Id,
+    string Name,
+    string Summary,
+    string Description,
+    string? IconUrl,
+    IReadOnlyList<string> Screenshots,
+    IReadOnlyList<string> Categories,
+    long Downloads,
+    DateTimeOffset? Updated,
+    string? WebsiteUrl);
+
 /// <summary>CurseForge 文件（整合包是 zip，模组是 jar，材质/光影是 zip）。</summary>
 public sealed record CurseForgeFile(
     int ModId,
@@ -83,6 +96,72 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         if (payload?.Data is null) return [];
 
         return [.. payload.Data.Select(ToPack)];
+    }
+
+    /// <summary>项目详情（含描述与截图）。</summary>
+    public async Task<CurseForgeModDetail?> GetModAsync(int modId, CancellationToken ct = default)
+    {
+        if (!HasKey) return null;
+
+        using var response = await SendAsync(HttpMethod.Get, $"{Base}mods/{modId}", ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+
+        var payload = await response.Content.ReadFromJsonAsync<DataResponse<ModDto>>(JsonOptions, ct).ConfigureAwait(false);
+        var dto = payload?.Data;
+        if (dto is null) return null;
+
+        var screenshots = (dto.Screenshots ?? [])
+            .Select(x => x.ThumbnailUrl ?? x.Url)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .ToList();
+
+        return new CurseForgeModDetail(
+            dto.Id,
+            string.IsNullOrWhiteSpace(dto.Name) ? $"#{dto.Id}" : dto.Name!,
+            dto.Summary ?? "",
+            StripHtml(dto.Description ?? dto.Summary ?? ""),
+            dto.Logo?.ThumbnailUrl ?? dto.Logo?.Url,
+            screenshots,
+            [.. (dto.Categories ?? []).Select(c => c.Name ?? "").Where(n => n.Length > 0)],
+            dto.DownloadCount,
+            dto.DateModified ?? dto.DateReleased,
+            dto.Links?.WebsiteUrl);
+    }
+
+    /// <summary>该项目的全部文件（新到旧），详情页用来提供历史版本下载。</summary>
+    public async Task<IReadOnlyList<CurseForgeFile>> GetFilesAsync(int modId, int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        if (!HasKey) return [];
+
+        var url = $"{Base}mods/{modId}/files?pageSize={Math.Clamp(pageSize, 1, 50)}";
+        using var response = await SendAsync(HttpMethod.Get, url, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return [];
+
+        var payload = await response.Content.ReadFromJsonAsync<FilesResponse>(JsonOptions, ct).ConfigureAwait(false);
+        var files = payload?.Data;
+        if (files is null) return [];
+
+        return [.. files
+            .OrderByDescending(f => f.FileDate)
+            .Select(f => new CurseForgeFile(f.ModId, f.Id, f.FileName, f.DisplayName, f.DownloadUrl, f.GameVersions))];
+    }
+
+    /// <summary>把 CurseForge 的描述 HTML 压成纯文本（详情页只用 TextBlock 显示）。</summary>
+    private static string StripHtml(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return "";
+
+        var text = System.Text.RegularExpressions.Regex.Replace(html, @"<br\s*/?>", "\n",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"</p>", "\n",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"<[^>]+>", "",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        text = System.Net.WebUtility.HtmlDecode(text);
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{3,}", "\n\n");
+        return text.Trim();
     }
 
     /// <summary>
@@ -268,11 +347,23 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         [JsonPropertyName("dateModified")] public DateTimeOffset? DateModified { get; init; }
         [JsonPropertyName("dateReleased")] public DateTimeOffset? DateReleased { get; init; }
         [JsonPropertyName("logo")] public LogoDto? Logo { get; init; }
+        [JsonPropertyName("description")] public string? Description { get; init; }
+        [JsonPropertyName("screenshots")] public List<ScreenshotDto>? Screenshots { get; init; }
+        [JsonPropertyName("categories")] public List<CategoryDto>? Categories { get; init; }
+        [JsonPropertyName("links")] public LinksDto? Links { get; init; }
     }
 
     private sealed record LogoDto(
         [property: JsonPropertyName("thumbnailUrl")] string? ThumbnailUrl,
         [property: JsonPropertyName("url")] string? Url);
+
+    private sealed record ScreenshotDto(
+        [property: JsonPropertyName("thumbnailUrl")] string? ThumbnailUrl,
+        [property: JsonPropertyName("url")] string? Url);
+
+    private sealed record CategoryDto([property: JsonPropertyName("name")] string? Name);
+
+    private sealed record LinksDto([property: JsonPropertyName("websiteUrl")] string? WebsiteUrl);
 
     private sealed record CurseForgeFileDto
     {
