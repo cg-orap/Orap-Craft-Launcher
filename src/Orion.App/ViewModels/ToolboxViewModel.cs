@@ -122,8 +122,15 @@ public sealed class ToolboxViewModel : ObservableObject
         set => SetProperty(ref _showGridOverlay, value);
     }
 
+    /// <summary>当前用的是哪个引擎（cubiomes 原生 / 简化模型）。</summary>
+    public string MapEngineLabel => CubiomesNative.Available
+        ? $"群系引擎：cubiomes（支持 {CubiomesNative.Versions[0]} 及更早）"
+        : "群系引擎：简化模型（未加载 OrapCubiomes.dll）";
+
     public string MapModelNotice =>
-        "群系由 5 通道噪声近似生成（可复现，但与游戏内实际地形不保证一致）；史莱姆区块是精确值。";
+        CubiomesNative.Available
+            ? "群系由 cubiomes 按原版算法生成（与 Chunkbase / Amidst 同源）；史莱姆区块同样是精确值。"
+            : "群系由 5 通道噪声近似生成（可复现，但与游戏内实际地形不保证一致）；史莱姆区块是精确值。";
 
 
     public ICommand GenerateMapCommand { get; }

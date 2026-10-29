@@ -8,11 +8,16 @@ using Orion.Core.World;
 namespace Orion.App.Controls;
 
 /// <summary>悬停信息：方块坐标、群系、是否史莱姆区块。</summary>
-public sealed class BiomeHoverEventArgs(int blockX, int blockZ, BiomeKind biome, bool slime) : EventArgs
+public sealed class BiomeHoverEventArgs(int blockX, int blockZ, string? nativeName, int nativeId, BiomeKind fallback, bool slime) : EventArgs
 {
     public int BlockX { get; } = blockX;
     public int BlockZ { get; } = blockZ;
-    public BiomeKind Biome { get; } = biome;
+
+    /// <summary>原生引擎给出的中文群系名（不可用时为 null）。</summary>
+    public string? NativeName { get; } = nativeName;
+
+    public int NativeId { get; } = nativeId;
+    public BiomeKind FallbackBiome { get; } = fallback;
     public bool Slime { get; } = slime;
 }
 
@@ -32,10 +37,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private static readonly Brush TextBrush = new SolidColorBrush(Color.FromArgb(0xD8, 0xF2, 0xF4, 0xF8));
     private static readonly Brush OriginBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xD8, 0x6B));
 
-    private static readonly int[] ZoomSteps = [2, 4, 8, 16, 32];
+    // 与 cubiomes 的 scale 取值对齐：每格 1/4/16/64 方块
+    private static readonly int[] ZoomSteps = [1, 4, 16, 64];
 
     private long _seed;
-    private int _zoomIndex = 2;          // 默认 8 方块/像素
+    private int _zoomIndex = 2;          // 默认 16 方块/像素
     private int _centerBlockX;
     private int _centerBlockZ;
 
@@ -71,6 +77,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
             RequestRender();
         }
     }
+
+    /// <summary>cubiomes 版本表下标（0 = 最新）。原生引擎不可用时忽略。</summary>
+    public int EngineVersionIndex { get; set; }
 
     public bool ShowSlime { get; set; } = true;
     public bool ShowGrid { get; set; } = true;
@@ -117,11 +126,15 @@ public sealed class BiomeMapCanvas : FrameworkElement
             var centerX = _centerBlockX;
             var centerZ = _centerBlockZ;
             var step = BlocksPerPixel;
+            var versionIndex = EngineVersionIndex;
             var version = ++_bitmapVersion;
 
             Task.Run(() =>
             {
-                var pixels = SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, step, width, height);
+                // 有原生引擎就用真算法（cubiomes），否则退回简化模型。
+                var pixels = CubiomesNative.RenderRgba(seed, versionIndex, CubiomesNative.DimOverworld,
+                                                       centerX, centerZ, step, width, height)
+                             ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, step, width, height);
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (version != _bitmapVersion) return;    // 已被更新的请求取代
@@ -272,8 +285,14 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var blockX = left + (int)(position.X * step);
         var blockZ = top + (int)(position.Y * step);
 
+        var nativeId = CubiomesNative.Available
+            ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, CubiomesNative.DimOverworld, step, blockX, 63, blockZ)
+            : -1;
+
         HoverChanged?.Invoke(this, new BiomeHoverEventArgs(
             blockX, blockZ,
+            nativeId >= 0 ? BiomeCatalog.FromCubiomesName(CubiomesNative.BiomeName(EngineVersionIndex, nativeId)) : null,
+            nativeId,
             SimplifiedBiomeMap.Sample(_seed, blockX, blockZ),
             SeedMap.IsSlimeChunk(_seed, blockX >> 4, blockZ >> 4)));
     }

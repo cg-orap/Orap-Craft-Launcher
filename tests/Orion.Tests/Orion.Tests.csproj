@@ -22,4 +22,9 @@
     <ProjectReference Include="..\..\src\Orion.Core\Orion.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- cubiomes 原生引擎（由 build/build-native.ps1 生成；缺失时启动器自动回退到简化模型） -->
+    <None Include="..\..\src\Orion.Core\Native\OrapCubiomes.dll" Link="OrapCubiomes.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\src\Orion.Core\Native\OrapCubiomes.dll')" />
+  </ItemGroup>
+
 </Project>

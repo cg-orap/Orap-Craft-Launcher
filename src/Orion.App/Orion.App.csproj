@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -37,5 +37,16 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
+
+
+
+
+  <!-- cubiomes 原生引擎：由 build/build-native.ps1 生成，缺失时启动器自动回退到简化模型 -->
+  <Target Name="CopyNativeEngineToOutput" AfterTargets="Build" Condition="Exists('..\Orion.Core\Native\OrapCubiomes.dll')">
+    <Copy SourceFiles="..\Orion.Core\Native\OrapCubiomes.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyNativeEngineToPublish" AfterTargets="Publish" Condition="Exists('..\Orion.Core\Native\OrapCubiomes.dll')">
+    <Copy SourceFiles="..\Orion.Core\Native\OrapCubiomes.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

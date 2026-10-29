@@ -30,6 +30,7 @@ public partial class ToolboxView : UserControl
             BiomeCanvas.Seed = _attached.SeedValue;
             BiomeCanvas.ShowSlime = _attached.ShowSlimeOverlay;
             BiomeCanvas.ShowGrid = _attached.ShowGridOverlay;
+            BiomeCanvas.EngineVersionIndex = CubiomesNative.VersionIndexFor(_attached.SeedVersion);
         }
     }
 
@@ -41,6 +42,7 @@ public partial class ToolboxView : UserControl
         {
             case nameof(ToolboxViewModel.SeedValue):
                 BiomeCanvas.Seed = vm.SeedValue;
+                BiomeCanvas.EngineVersionIndex = CubiomesNative.VersionIndexFor(vm.SeedVersion);
                 BiomeCanvas.CenterOn(0, 0);
                 break;
             case nameof(ToolboxViewModel.ShowSlimeOverlay):
@@ -59,7 +61,8 @@ public partial class ToolboxView : UserControl
         if (_attached is not { } vm) return;
 
         var slime = e.Slime ? " · 史莱姆区块" : "";
-        vm.MapStatus = $"方块 {e.BlockX}, {e.BlockZ} · {SimplifiedBiomeMap.DisplayName(e.Biome)}{slime}";
+        var biome = e.NativeName ?? SimplifiedBiomeMap.DisplayName(e.FallbackBiome);
+        vm.MapStatus = $"方块 {e.BlockX}, {e.BlockZ} · {biome}{slime}";
     }
 
     private void OnZoomIn(object sender, RoutedEventArgs e) => BiomeCanvas.Zoom(1.25);
