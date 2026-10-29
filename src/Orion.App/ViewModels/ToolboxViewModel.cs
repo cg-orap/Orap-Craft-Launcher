@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Orion.App.Mvvm;
 using Orion.Core.Game;
+using Orion.Core.World;
 
 namespace Orion.App.ViewModels;
 
@@ -29,6 +30,7 @@ public sealed class ToolboxViewModel : ObservableObject
     {
         _main = main;
 
+        GenerateMapCommand = new RelayCommand(GenerateMap);
         OpenChunkbaseCommand = new RelayCommand(OpenChunkbase);
         OpenMislandCommand = new RelayCommand(OpenMisland);
         CopySeedCommand = new RelayCommand(CopySeed);
@@ -83,6 +85,29 @@ public sealed class ToolboxViewModel : ObservableObject
         : $"将用种子「{Seed.Trim()}」打开在线地图。";
 
     public string SeedVersion => _main.CurrentInstance?.GameVersion ?? "1.21";
+
+    // 离线地图：种子解析结果 + 悬停状态
+    private long _seedValue;
+    private string _mapStatus = "拖动平移，滚轮缩放；绿色格子 = 史莱姆区块。";
+    private string _seedError = "";
+
+    public long SeedValue => _seedValue;
+
+    public string SeedError
+    {
+        get => _seedError;
+        private set => SetProperty(ref _seedError, value);
+    }
+
+    public string MapStatus
+    {
+        get => _mapStatus;
+        set => SetProperty(ref _mapStatus, value);
+    }
+
+    public string Legend => "绿色：史莱姆区块（与游戏内公式逐位一致）";
+
+    public ICommand GenerateMapCommand { get; }
 
     public ICommand OpenChunkbaseCommand { get; }
     public ICommand OpenMislandCommand { get; }
@@ -254,6 +279,28 @@ public sealed class ToolboxViewModel : ObservableObject
             ? $"已把默认设置写入 {applied} 个版本（只改视距/界面尺寸/自动跳跃等几项，其余设置不动）。"
             : $"已写入 {applied} 个版本，{failed} 个失败（看日志）。";
         _main.LogsPage.AppendSystem(Status);
+    }
+
+    /// <summary>解析种子并让画布重画（数字直接使用，文本按 Java hashCode）。</summary>
+    private void GenerateMap()
+    {
+        if (string.IsNullOrWhiteSpace(Seed))
+        {
+            SeedError = "先填一个种子；留空不会画地图。";
+            return;
+        }
+
+        if (!SeedMap.TryParseSeed(Seed, out var value))
+        {
+            SeedError = "这个种子解析不了，换一个试试。";
+            return;
+        }
+
+        SeedError = "";
+        _seedValue = value;
+        OnPropertyChanged(nameof(SeedValue));
+        MapStatus = $"种子 = {value}（拖动平移，滚轮缩放）";
+        _main.LogsPage.AppendSystem($"工具箱：已生成离线种子地图 {value}");
     }
 
     private void OpenChunkbase()
