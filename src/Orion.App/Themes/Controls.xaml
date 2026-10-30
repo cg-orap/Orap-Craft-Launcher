@@ -84,6 +84,65 @@
         <Setter Property="Padding" Value="8,3" />
     </Style>
 
+
+    <!-- ============================ 滑块 ============================ -->
+    <!-- 数值型设置（内存、并发数）用滑块调，比只填数字直观；轨道用强调色填充，和按钮同一套语言。 -->
+    <Style TargetType="Slider">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid VerticalAlignment="Center" Background="Transparent">
+                        <Border Height="6" CornerRadius="3" VerticalAlignment="Center"
+                                Background="{DynamicResource SurfaceAltBg}"
+                                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1" />
+                        <Track x:Name="PART_Track" VerticalAlignment="Center">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="6" CornerRadius="3" VerticalAlignment="Center"
+                                                    Background="{DynamicResource AccentBrush}" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="Slider.IncreaseLarge" Focusable="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="6" Background="Transparent" VerticalAlignment="Center" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Width="16" Height="16" Cursor="Hand">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Grid>
+                                                <Ellipse Fill="{DynamicResource AccentBrush}"
+                                                         Stroke="{DynamicResource AccentPressedBrush}" StrokeThickness="1.5" />
+                                                <Ellipse Fill="White" Width="6" Height="6" />
+                                            </Grid>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ============================ Buttons ============================ -->
     <Style x:Key="BaseButton" TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />

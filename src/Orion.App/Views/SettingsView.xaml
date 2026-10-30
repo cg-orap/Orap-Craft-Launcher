@@ -1,4 +1,4 @@
-<UserControl x:Class="Orion.App.Views.SettingsView"
+﻿<UserControl x:Class="Orion.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -254,11 +254,21 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
                                         <TextBlock Text="最大内存 (MB)" Style="{StaticResource CaptionText}" />
-                                        <TextBox Text="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                                        <Slider Minimum="1024" Maximum="32768" TickFrequency="512" SmallChange="512"
+                                                LargeChange="2048" IsSnapToTickEnabled="True" Margin="0,6,0,0"
+                                                Value="{Binding MemoryMb, Mode=TwoWay}"
+                                                AutomationProperties.AutomationId="MemorySlider" />
+                                        <TextBox Text="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
+                                                 Width="120" HorizontalAlignment="Left" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBlock Text="初始内存 (MB)" Style="{StaticResource CaptionText}" />
-                                        <TextBox Text="{Binding MinMemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
+                                        <Slider Minimum="512" Maximum="16384" TickFrequency="256" SmallChange="256"
+                                                LargeChange="1024" IsSnapToTickEnabled="True" Margin="0,6,0,0"
+                                                Value="{Binding MinMemoryMb, Mode=TwoWay}"
+                                                AutomationProperties.AutomationId="MinMemorySlider" />
+                                        <TextBox Text="{Binding MinMemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
+                                                 Width="120" HorizontalAlignment="Left" />
                                     </StackPanel>
                                 </Grid>
                                 <TextBlock Text="1.21.1 + NeoForge 建议 3072–6144 MB。" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
@@ -280,7 +290,12 @@
                                           SelectedValuePath="Source" DisplayMemberPath="Name" Margin="0,6,0,12" />
 
                                 <TextBlock Text="最大并发连接数" Style="{StaticResource CaptionText}" />
-                                <TextBox Text="{Binding MaxConcurrency, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12" />
+                                <Slider Minimum="1" Maximum="64" TickFrequency="1" SmallChange="1" LargeChange="8"
+                                        IsSnapToTickEnabled="True" Margin="0,6,0,0"
+                                        Value="{Binding MaxConcurrency, Mode=TwoWay}"
+                                        AutomationProperties.AutomationId="ConcurrencySlider" />
+                                <TextBox Text="{Binding MaxConcurrency, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12"
+                                         Width="120" HorizontalAlignment="Left" />
 
                                 <TextBlock Text="代理（例如 http://127.0.0.1:7890）" Style="{StaticResource CaptionText}" />
                                 <TextBox Text="{Binding ProxyUrl, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
