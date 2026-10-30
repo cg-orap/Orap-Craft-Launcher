@@ -49,6 +49,7 @@ public sealed class PackArchiveInstaller
     private readonly InstanceImporter _importer;
     private readonly HttpClient _http;
     private readonly string? _curseForgeApiKey;
+    private readonly ModDependencyRepair? _dependencyRepair;
 
     public PackArchiveInstaller(
         GamePaths paths,
@@ -56,7 +57,8 @@ public sealed class PackArchiveInstaller
         LoaderService loaders,
         InstanceImporter importer,
         HttpClient http,
-        string? curseForgeApiKey = null)
+        string? curseForgeApiKey = null,
+        ModDependencyRepair? dependencyRepair = null)
     {
         _paths = paths;
         _instances = instances;
@@ -64,6 +66,7 @@ public sealed class PackArchiveInstaller
         _importer = importer;
         _http = http;
         _curseForgeApiKey = curseForgeApiKey;
+        _dependencyRepair = dependencyRepair;
     }
 
     /// <summary>Quick sniff of an archive without installing anything (used for drag &amp; drop hints).</summary>
@@ -252,6 +255,9 @@ public sealed class PackArchiveInstaller
                 output?.Report($"已移除 {pruned} 个损坏的模组文件，请重新安装缺失的模组。");
             }
 
+            await CheckAndRepairDependenciesAsync(instance, info.MinecraftVersion,
+                CurseForgeClient.LoaderTypeOf(info.Loader), warnings, output, ct).ConfigureAwait(false);
+
             output?.Report($"整合包已安装：{name}（{downloaded} 个模组，{overridesCopied} 个配置文件）");
 
             var result = new MrPackResult
@@ -431,6 +437,45 @@ public sealed class PackArchiveInstaller
     /// key, fast CDN), the official redirect as a fallback. Anything still failing is queued with a
     /// browser link so the user can fetch it by hand instead of an opaque "some files failed".
     /// </summary>
+    /// <summary>
+    /// 装完之后检查并自动补齐必需前置。没有 Key 或没有 repair 服务时只报告缺失，不发请求。
+    /// </summary>
+    private async Task CheckAndRepairDependenciesAsync(
+        Instance instance, string? minecraftVersion, int? modLoaderType,
+        List<string> warnings, IProgress<string>? output, CancellationToken ct)
+    {
+        var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
+        var scan = ModDependencyScanner.Scan(modsDirectory);
+        if (scan.Missing.Count == 0) return;
+
+        output?.Report($"检测到 {scan.Missing.Count} 个前置缺失，正在尝试自动补齐…");
+
+        if (_dependencyRepair is null)
+        {
+            warnings.Add($"缺少 {scan.Missing.Count} 个前置模组，需要手动安装：");
+            warnings.AddRange(scan.Missing.Take(20)
+                .Select(m => $"  {m.ModId}（被 {m.RequiredBy} 需要，版本 {m.VersionRange}）"));
+            return;
+        }
+
+        var result = await _dependencyRepair.RepairAsync(
+            instance.GameDirectory, scan.Missing, minecraftVersion, modLoaderType,
+            Path.Combine(instance.GameDirectory, ".orap-cache"),
+            new Progress<string>(line => output?.Report(line)), ct).ConfigureAwait(false);
+
+        if (result.Installed.Count > 0)
+        {
+            warnings.Add($"已自动补齐 {result.Installed.Count} 个前置：");
+            warnings.AddRange(result.Installed);
+        }
+
+        if (result.Failed.Count > 0)
+        {
+            warnings.Add($"有 {result.Failed.Count} 个前置没补上（可在模组页手动搜索安装）：");
+            warnings.AddRange(result.Failed.Take(20));
+        }
+    }
+
     /// <summary>删除下载失败留下的半截文件（失败也无所谓）。</summary>
     private static void TryDeleteFile(string path)
     {
@@ -465,6 +510,15 @@ public sealed class PackArchiveInstaller
         return removed;
     }
 
+    /// <summary>实例加载器 → CurseForge 的 modLoaderType（搜索筛选用）。</summary>
+    private static int? LoaderKindOf(LoaderKind loader) => loader switch
+    {
+        LoaderKind.Forge => 1,
+        LoaderKind.Fabric => 4,
+        LoaderKind.Quilt => 5,
+        LoaderKind.NeoForge => 6,
+        _ => null,
+    };
     /// <summary>调用 CurseForge 的 download-url 接口，取出真实下载地址。</summary>
     private async Task<string?> ResolveCurseForgeUrlAsync(string apiUrl, CancellationToken ct)
     {

@@ -96,6 +96,7 @@ public sealed class ModsViewModel : ObservableObject
         RescanCommand = new AsyncRelayCommand(LoadModsAsync, () => SelectedInstance is not null);
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !string.IsNullOrWhiteSpace(SearchText) && !IsSearching);
         SearchCurseForgeCommand = new AsyncRelayCommand(SearchCurseForgeAsync, () => !IsPackSearching);
+        RepairDependenciesCommand = new AsyncRelayCommand(RepairDependenciesAsync, () => !IsBusy);
         RefreshCurseForgeKeyCommand = new RelayCommand(() => OnPropertyChanged(nameof(HasCurseForgeKey)));
         OpenFolderCommand = new RelayCommand(OpenModsFolder);
         OpenModrinthPageCommand = new RelayCommand(OpenModrinthPage);
@@ -184,6 +185,9 @@ public sealed class ModsViewModel : ObservableObject
     public bool HasCurseForgeKey => _main.Context.CurseForge.HasKey;
 
     public ICommand SearchCurseForgeCommand { get; private set; } = null!;
+
+    /// <summary>检查当前实例缺少的必需前置并自动补齐。</summary>
+    public ICommand RepairDependenciesCommand { get; private set; } = null!;
     public ICommand RefreshCurseForgeKeyCommand { get; private set; } = null!;
 
     public Instance? SelectedInstance
@@ -390,6 +394,59 @@ public sealed class ModsViewModel : ObservableObject
         finally
         {
             IsPackSearching = false;
+        }
+    }
+
+    /// <summary>扫描当前实例的 mods，把缺的必需前置用 CurseForge 自动补上。</summary>
+    public async Task RepairDependenciesAsync()
+    {
+        var instance = SelectedInstance ?? _main.CurrentInstance;
+        if (instance is null)
+        {
+            Status = "请先选择一个版本。";
+            return;
+        }
+
+        var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
+        var scan = Orion.Core.Mods.ModDependencyScanner.Scan(modsDirectory);
+
+        if (scan.Missing.Count == 0)
+        {
+            Status = $"检查完成：{scan.ModCount} 个模组，未发现缺失前置。";
+            return;
+        }
+
+        IsBusy = true;
+        var activity = _main.Activities.Begin($"补齐前置（{instance.Name}）", $"{scan.Missing.Count} 个缺失");
+        Status = $"发现 {scan.Missing.Count} 个缺失前置，正在自动补齐…";
+
+        try
+        {
+            var result = await _main.Context.DependencyRepair.RepairAsync(
+                instance.GameDirectory,
+                scan.Missing,
+                instance.GameVersion,
+                instance.Loader == LoaderKind.Vanilla ? null : Orion.Core.Mods.CurseForgeClient.LoaderTypeOf(instance.Loader),
+                Path.Combine(instance.GameDirectory, ".orap-cache"),
+                new Progress<string>(line => Status = line)).ConfigureAwait(true);
+
+            Status = result.Remaining.Count == 0
+                ? $"已补齐 {result.Installed.Count} 个前置，依赖全部满足。"
+                : $"补齐 {result.Installed.Count} 个，仍有 {result.Remaining.Count} 个缺失：" +
+                  string.Join('、', result.Remaining.Select(r => r.ModId).Take(6));
+
+            _main.Activities.Finish(activity,
+                result.Remaining.Count == 0 ? ActivityState.Completed : ActivityState.Failed, Status);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (Exception ex)
+        {
+            Status = "补齐失败: " + ex.Message;
+            _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 

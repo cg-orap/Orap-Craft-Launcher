@@ -114,6 +114,27 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         return new CurseForgePage([.. payload.Data.Select(ToPack)], total, index, size);
     }
 
+    /// <summary>按 projectId 取一个项目（已知发行版提示用）。</summary>
+    public async Task<CurseForgePack?> GetPackAsync(int modId, CancellationToken ct = default)
+    {
+        if (!HasKey) return null;
+
+        using var response = await SendAsync(HttpMethod.Get, $"{Base}mods/{modId}", ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+
+        try
+        {
+            var payload = await response.Content.ReadFromJsonAsync<DataResponse<ModDto>>(JsonOptions, ct)
+                .ConfigureAwait(false);
+            return payload?.Data is { } dto ? ToPack(dto) : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // 响应结构不对（代理返回 HTML / 数组等）时当作取不到，不炸调用方
+            return null;
+        }
+    }
+
     /// <summary>项目详情（含描述与截图）。</summary>
     public async Task<CurseForgeModDetail?> GetModAsync(int modId, CancellationToken ct = default)
     {

@@ -114,6 +114,10 @@
                             <Button Content="检查更新" Style="{StaticResource GhostButton}"
                                     Command="{Binding CheckUpdatesCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
                                     ToolTip="只检查，不下载；发现更新会先询问你" />
+                            <Button Content="补齐缺失前置" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding RepairDependenciesCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                    ToolTip="扫描 mods 里每个 mods.toml 的必需依赖，缺的用 CurseForge 自动下载补齐"
+                                    AutomationProperties.AutomationId="RepairDependencies" />
                         </StackPanel>
                     </Grid>
 
