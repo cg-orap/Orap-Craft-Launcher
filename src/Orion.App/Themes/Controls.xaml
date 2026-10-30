@@ -90,6 +90,8 @@
         <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Padding" Value="12,6" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
@@ -114,19 +116,24 @@
     </Style>
 
     <!--
-        主界面按钮统一成"启动游戏"那种样式：实心强调色、白字、8px 圆角、粗体。
-        Primary / Secondary / Ghost 三档保留名字（调用点不用改），但外观一致；
-        危险操作仍然用红色（Danger / DangerFilled），标题栏的最小化/关闭保持无底色。
+        按钮按"功能层级"分三档，共同点：都有 1px 边框轮廓（不存在只有文字的按钮）、8px 圆角。
+
+        1. PrimaryButton  主要操作（启动游戏、安装、保存、确定）：实心强调色 + 白字，强调色深色描边
+        2. SecondaryButton 次要操作（重新扫描、检查更新、导出）：透明底 + 强调色描边 + 强调色文字
+        3. GhostButton    低强调操作（打开目录、取消、辅助跳转）：中性底色 + 浅描边 + 常规文字
+        危险操作仍走 DangerButton（红描边红字）/ DangerFilledButton（红底），描边同样保留。
     -->
     <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
         <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
         <Setter Property="Foreground" Value="White" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentPressedBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Padding" Value="12,6" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}" />
@@ -134,9 +141,40 @@
         </Style.Triggers>
     </Style>
 
-    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}" />
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="12,6" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SurfaceHover}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SurfaceAltBg}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
-    <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}" />
+    <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,6" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SurfaceHover}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SurfaceAltBg}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <!-- Solid red action: destructive operations such as 删除版本 must be unmistakable. -->
     <Style x:Key="DangerFilledButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
