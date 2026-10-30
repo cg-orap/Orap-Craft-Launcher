@@ -119,11 +119,10 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button x:Name="MinButton" Content="&#xE921;" Style="{StaticResource CaptionButton}" Click="OnMinimize"
-                            AutomationProperties.AutomationId="CaptionMinimize" />
-                    <Button x:Name="MaxButton" Content="&#xE922;" Style="{StaticResource CaptionButton}" Click="OnMaximize"
-                            AutomationProperties.AutomationId="CaptionMaximize" />
+                            AutomationProperties.AutomationId="CaptionMinimize" ToolTip="最小化" />
+                    <!-- 全屏/最大化按钮已移除：只保留最小化与关闭 -->
                     <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CaptionButton}" Click="OnClose"
-                            AutomationProperties.AutomationId="CaptionClose" />
+                            AutomationProperties.AutomationId="CaptionClose" ToolTip="关闭启动器" />
                 </StackPanel>
             </Grid>
         </Border>

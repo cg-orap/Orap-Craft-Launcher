@@ -10,6 +10,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         Loaded += (_, _) => { App.ApplyWindowChrome(this); FixMaximizedBounds(); };
+        SourceInitialized += OnTitleBarSourceInitialized;   // 双击标题栏/系统菜单不再最大化
         StateChanged += (_, _) => FixMaximizedBounds();
         InitializeComponent();
         FitToWorkArea();
@@ -157,10 +158,38 @@ public partial class MainWindow : Window
         RailIndicator.Margin = new Thickness(0, 0, 0, 0);
     }
 
-    private void OnMaximize(object sender, System.Windows.RoutedEventArgs e)
-        => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-
     private void OnClose(object sender, System.Windows.RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// 全屏/最大化功能已移除：窗口仍可拖边缩放，但双击标题栏不再最大化，
+    /// 也不响应系统菜单里的"最大化"（吞掉 WM_NCLBUTTONDBLCLK 与 WM_SYSCOMMAND 的最大化命令）。
+    /// </summary>
+    private void OnTitleBarSourceInitialized(object? sender, EventArgs e)
+    {
+        if (PresentationSource.FromVisual(this) is not System.Windows.Interop.HwndSource source) return;
+        source.AddHook(TitleBarWndProc);
+    }
+
+    private const int WmNcLButtonDblClk = 0x00A3;
+    private const int WmSysCommand = 0x0112;
+    private const int ScMaximize = 0xF030;
+
+    private IntPtr TitleBarWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmNcLButtonDblClk)
+        {
+            handled = true;   // 双击标题栏不再最大化
+            return IntPtr.Zero;
+        }
+
+        if (msg == WmSysCommand && (wParam.ToInt64() & 0xFFF0) == ScMaximize)
+        {
+            handled = true;   // 系统菜单 / Win+Up 也不最大化
+            return IntPtr.Zero;
+        }
+
+        return IntPtr.Zero;
+    }
 
     /// <summary>
     /// A WindowChrome window maximises to the full monitor bounds, which hides the taskbar.
