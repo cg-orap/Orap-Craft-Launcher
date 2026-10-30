@@ -118,11 +118,19 @@
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Button x:Name="MinButton" Content="&#xE921;" Style="{StaticResource CaptionButton}" Click="OnMinimize"
-                            AutomationProperties.AutomationId="CaptionMinimize" ToolTip="最小化" />
-                    <!-- 全屏/最大化按钮已移除：只保留最小化与关闭 -->
-                    <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CaptionButton}" Click="OnClose"
-                            AutomationProperties.AutomationId="CaptionClose" ToolTip="关闭启动器" />
+                    <!-- 图标用矢量绘制：Segoe 图标字体在部分机器上缺字形，会显示成方框 -->
+                    <Button x:Name="MinButton" Style="{StaticResource CaptionButton}" Click="OnMinimize"
+                            AutomationProperties.AutomationId="CaptionMinimize" ToolTip="最小化">
+                        <Path Data="M 0,5 L 10,5" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.2"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button x:Name="CloseButton" Style="{StaticResource CaptionButton}" Click="OnClose"
+                            AutomationProperties.AutomationId="CaptionClose" ToolTip="关闭启动器">
+                        <Path Data="M 0,0 L 10,10 M 10,0 L 0,10" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.2"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>

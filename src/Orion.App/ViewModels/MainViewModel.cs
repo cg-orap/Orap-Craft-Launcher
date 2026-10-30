@@ -164,7 +164,7 @@ public sealed class MainViewModel : ObservableObject
         NavItems.AddRange(
         [
             new NavItem("home", "首页", "\uE80F", "游戏"),
-                new NavItem("instances", "版本设置", "\uE713", "游戏"),
+                new NavItem("instances", "版本设置", "\uE81E", "游戏"),   // 层叠图标：和"设置"的齿轮区分
             new NavItem("catalog", "下载中心", "\uE896", "资源")
             {
                 SubItems =

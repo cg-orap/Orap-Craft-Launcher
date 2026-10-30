@@ -188,7 +188,68 @@ public partial class MainWindow : Window
             return IntPtr.Zero;
         }
 
+        // 贴靠到屏幕边缘 / 系统最大化都会问"最大能多大"：这里直接回"就是现在这个尺寸"，
+        // 于是窗口永远铺不满屏幕，但拖边框缩放（走 WM_SIZING）仍然是自由的。
+        if (msg == WmGetMinMaxInfo && lParam != IntPtr.Zero)
+        {
+            LockMaxSizeToCurrent(lParam);
+            handled = true;
+            return IntPtr.Zero;
+        }
+
         return IntPtr.Zero;
+    }
+
+    private const int WmGetMinMaxInfo = 0x0024;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
+
+    private void LockMaxSizeToCurrent(IntPtr lParam)
+    {
+        var info = System.Runtime.InteropServices.Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        if (!GetWindowRect(new System.Windows.Interop.WindowInteropHelper(this).Handle, out var rect)) return;
+
+        var width = rect.Right - rect.Left;
+        var height = rect.Bottom - rect.Top;
+        if (width <= 0 || height <= 0) return;
+
+        // ptMaxSize 决定"最大化/贴靠后"的尺寸：直接等于当前尺寸 → 视觉上没有任何变化。
+        info.MaxSize.X = width;
+        info.MaxSize.Y = height;
+        info.MaxPosition.X = rect.Left;
+        info.MaxPosition.Y = rect.Top;
+
+        // 手动拖边框仍允许放大，但不超过当前工作区（不会盖住任务栏）。
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+        var work = System.Windows.SystemParameters.WorkArea;
+        info.MaxTrackSize.X = Math.Max(width, (int)(work.Width * dpi.DpiScaleX));
+        info.MaxTrackSize.Y = Math.Max(height, (int)(work.Height * dpi.DpiScaleY));
+
+        System.Runtime.InteropServices.Marshal.StructureToPtr(info, lParam, false);
     }
 
     /// <summary>
