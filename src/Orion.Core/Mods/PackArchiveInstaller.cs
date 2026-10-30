@@ -222,7 +222,7 @@ public sealed class PackArchiveInstaller
                 await gate.WaitAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    var ok = await DownloadCurseForgeFileAsync(file, modsDirectory, queue, ct).ConfigureAwait(false);
+                    var ok = await DownloadCurseForgeFileCoreAsync(file, modsDirectory, queue, warnings, ct).ConfigureAwait(false);
                     if (ok)
                     {
                         var finished = Interlocked.Increment(ref done);
@@ -527,6 +527,17 @@ public sealed class PackArchiveInstaller
         System.Collections.Concurrent.ConcurrentQueue<string> unresolved,
         CancellationToken ct)
     {
+        return await DownloadCurseForgeFileCoreAsync(file, modsDirectory, unresolved, warnings: null, ct)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<bool> DownloadCurseForgeFileCoreAsync(
+        CurseForgeFile file,
+        string modsDirectory,
+        System.Collections.Concurrent.ConcurrentQueue<string> unresolved,
+        List<string>? warnings,
+        CancellationToken ct)
+    {
         var name = string.IsNullOrWhiteSpace(file.FileName)
             ? $"curseforge-{file.ProjectId}-{file.FileId}.jar"
             : Path.GetFileName(file.FileName!.Trim('"'));
@@ -591,6 +602,13 @@ public sealed class PackArchiveInstaller
                 {
                     try { File.Delete(target); } catch (IOException) { }
                     continue;
+                }
+
+                // 资源包 / 光影不能留在 mods（NeoForge 会判定 "not a valid mod file" 并让加载失败）
+                var routed = PackFileClassifier.Route(target, Path.GetDirectoryName(modsDirectory)!, out var kind);
+                if (warnings is not null && kind is PackFileKind.ResourcePack or PackFileKind.ShaderPack)
+                {
+                    warnings.Add($"{Path.GetFileName(routed)} 识别为{(kind == PackFileKind.ResourcePack ? "资源包" : "光影")}，已放到 {PackFileClassifier.FolderFor(kind)}/");
                 }
 
                 return true;
