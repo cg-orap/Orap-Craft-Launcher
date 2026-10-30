@@ -161,6 +161,7 @@ public sealed class BackupViewModel : ObservableObject
         OnPropertyChanged(nameof(HasRows));
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(EmptyHint));
+        _main.RefreshBackupUsage();
     }
 
     private async Task ExportAsync()

@@ -61,6 +61,9 @@ public sealed class LauncherSettings
     /// <summary>工具箱 → 游戏默认设置：新版本初始化时写入 options.txt。</summary>
     [JsonPropertyName("defaultGameOptions")] public Game.GameOptionsTemplate DefaultGameOptions { get; set; } = new();
 
+    /// <summary>备份配额（MB）：侧边栏「备份占用」的分母，超过 90% 会变色提醒。</summary>
+    [JsonPropertyName("backupQuotaMb")] public int BackupQuotaMb { get; set; } = 8192;
+
     [JsonPropertyName("showSnapshots")] public bool ShowSnapshots { get; set; } = true;
     [JsonPropertyName("showOldVersions")] public bool ShowOldVersions { get; set; } = true;
 

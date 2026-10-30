@@ -221,6 +221,43 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ToggleSidebarCommand { get; }
 
     public BackupViewModel BackupPage { get; }
+
+    private string _backupUsageText = "";
+    private double _backupUsagePercent;
+    private bool _backupUsageNearLimit;
+
+    /// <summary>侧边栏「备份占用」右侧那行，例如 "1.1 GB / 8 GB"。</summary>
+    public string BackupUsageText
+    {
+        get => _backupUsageText;
+        private set => SetProperty(ref _backupUsageText, value);
+    }
+
+    /// <summary>进度条百分比（0-100）。</summary>
+    public double BackupUsagePercent
+    {
+        get => _backupUsagePercent;
+        private set => SetProperty(ref _backupUsagePercent, value);
+    }
+
+    /// <summary>接近配额时高亮。</summary>
+    public bool BackupUsageNearLimit
+    {
+        get => _backupUsageNearLimit;
+        private set => SetProperty(ref _backupUsageNearLimit, value);
+    }
+
+    /// <summary>重新统计所有实例的快照占用（新建/删除备份、切换数据目录后调用）。</summary>
+    public void RefreshBackupUsage()
+    {
+        var quotaMb = Context.Settings.BackupQuotaMb;
+        var usage = Core.Instances.BackupUsage.MeasureForInstances(
+            Instances.Select(i => i.GameDirectory), quotaMb);
+
+        BackupUsageText = usage.Text;
+        BackupUsagePercent = usage.Percent;
+        BackupUsageNearLimit = usage.IsNearLimit;
+    }
     public ToolboxViewModel ToolboxPage { get; }
     public HomeViewModel Home { get; }
     public VersionsViewModel VersionsPage { get; }
@@ -613,6 +650,7 @@ public sealed class MainViewModel : ObservableObject
         var instances = Context.Instances.LoadAll();
         Instances.Replace(instances);
         BackupPage.Refresh();
+        RefreshBackupUsage();
 
         var lastId = Context.Settings.LastInstanceId;
 
