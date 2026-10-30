@@ -446,6 +446,17 @@ public sealed class PackArchiveInstaller
     {
         var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
         var scan = ModDependencyScanner.Scan(modsDirectory);
+
+        // KubeJS 脚本引用了没装的模组时，游戏会卡在 "client script errors" 界面，
+        // 这既不崩游戏也补不了（没有可装的来源），只能明确告诉用户是哪一行。
+        if (scan.ScriptReferences is { Count: > 0 } scripts)
+        {
+            warnings.Add($"有 {scripts.Count} 处 KubeJS 脚本引用了未安装模组的物品，游戏会在启动时停在脚本错误界面：");
+            warnings.AddRange(scripts.Take(10)
+                .Select(r => $"  {r.File}:{r.Line} → {r.ItemId}（缺少 {r.Namespace}）"));
+            warnings.Add("  处理办法：装回对应模组，或把这些脚本行注释掉。");
+        }
+
         if (scan.Missing.Count == 0) return;
 
         output?.Report($"检测到 {scan.Missing.Count} 个前置缺失，正在尝试自动补齐…");

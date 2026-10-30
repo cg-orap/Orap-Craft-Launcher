@@ -6,8 +6,12 @@ namespace Orion.Core.Mods;
 /// <summary>模组声明的依赖，以及它被谁需要。</summary>
 public sealed record RequiredDependency(string ModId, string VersionRange, string RequiredBy);
 
-/// <summary>扫描结果：已装模组 + 缺失的必需依赖。</summary>
-public sealed record DependencyScan(IReadOnlyList<RequiredDependency> Missing, int ModCount, int DependencyCount);
+/// <summary>扫描结果：已装模组 + 缺失的必需依赖 + KubeJS 脚本引用了但不存在的命名空间。</summary>
+public sealed record DependencyScan(
+    IReadOnlyList<RequiredDependency> Missing,
+    int ModCount,
+    int DependencyCount,
+    IReadOnlyList<MissingScriptReference>? ScriptReferences = null);
 
 /// <summary>
 /// 扫描整合包 mods 目录，找出<b>必需但没装</b>的前置模组。
@@ -87,7 +91,10 @@ public static class ModDependencyScanner
             missing.Add(dependency);
         }
 
-        return new DependencyScan(missing, modCount, required.Count);
+        var kubeJs = Path.Combine(Path.GetDirectoryName(modsDirectory) ?? modsDirectory, "kubejs");
+        var scripts = KubeJsScriptScanner.Scan(kubeJs, installed.Keys);
+
+        return new DependencyScan(missing, modCount, required.Count, scripts);
     }
 
     /// <summary>Minecraft / Forge / NeoForge 这些内置模块永远"已安装"，不用去找。</summary>
