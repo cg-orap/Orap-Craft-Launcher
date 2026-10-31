@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Orion.App.Views.CatalogDetailView"
+<UserControl x:Class="Orion.App.Views.CatalogDetailView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -14,52 +14,58 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- header -->
-        <Border Grid.Row="0" Background="{DynamicResource SurfaceBg}" Padding="18,14"
+                <!-- header：图标 + 标题/元信息在左，返回列表放到右上角（原来挤在最左侧） -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBg}" Padding="20,16"
                 BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Button Grid.Column="0" Content="← 返回列表" Style="{StaticResource GhostButton}"
-                        Command="{Binding DataContext.CatalogPage.CloseDetailCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                        VerticalAlignment="Center" Margin="0,0,14,0"
-                        AutomationProperties.AutomationId="DetailBackButton" />
-
-                <Grid Grid.Column="1" Width="64" Height="64" Margin="0,0,14,0">
-                    <Border CornerRadius="11" Background="{DynamicResource SurfaceAltBg}"
+                <Grid Grid.Column="0" Width="72" Height="72" Margin="0,0,16,0">
+                    <Border CornerRadius="14" Background="{DynamicResource SurfaceAltBg}"
                             BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
                             Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
                         <TextBlock Text="{Binding Title, Converter={StaticResource Initial}}"
-                                   FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                   FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <Border CornerRadius="11" ClipToBounds="True"
+                    <Border CornerRadius="14" ClipToBounds="True"
+                            BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
                             Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}">
-                        <Image Source="{Binding Icon}" Stretch="UniformToFill" />
+                        <Image Source="{Binding Icon}" Stretch="UniformToFill"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
                     </Border>
                 </Grid>
 
-                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold"
+                        <TextBlock Text="{Binding Title}" FontSize="21" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxWidth="520" />
-                        <Border Style="{StaticResource Chip}" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <Border Style="{StaticResource Chip}" Margin="10,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding KindLabel}" FontSize="11"
                                        Foreground="{DynamicResource MutedTextBrush}" />
                         </Border>
                     </StackPanel>
 
-                    <WrapPanel Margin="0,6,0,0">
+                    <WrapPanel Margin="0,8,0,0">
                         <TextBlock Text="{Binding Author}" Style="{StaticResource CaptionText}" />
-                        <TextBlock Text="{Binding DownloadsText}" Style="{StaticResource CaptionText}" Margin="14,0,0,0" />
-                        <TextBlock Text="{Binding FollowsText}" Style="{StaticResource CaptionText}" Margin="14,0,0,0" />
-                        <TextBlock Text="{Binding CategoryText}" Style="{StaticResource CaptionText}" Margin="14,0,0,0" />
+                        <TextBlock Text=" · " Style="{StaticResource CaptionText}" />
+                        <TextBlock Text="{Binding DownloadsText}" Style="{StaticResource CaptionText}" />
+                        <TextBlock Text=" · " Style="{StaticResource CaptionText}" />
+                        <TextBlock Text="{Binding FollowsText}" Style="{StaticResource CaptionText}" />
+                        <TextBlock Text=" · " Style="{StaticResource CaptionText}" />
+                        <TextBlock Text="{Binding CategoryText}" Style="{StaticResource CaptionText}"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="360" />
                     </WrapPanel>
                 </StackPanel>
+
+                <Button Grid.Column="2" Content="←  返回列表" Style="{StaticResource GhostButton}"
+                        Command="{Binding DataContext.CatalogPage.CloseDetailCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        VerticalAlignment="Center" Padding="12,6" FontSize="12"
+                        AutomationProperties.AutomationId="DetailBackButton" />
             </Grid>
         </Border>
 

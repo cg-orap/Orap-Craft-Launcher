@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -15,6 +15,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orion.Core\Orion.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 标题栏与启动遮罩用的启动器图标（WPF 资源，pack URI 引用） -->
+    <Resource Include="Assets\app-icon.png" />
   </ItemGroup>
 
   <ItemGroup>
