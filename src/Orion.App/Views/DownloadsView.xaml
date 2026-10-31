@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="960">
 
@@ -78,7 +79,7 @@
                                 </Border>
                             </StackPanel>
 
-                            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Value="{Binding Fraction}" Maximum="1" Margin="0,8,0,0" />
+                            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" anim:AnimatedValue.To="{Binding Fraction}" Maximum="1" Margin="0,8,0,0" />
 
                             <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Detail}" Style="{StaticResource CaptionText}"
                                        TextWrapping="Wrap" Margin="0,6,0,0" />

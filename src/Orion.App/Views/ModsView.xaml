@@ -17,14 +17,55 @@
                     <ControlTemplate TargetType="ListBoxItem">
                         <Border x:Name="Row" Background="Transparent" CornerRadius="8" Padding="10,8"
                                 BorderThickness="1" BorderBrush="Transparent">
-                            <ContentPresenter />
+                            <Grid>
+                                <!-- hover / 选中用遮罩层做 120ms 过渡，避免底色瞬变 -->
+                                <Border x:Name="Hover" CornerRadius="7" Opacity="0" IsHitTestVisible="False"
+                                        Background="{DynamicResource SurfaceHover}" />
+                                <Border x:Name="Selected" CornerRadius="7" Opacity="0" IsHitTestVisible="False"
+                                        Background="{DynamicResource SurfaceAltBg}" />
+                                <ContentPresenter />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.12">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.12" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceAltBg}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.12">
+                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.12" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -325,7 +366,7 @@
                 </StackPanel>
             </Border>
             <!-- 状态行 -->
-            <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}" Margin="2,10,2,10"
+            <TextBlock anim:TextFade.Text="{Binding Status}" Style="{StaticResource CaptionText}" Margin="2,10,2,10"
                        TextWrapping="Wrap"
                        Visibility="{Binding Status, Converter={StaticResource StringToVisibility}}" />
 

@@ -164,19 +164,19 @@
                             <TextBlock Text="内存" Style="{StaticResource MetaText}" />
                             <TextBlock Text="{Binding MemoryUsageText}" FontFamily="Consolas" FontSize="12"
                                        Margin="0,4,0,6" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                            <ProgressBar Value="{Binding MemoryPercent, Mode=OneWay}" Maximum="100" Height="4" />
+                            <ProgressBar anim:AnimatedValue.To="{Binding MemoryPercent}" Maximum="100" Height="4" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Margin="0,0,18,0">
                             <TextBlock Text="CPU" Style="{StaticResource MetaText}" />
                             <TextBlock Text="{Binding CpuText}" FontFamily="Consolas" FontSize="12" Margin="0,4,0,6" />
-                            <ProgressBar Value="{Binding CpuPercent, Mode=OneWay}" Maximum="100" Height="4" />
+                            <ProgressBar anim:AnimatedValue.To="{Binding CpuPercent}" Maximum="100" Height="4" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" Margin="0,0,18,0">
                             <TextBlock Text="GPU" Style="{StaticResource MetaText}" />
                             <TextBlock Text="{Binding GpuText}" FontFamily="Consolas" FontSize="12" Margin="0,4,0,6" />
-                            <ProgressBar Value="{Binding GpuPercent, Mode=OneWay}" Maximum="100" Height="4" />
+                            <ProgressBar anim:AnimatedValue.To="{Binding GpuPercent}" Maximum="100" Height="4" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="3">

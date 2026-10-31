@@ -31,7 +31,12 @@ public partial class LoginWindow : Window
         InitializeComponent();
         DataContext = _vm;
 
-        Loaded += (_, _) => _ = InitializeAsync();
+        Loaded += (_, _) =>
+        {
+            // 窗口入场：淡入 + 10px 上滑（对话框不该"啪"地出现）
+            Animations.Motion.SlideFadeIn(this, 10, Animations.Motion.Page);
+            _ = InitializeAsync();
+        };
         Closed += OnClosed;
     }
 

@@ -186,6 +186,18 @@ public partial class App : Application
         }
 
         ApplyAccent(accent);
+        BreatheAfterThemeSwap();
+    }
+
+    /// <summary>
+    /// 主题切换的「呼吸」：换字典是瞬时的，直接硬切会有一下白闪。
+    /// 换完把整窗从 0.85 淡回 1（220ms），看起来像眼睛适应了一下。
+    /// </summary>
+    private static void BreatheAfterThemeSwap()
+    {
+        if (Current?.MainWindow is not Window window) return;
+
+        Animations.Motion.FadeIn(window, Animations.Motion.Page, 0.85, 1);
     }
 
     /// <summary>Accent keys must be merged after the palette so they override its defaults.</summary>

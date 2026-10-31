@@ -543,7 +543,7 @@
                     </Border>
                 </Grid>
 
-                <TextBlock Grid.Row="2" Text="{Binding Status}" Style="{StaticResource CaptionText}"
+                <TextBlock Grid.Row="2" anim:TextFade.Text="{Binding Status}" Style="{StaticResource CaptionText}"
                            TextWrapping="Wrap" Margin="18,0,18,12"
                            AutomationProperties.AutomationId="CurseForgeDetailStatus"
                            Visibility="{Binding Status, Converter={StaticResource StringToVisibility}}" />
