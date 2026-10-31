@@ -1,4 +1,4 @@
-﻿<Application x:Class="Orion.App.App"
+<Application x:Class="Orion.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:Orion.App.Converters"
@@ -21,6 +21,7 @@
             <conv:EqualsToVisibilityConverter x:Key="EqualsToVisibility" />
             <conv:NotEqualsToVisibilityConverter x:Key="NotEqualsToVisibility" />
     <conv:StateToVisibilityConverter x:Key="StateToVisibility" />
+    <conv:ZeroToVisibilityConverter x:Key="ZeroToVisibility" />
 
             <!-- Implicit templates map view models onto views, so navigation stays pure MVVM. -->
             <DataTemplate DataType="{x:Type vm:HomeViewModel}">
@@ -32,7 +33,11 @@
             <DataTemplate DataType="{x:Type vm:InstancesViewModel}">
                 <views:InstancesView />
             </DataTemplate>
-            <DataTemplate DataType="{x:Type vm:ModsViewModel}">
+            <DataTemplate DataType="{x:Type vm:ContentViewModel}">
+            <views:ContentView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type vm:ModsViewModel}">
                 <views:ModsView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:DownloadsViewModel}">
