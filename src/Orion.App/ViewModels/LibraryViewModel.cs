@@ -24,7 +24,13 @@ public sealed class LibraryViewModel : ObservableObject
 
     public ICommand SelectTabCommand { get; }
 
-    public IReadOnlyList<string> Tabs { get; } = ["资源", "存档", "空间"];
+    /// <summary>左侧竖排页签：标题 + 图标（图标用启动器里已验证能渲染的 MDL2 字形）。</summary>
+    public IReadOnlyList<LibraryTab> Tabs { get; } =
+    [
+        new("资源", "\uE8F1"),
+        new("存档", "\uE8B7"),
+        new("空间", "\uE9D9"),
+    ];
 
     /// <summary>0 = 资源（资源包/光影/数据包），1 = 存档与截图，2 = 空间占用。</summary>
     public int TabIndex
@@ -85,3 +91,6 @@ public sealed class LibraryViewModel : ObservableObject
     /// <summary>侧栏点进来时按当前页签刷新一次。</summary>
     public Task RefreshAsync() => RefreshCurrentAsync();
 }
+
+/// <summary>左侧竖排页签的一项。</summary>
+public sealed record LibraryTab(string Title, string Glyph);

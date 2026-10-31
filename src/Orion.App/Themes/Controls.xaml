@@ -654,6 +654,41 @@
         </Setter>
     </Style>
 
+
+    <!-- 竖排分段控件：左侧侧栏用，滑块沿 Y 轴滑动 -->
+    <Style x:Key="VerticalSegmentedControl" TargetType="{x:Type controls:SegmentedControl}">
+        <Setter Property="Orientation" Value="Vertical" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical" />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type controls:SegmentedControl}">
+                    <Border CornerRadius="10" Padding="4"
+                            Background="{DynamicResource SurfaceAltBg}"
+                            BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1">
+                        <Grid>
+                            <Border x:Name="PART_Indicator" CornerRadius="8" Height="0" Opacity="0"
+                                    HorizontalAlignment="Stretch" VerticalAlignment="Top"
+                                    IsHitTestVisible="False"
+                                    Background="{DynamicResource AccentBrush}">
+                                <Border.RenderTransform>
+                                    <TranslateTransform />
+                                </Border.RenderTransform>
+                            </Border>
+                            <ItemsPresenter />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="{x:Type controls:SegmentedControl}">
         <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="ItemsPanel">

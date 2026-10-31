@@ -23,6 +23,23 @@ public class SegmentedControl : ItemsControl
         nameof(SelectedIndex), typeof(int), typeof(SegmentedControl),
         new FrameworkPropertyMetadata(-1, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnSelectedIndexChanged));
 
+    public static readonly DependencyProperty OrientationProperty = DependencyProperty.Register(
+        nameof(Orientation), typeof(Orientation), typeof(SegmentedControl),
+        new FrameworkPropertyMetadata(Orientation.Horizontal,
+            FrameworkPropertyMetadataOptions.AffectsMeasure, OnOrientationChanged));
+
+    /// <summary>Horizontal = 顶部横条；Vertical = 左侧竖条（滑块沿 Y 轴滑动）。</summary>
+    public Orientation Orientation
+    {
+        get => (Orientation)GetValue(OrientationProperty);
+        set => SetValue(OrientationProperty, value);
+    }
+
+    private static void OnOrientationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is SegmentedControl control) control.QueuePosition(animate: false);
+    }
+
     /// <summary>滑块与选项文字的间距、圆角都由模板提供，这里只负责"选中第几个"。</summary>
     public int SelectedIndex
     {
@@ -54,6 +71,13 @@ public class SegmentedControl : ItemsControl
         if (element is SegmentedItem container)
         {
             container.IsSelected = IndexOf(container) == SelectedIndex;
+
+            // 竖向模式左对齐、撑满宽度，横条模式居中（沿用容器默认值）
+            if (Orientation == Orientation.Vertical)
+            {
+                container.HorizontalContentAlignment = HorizontalAlignment.Left;
+                container.HorizontalAlignment = HorizontalAlignment.Stretch;
+            }
         }
     }
 
@@ -146,7 +170,17 @@ public class SegmentedControl : ItemsControl
 
         UpdateLayout();
         var origin = active.TranslatePoint(new Point(0, 0), this);
-        _indicator.Width = active.ActualWidth;
+        var vertical = Orientation == Orientation.Vertical;
+
+        if (vertical)
+        {
+            _indicator.Height = active.ActualHeight;
+            _indicator.Width = double.NaN;      // 竖向时宽度由模板拉伸
+        }
+        else
+        {
+            _indicator.Width = active.ActualWidth;
+        }
 
         // 模板里的 TranslateTransform 是共享且已冻结的，动它必然抛"对象已密封"。
         // 每个控件实例自己 new 一个可动画的 transform。
@@ -157,17 +191,21 @@ public class SegmentedControl : ItemsControl
         }
         _translate = translate;
 
+        var axis = vertical ? TranslateTransform.YProperty : TranslateTransform.XProperty;
+        var offset = vertical ? origin.Y : origin.X;
+
         if (!animate)
         {
-            _translate.BeginAnimation(TranslateTransform.XProperty, null);
-            _translate.X = origin.X;
+            _translate.BeginAnimation(axis, null);
+            if (vertical) _translate.Y = offset;
+            else _translate.X = offset;
             _indicator.Opacity = 1;
             return;
         }
 
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         var duration = new Duration(TimeSpan.FromMilliseconds(200));
-        _translate.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(origin.X, duration) { EasingFunction = ease });
+        _translate.BeginAnimation(axis, new DoubleAnimation(offset, duration) { EasingFunction = ease });
         _indicator.BeginAnimation(OpacityProperty, new DoubleAnimation(1, duration));
     }
 }
