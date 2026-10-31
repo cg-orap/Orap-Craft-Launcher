@@ -7,6 +7,15 @@ namespace Orion.App.Views;
 public partial class HomeView : UserControl
 {
     public HomeView() => InitializeComponent();
+
+    /// <summary>氛围动效：点启动游戏时按钮脉冲一次（ReduceMotion 时自动跳过）。</summary>
+    private void OnLaunchClick(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (sender is System.Windows.FrameworkElement button)
+        {
+            Animations.Motion.Pulse(button, peak: 1.04, milliseconds: 280);
+        }
+    }
 }
 
 public partial class VersionsView : UserControl

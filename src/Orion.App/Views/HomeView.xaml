@@ -1,4 +1,4 @@
-<UserControl x:Class="Orion.App.Views.HomeView"
+﻿<UserControl x:Class="Orion.App.Views.HomeView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -118,7 +118,9 @@
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
-                            <Button Style="{StaticResource LaunchPrimary}" Command="{Binding LaunchCommand}"
+                            <Button x:Name="LaunchButton" Style="{StaticResource LaunchPrimary}"
+                                    Command="{Binding LaunchCommand}"
+                                    Click="OnLaunchClick"
                                     AutomationProperties.AutomationId="LaunchButton">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"

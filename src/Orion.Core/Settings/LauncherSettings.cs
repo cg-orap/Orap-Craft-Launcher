@@ -35,6 +35,9 @@ public sealed class LauncherSettings
     [JsonPropertyName("closeLauncherOnGameStart")] public bool CloseLauncherOnGameStart { get; set; }
     [JsonPropertyName("forceUtf8Console")] public bool ForceUtf8Console { get; set; } = true;
 
+    /// <summary>减少动效：关闭位移/缩放，只保留极短的透明度过渡（无障碍设置）。</summary>
+    [JsonPropertyName("reduceMotion")] public bool ReduceMotion { get; set; }
+
     [JsonPropertyName("microsoftClientId")] public string? MicrosoftClientId { get; set; }
     [JsonPropertyName("selectedAccountId")] public string? SelectedAccountId { get; set; }
     [JsonPropertyName("lastInstanceId")] public string? LastInstanceId { get; set; }

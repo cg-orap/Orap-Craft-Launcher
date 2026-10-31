@@ -146,6 +146,18 @@
 
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
+                                <TextBlock Text="动效" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="关闭后只保留必要的淡入淡出，不做位移和缩放（更容易集中注意力）。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                                <CheckBox Content="减少动效" IsChecked="{Binding ReduceMotion, Mode=TwoWay}"
+                                          Margin="0,10,0,0" AutomationProperties.AutomationId="ReduceMotionToggle" />
+                                <TextBlock Text="系统关闭了「显示动画」时，这里也会自动按减少动效处理。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
                                 <TextBlock Text="主题色" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="用于按钮、选中态与强调文字。" Style="{StaticResource CaptionText}" />
                                 <ItemsControl ItemsSource="{Binding Accents}" Margin="0,12,0,0">

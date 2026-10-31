@@ -156,6 +156,19 @@ public sealed class SettingsViewModel : ObservableObject
         set => SetProperty(ref _proxyUrl, value);
     }
 
+    /// <summary>减少动效开关：改动立即生效。</summary>
+    public bool ReduceMotion
+    {
+        get => _reduceMotion;
+        set
+        {
+            if (!SetProperty(ref _reduceMotion, value)) return;
+            Animations.Motion.ReduceMotion = value;
+        }
+    }
+
+    private bool _reduceMotion;
+
     public string Theme
     {
         get => _theme;
@@ -235,6 +248,8 @@ public sealed class SettingsViewModel : ObservableObject
 
         JavaPath = settings.JavaPath ?? "";
         MemoryMb = settings.MemoryMb;
+        _reduceMotion = settings.ReduceMotion;
+        Animations.Motion.ReduceMotion = settings.ReduceMotion;
         MinMemoryMb = settings.MinMemoryMb;
         MaxConcurrency = settings.MaxConcurrency;
         Source = settings.Source;
@@ -254,6 +269,7 @@ public sealed class SettingsViewModel : ObservableObject
 
         settings.JavaPath = string.IsNullOrWhiteSpace(JavaPath) ? null : JavaPath.Trim();
         settings.MemoryMb = MemoryMb;
+        settings.ReduceMotion = ReduceMotion;
         settings.MinMemoryMb = MinMemoryMb;
         settings.MaxConcurrency = MaxConcurrency;
         settings.Source = Source;

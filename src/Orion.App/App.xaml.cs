@@ -42,6 +42,7 @@ public partial class App : Application
             Shell = viewModel;
 
             ApplyTheme(_context.Settings.Theme, _context.Settings.Accent);
+        Animations.Motion.ReduceMotion = _context.Settings.ReduceMotion;
 
             window.DataContext = viewModel;
             window.Show();
