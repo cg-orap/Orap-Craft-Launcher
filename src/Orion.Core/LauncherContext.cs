@@ -144,12 +144,17 @@ public sealed class LauncherContext : IAsyncDisposable
     /// <summary>Portable mode (a <c>portable.txt</c> beside the executable) stores data next to the EXE.</summary>
     public static string DefaultRootDirectory()
     {
-        var baseDirectory = AppContext.BaseDirectory;
-        if (File.Exists(Path.Combine(baseDirectory, "portable.txt")))
-            return Path.Combine(baseDirectory, "data");
+        // 注意：单文件发布（尤其是 IncludeAllContentForSelfExtract）时，AppContext.BaseDirectory
+        // 可能指向 **临时解包目录**（%TEMP%\.net\...），而不是 exe 所在的文件夹。
+        // 用它去找 portable.txt 会让"便携模式"静默失效、数据仍然跑到 %APPDATA%。
+        // Environment.ProcessPath 才是真正的 exe 路径，这里以它为准。
+        var exeDirectory = ResolveExecutableDirectory();
+
+        if (File.Exists(Path.Combine(exeDirectory, "portable.txt")))
+            return Path.Combine(exeDirectory, "data");
 
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        if (string.IsNullOrWhiteSpace(appData)) appData = baseDirectory;
+        if (string.IsNullOrWhiteSpace(appData)) appData = exeDirectory;
 
         var current = Path.Combine(appData, "OrapCraftLauncher");
 
@@ -159,6 +164,35 @@ public sealed class LauncherContext : IAsyncDisposable
         if (!Directory.Exists(current) && Directory.Exists(legacy)) return legacy;
 
         return current;
+    }
+
+    /// <summary>测试用：按指定的 exe 目录计算数据根目录（生产路径见 <see cref="DefaultRootDirectory"/>）。</summary>
+    internal static string ResolveRootForTests(string exeDirectory)
+    {
+        if (File.Exists(Path.Combine(exeDirectory, "portable.txt")))
+            return Path.Combine(exeDirectory, "data");
+
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (string.IsNullOrWhiteSpace(appData)) appData = exeDirectory;
+
+        var current = Path.Combine(appData, "OrapCraftLauncher");
+        var legacy = Path.Combine(appData, "OrionLauncher");
+        if (!Directory.Exists(current) && Directory.Exists(legacy)) return legacy;
+
+        return current;
+    }
+
+    /// <summary>真正的 exe 所在目录（单文件发布下也不受临时解包目录影响）。</summary>
+    private static string ResolveExecutableDirectory()
+    {
+        var processPath = Environment.ProcessPath;
+        if (!string.IsNullOrWhiteSpace(processPath))
+        {
+            var directory = Path.GetDirectoryName(processPath);
+            if (!string.IsNullOrWhiteSpace(directory)) return directory;
+        }
+
+        return AppContext.BaseDirectory;
     }
 
     /// <summary>Registers version roots of imported instances so their versions can be launched.</summary>
