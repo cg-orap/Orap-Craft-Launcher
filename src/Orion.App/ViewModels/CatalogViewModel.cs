@@ -47,6 +47,12 @@ public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, 
 
     public string DownloadsText => Project.Downloads > 0 ? $"{Project.Downloads:N0} 次下载" : "";
 
+    /// <summary>统一列表模板用：作者。</summary>
+    public string AuthorText => Author;
+
+    /// <summary>统一列表模板用：无更新时间时留空。</summary>
+    public string UpdatedText => "";
+
     public string KindLabel => Kind.Name;
 
     public string CategoryText => Project.Categories.Count == 0
@@ -97,6 +103,14 @@ public sealed class CurseForgeRow(Orion.Core.Mods.CurseForgePack pack, CatalogVi
     public string Description => Pack.Summary;
     public string DownloadsText => Pack.Downloads > 0 ? $"{Pack.Downloads:N0} 次下载" : "";
     public string KindLabel => owner.KindNameOf(Kind);
+
+    /// <summary>统一列表模板用（CurseForge 搜索接口不返回作者，留空）。</summary>
+    public string AuthorText => "";
+
+    /// <summary>统一列表模板用：最后更新时间。</summary>
+    public string UpdatedText => Pack.Updated is { } updated
+        ? $"更新 {updated.ToLocalTime():yyyy-MM-dd}"
+        : "";
 
     public ICommand InstallCommand => new AsyncRelayCommand(() => owner.InstallCurseForgeItemAsync(this), null,
         ex => owner.Status = "安装失败: " + ex.Message);
@@ -276,6 +290,97 @@ public sealed class CatalogViewModel : ObservableObject
 
     /// <summary>搜索范围：0 = 按当前实例的 MC 版本过滤，1 = 不限版本。</summary>
     public IReadOnlyList<string> SearchScopes { get; } = ["按当前版本", "不限版本"];
+
+    /// <summary>排序方式（两个来源各自映射到自己的排序字段）。</summary>
+    public IReadOnlyList<string> SortOptions { get; } = ["相关度", "下载量", "最新更新"];
+
+    private int _sortIndex;
+
+    public int SortIndex
+    {
+        get => _sortIndex;
+        set
+        {
+            if (!SetProperty(ref _sortIndex, Math.Clamp(value, 0, 2))) return;
+            _ = RerunSearchAsync();
+        }
+    }
+
+    /// <summary>加载器筛选：不限 / Forge / NeoForge / Fabric / Quilt。</summary>
+    public IReadOnlyList<string> LoaderOptions { get; } = ["不限加载器", "Forge", "NeoForge", "Fabric", "Quilt"];
+
+    private int _loaderIndex;
+
+    public int LoaderIndex
+    {
+        get => _loaderIndex;
+        set
+        {
+            if (!SetProperty(ref _loaderIndex, Math.Clamp(value, 0, LoaderOptions.Count - 1))) return;
+            _ = RerunSearchAsync();
+        }
+    }
+
+    /// <summary>当前来源/类型对应的 CurseForge 排序字段。</summary>
+    private int CurseForgeSortField => SortIndex switch { 1 => 6, 2 => 3, _ => 2 };
+
+    /// <summary>当前选中的加载器（Modrinth 用 LoaderKind，CurseForge 用 modLoaderType）。</summary>
+    private Core.Instances.LoaderKind? SelectedLoader => LoaderIndex switch
+    {
+        1 => Core.Instances.LoaderKind.Forge,
+        2 => Core.Instances.LoaderKind.NeoForge,
+        3 => Core.Instances.LoaderKind.Fabric,
+        4 => Core.Instances.LoaderKind.Quilt,
+        _ => null,
+    };
+
+    private int? SelectedLoaderType => SelectedLoader is { } loader
+        ? Orion.Core.Mods.CurseForgeClient.LoaderTypeOf(loader)
+        : null;
+
+    /// <summary>CurseForge 的分类是数字 id：按类型拉一次分类表，把选中项的名字映射成 id。</summary>
+    private readonly Dictionary<string, Dictionary<string, int>> _cfCategoryIds = new(StringComparer.OrdinalIgnoreCase);
+
+    private async Task<int?> ResolveCurseForgeCategoryIdAsync(Orion.Core.Mods.CurseForgeKind kind)
+    {
+        if (string.IsNullOrWhiteSpace(SelectedCategory)) return null;
+
+        var key = kind.ToString();
+        if (!_cfCategoryIds.TryGetValue(key, out var map))
+        {
+            map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (var (id, name) in await _main.Context.CurseForge.GetCategoriesAsync(kind).ConfigureAwait(true))
+                {
+                    map[name] = id;
+                }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                return null;
+            }
+
+            _cfCategoryIds[key] = map;
+        }
+
+        return map.TryGetValue(SelectedCategory, out var categoryId) ? categoryId : null;
+    }
+
+    /// <summary>换了排序/筛选就回到第一页重搜（只重搜当前来源）。</summary>
+    private async Task RerunSearchAsync()
+    {
+        try
+        {
+            if (IsCurseForgeSource) await SearchCurseForgeAsync(0).ConfigureAwait(true);
+            else await SearchAsync(0, forceRefresh: true).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Status = "重新搜索失败: " + ex.Message;
+        }
+    }
+
 
     private int _scopeIndex;
 
@@ -473,7 +578,7 @@ public sealed class CatalogViewModel : ObservableObject
         {
             var normalized = string.IsNullOrWhiteSpace(value) ? null : value;
             if (!SetProperty(ref _category, normalized)) return;
-            _ = SearchAsync(0);
+            _ = RerunSearchAsync();
         }
     }
 
@@ -578,7 +683,12 @@ public sealed class CatalogViewModel : ObservableObject
                 Category = _category,
                 Limit = PageSize,
                 Offset = page * PageSize,
-                SortBy = string.IsNullOrWhiteSpace(SearchText) ? "downloads" : "relevance",
+                SortBy = SortIndex switch
+                {
+                    1 => "downloads",
+                    2 => "updated",
+                    _ => string.IsNullOrWhiteSpace(SearchText) ? "downloads" : "relevance",
+                },
             };
 
             // Mods must match the selected version *and* loader; shaders and resource packs have no
@@ -593,6 +703,12 @@ public sealed class CatalogViewModel : ObservableObject
                 {
                     query.Loader = instance.Loader;
                 }
+            }
+
+            // 显式选择的加载器优先于实例推断
+            if (SelectedLoader is { } explicitLoader)
+            {
+                query.Loader = explicitLoader;
             }
 
             var result = await _main.Context.Modrinth.SearchAsync(query, token).ConfigureAwait(true);
@@ -1249,8 +1365,12 @@ public sealed class CatalogViewModel : ObservableObject
             var instance = _main.CurrentInstance;
             var versionFilter = IsVersionFiltered ? instance?.GameVersion : null;
 
+            var categoryId = await ResolveCurseForgeCategoryIdAsync(kind).ConfigureAwait(true);
+
             var result = await _main.Context.CurseForge
-                .SearchPageAsync(kind, SearchText, versionFilter, page, PageSize)
+                .SearchPageAsync(kind, SearchText, versionFilter, page, PageSize,
+                    ct: default, sortField: CurseForgeSortField,
+                    categoryId: categoryId, modLoaderType: SelectedLoaderType)
                 .ConfigureAwait(true);
 
             var packs = result.Packs;

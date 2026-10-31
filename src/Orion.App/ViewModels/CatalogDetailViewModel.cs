@@ -71,7 +71,7 @@ public sealed class CatalogDetailViewModel : ObservableObject
         }
 
         // Modrinth returns markdown; headings and images are stripped to keep it readable.
-        Description = ToPlainText(project.Body);
+        _originalDescription = ToPlainText(project.Body);
     }
 
     public ModrinthProject Project { get; }
@@ -92,7 +92,87 @@ public sealed class CatalogDetailViewModel : ObservableObject
 
     public string CategoryText => Project.Categories.Count == 0 ? "" : string.Join(" · ", Project.Categories);
 
-    public string Description { get; }
+    private readonly string _originalDescription;
+    private string? _translated;
+    private bool _showTranslated;
+    private bool _isTranslating;
+    private string _translationStatus = "";
+
+    /// <summary>原文 / 译文切换后的描述。</summary>
+    public string Description => _showTranslated && _translated is { Length: > 0 }
+        ? _translated
+        : _originalDescription;
+
+    public bool IsTranslated => _showTranslated && _translated is { Length: > 0 };
+
+    public bool IsTranslating
+    {
+        get => _isTranslating;
+        private set
+        {
+            if (!SetProperty(ref _isTranslating, value)) return;
+            ((AsyncRelayCommand)TranslateCommand).RaiseCanExecuteChanged();
+        }
+    }
+
+    public string TranslateLabel => _translated is { Length: > 0 }
+        ? (IsTranslated ? "显示原文" : "显示译文")
+        : "翻译成中文";
+
+    public string TranslationStatus
+    {
+        get => _translationStatus;
+        private set => SetProperty(ref _translationStatus, value);
+    }
+
+    public ICommand TranslateCommand => new AsyncRelayCommand(ToggleTranslationAsync, () => !IsTranslating);
+
+    private async Task ToggleTranslationAsync()
+    {
+        if (_translated is { Length: > 0 })
+        {
+            _showTranslated = !_showTranslated;
+            RaiseTranslationState();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_originalDescription))
+        {
+            TranslationStatus = "这个项目没有可翻译的描述。";
+            return;
+        }
+
+        TranslationStatus = "正在翻译…（MyMemory，非大模型，长文会分段）";
+        IsTranslating = true;
+
+        string? result;
+        try
+        {
+            result = await _main.Context.Translator.TranslateAsync(_originalDescription).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsTranslating = false;
+        }
+
+        if (result is null)
+        {
+            TranslationStatus = _main.Context.Translator.LastError ?? "翻译失败。";
+            return;
+        }
+
+        _translated = result;
+        _showTranslated = true;
+        TranslationStatus = "已翻译（机器翻译，仅供理解，安装前请以原文为准）";
+        RaiseTranslationState();
+    }
+
+    private void RaiseTranslationState()
+    {
+        OnPropertyChanged(nameof(Description));
+        OnPropertyChanged(nameof(IsTranslated));
+        OnPropertyChanged(nameof(TranslateLabel));
+    }
 
     public ObservableList<CatalogVersionRow> Versions { get; } = [];
 

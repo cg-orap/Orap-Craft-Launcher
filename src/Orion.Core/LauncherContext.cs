@@ -63,6 +63,7 @@ public sealed class LauncherContext : IAsyncDisposable
         // Declared but never constructed: the CurseForge/zip dispatch threw a
         // NullReferenceException the first time it ran.
         CurseForge = new Mods.CurseForgeClient(http, settings.CurseForgeApiKey);
+        Translator = new Translation.TranslationService(http);
         DependencyRepair = new Mods.ModDependencyRepair(CurseForge, http);
         PackArchives = new Mods.PackArchiveInstaller(paths, Instances, Loaders, Importer, http, settings.CurseForgeApiKey,
             DependencyRepair);
@@ -97,6 +98,9 @@ public sealed class LauncherContext : IAsyncDisposable
 
     /// <summary>CurseForge 整合包浏览/下载（没有 Key 时 HasKey 为 false）。</summary>
     public CurseForgeClient CurseForge { get; }
+
+    /// <summary>英文 → 简体中文的机器翻译（MyMemory 翻译记忆库，非大模型）。</summary>
+    public Translation.TranslationService Translator { get; }
 
     /// <summary>缺前置检测与自动补齐（安装整合包后自动跑一次，模组页也能手动触发）。</summary>
     public Mods.ModDependencyRepair DependencyRepair { get; }

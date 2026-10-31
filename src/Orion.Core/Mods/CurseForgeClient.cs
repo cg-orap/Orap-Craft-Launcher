@@ -90,7 +90,7 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
     /// </summary>
     public async Task<CurseForgePage> SearchPageAsync(
         CurseForgeKind kind, string? query, string? gameVersion, int index = 0, int pageSize = 20,
-        CancellationToken ct = default)
+        CancellationToken ct = default, int sortField = 2, int? categoryId = null, int? modLoaderType = null)
     {
         if (!HasKey) return new CurseForgePage(Array.Empty<CurseForgePack>(), 0, 0, pageSize);
 
@@ -98,10 +98,12 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         var offset = Math.Max(0, index) * size;
 
         var url = $"{Base}mods/search?gameId={GameMinecraft}&classId={(int)kind}" +
-                  $"&sortField=2&sortOrder=desc&pageSize={size}&index={offset}";
+                  $"&sortField={Math.Max(1, sortField)}&sortOrder=desc&pageSize={size}&index={offset}";
 
         if (!string.IsNullOrWhiteSpace(query)) url += "&searchFilter=" + Uri.EscapeDataString(query.Trim());
         if (!string.IsNullOrWhiteSpace(gameVersion)) url += "&gameVersion=" + Uri.EscapeDataString(gameVersion.Trim());
+        if (categoryId is > 0) url += "&categoryId=" + categoryId.Value;
+        if (modLoaderType is > 0) url += "&modLoaderType=" + modLoaderType.Value;
 
         // 搜索是 GET（官方文档：GET /v1/mods/search），用 POST 会 405 然后静默空结果
         using var response = await SendAsync(HttpMethod.Get, url, ct).ConfigureAwait(false);
@@ -113,6 +115,39 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         var total = payload.Pagination?.TotalCount ?? payload.Pagination?.ResultCount ?? payload.Data.Count;
         return new CurseForgePage([.. payload.Data.Select(ToPack)], total, index, size);
     }
+
+    /// <summary>某个内容类型的分类列表（按 classId 过滤掉别的类型）。</summary>
+    public async Task<IReadOnlyList<(int Id, string Name)>> GetCategoriesAsync(
+        CurseForgeKind kind, CancellationToken ct = default)
+    {
+        if (!HasKey) return [];
+
+        using var response = await SendAsync(
+            HttpMethod.Get, $"{Base}categories?gameId={GameMinecraft}&classId={(int)kind}", ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return [];
+
+        try
+        {
+            var payload = await response.Content
+                .ReadFromJsonAsync<DataResponse<List<CategoryItemDto>>>(JsonOptions, ct).ConfigureAwait(false);
+
+            return payload?.Data is null
+                ? []
+                : [.. payload.Data
+                    .Where(c => c.ClassId is null || c.ClassId == (int)kind)
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Name))
+                    .Select(c => (c.Id, c.Name!))];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+
+    private sealed record CategoryItemDto(
+        [property: JsonPropertyName("id")] int Id,
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("classId")] int? ClassId);
 
     /// <summary>按 projectId 取一个项目（已知发行版提示用）。</summary>
     public async Task<CurseForgePack?> GetPackAsync(int modId, CancellationToken ct = default)
