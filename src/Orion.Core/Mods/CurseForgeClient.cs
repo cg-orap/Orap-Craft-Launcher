@@ -316,6 +316,37 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         return best;
     }
 
+    /// <summary>
+    /// 按 (projectID, fileID) 取单个文件元数据。
+    ///
+    /// 整合包的 manifest 只有 id 对，没有文件名；作者又可能禁止 API 直接下载（download-url 返回 403）。
+    /// 这时只有先拿到 fileName 才能拼 ForgeCDN 链接——这就是"PCL 能下、我们下不了"的那批文件。
+    /// </summary>
+    public async Task<CurseForgeFile?> GetFileAsync(int projectId, int fileId, CancellationToken ct = default)
+    {
+        if (!HasKey) return null;
+
+        var url = $"{Base}mods/{projectId}/files/{fileId}";
+
+        try
+        {
+            using var response = await SendAsync(HttpMethod.Get, url, ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var payload = await response.Content.ReadFromJsonAsync<DataResponse<CurseForgeFileDto>>(JsonOptions, ct)
+                .ConfigureAwait(false);
+            var dto = payload?.Data;
+            if (dto is null || string.IsNullOrWhiteSpace(dto.FileName)) return null;
+
+            return new CurseForgeFile(dto.ModId, dto.Id, dto.FileName, dto.DisplayName, dto.DownloadUrl,
+                dto.GameVersions);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>官方下载地址（文件元数据里没有时需要再问一次接口）。</summary>
     public async Task<string?> GetDownloadUrlAsync(CurseForgeFile file, CancellationToken ct = default)
     {

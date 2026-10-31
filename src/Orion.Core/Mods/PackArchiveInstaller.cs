@@ -258,7 +258,19 @@ public sealed class PackArchiveInstaller
             await CheckAndRepairDependenciesAsync(instance, info.MinecraftVersion,
                 CurseForgeClient.LoaderTypeOf(info.Loader), warnings, output, ct).ConfigureAwait(false);
 
-            output?.Report($"整合包已安装：{name}（{downloaded} 个模组，{overridesCopied} 个配置文件）");
+            // 有文件没下下来时不能只说"已安装"：用户看到的就是启动后"缺前置"的红字。
+            if (unresolved.Count > 0)
+            {
+                output?.Report($"整合包不完整：{downloaded}/{files.Count} 个模组下载成功，{unresolved.Count} 个失败。");
+                warnings.Add($"整合包不完整：{unresolved.Count} 个文件没下载下来（启动会报缺前置）。");
+            }
+            else
+            {
+                output?.Report($"整合包已安装：{name}（{downloaded} 个模组，{overridesCopied} 个配置文件）");
+            }
+
+            await WriteInstallReportAsync(instance.GameDirectory, name, files.Count, downloaded, unresolved)
+                .ConfigureAwait(false);
 
             var result = new MrPackResult
             {
@@ -487,6 +499,31 @@ public sealed class PackArchiveInstaller
         }
     }
 
+    /// <summary>
+    /// 把安装结果写到 &lt;gameDir&gt;/.orap-install-report.json：
+    /// 下次"为什么缺模组"可以直接看这个文件，不用再猜。
+    /// </summary>
+    private static async Task WriteInstallReportAsync(
+        string gameDirectory, string packName, int total, int downloaded, IReadOnlyList<string> unresolved)
+    {
+        try
+        {
+            await Orion.Core.Util.JsonUtil.WriteFileAsync(Path.Combine(gameDirectory, ".orap-install-report.json"), new
+            {
+                generatedAt = DateTimeOffset.Now,
+                pack = packName,
+                totalFiles = total,
+                downloaded,
+                failed = unresolved.Count,
+                failures = unresolved,
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 报告写不出来不影响安装
+        }
+    }
+
     /// <summary>删除下载失败留下的半截文件（失败也无所谓）。</summary>
     private static void TryDeleteFile(string path)
     {
@@ -608,13 +645,13 @@ public sealed class PackArchiveInstaller
             : Path.GetFileName(file.FileName!.Trim('"'));
 
         var candidates = new List<string>();
-        if (!string.IsNullOrWhiteSpace(file.FileName))
+
+        void AddCdnCandidates(string? fileName)
         {
-            var bucket = file.FileId / 1000;
-            var escaped = Uri.EscapeDataString(name);
-            candidates.Add($"https://mediafilez.forgecdn.net/files/{bucket}/{file.FileId % 1000}/{escaped}");
-            candidates.Add($"https://edge.forgecdn.net/files/{bucket}/{file.FileId % 1000}/{escaped}");
+            foreach (var url in CurseForgeCdn.Urls((int)file.FileId, fileName)) candidates.Add(url);
         }
+
+        AddCdnCandidates(file.FileName);
 
         candidates.Add($"https://www.curseforge.com/api/v1/mods/{file.ProjectId}/files/{file.FileId}/download");
 
@@ -683,6 +720,96 @@ public sealed class PackArchiveInstaller
                 // 半截文件（超时/断流）必须删掉，否则会留在 mods 里让 Forge 启动失败
                 TryDeleteFile(target);
             }
+
+        // 文件名缺失或所有候选都失败：用 API 把文件名问出来，再走一次 ForgeCDN。
+
+        // 整合包的 manifest 只有 id 对，作者又可能禁止 API 直接下载（download-url 403），
+
+        // 没有文件名就完全拼不出 CDN 链接——PCL 这类启动器也是先查文件名再拼。
+
+        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey) && string.IsNullOrWhiteSpace(file.FileName))
+
+        {
+
+            var metaClient = new CurseForgeClient(_http, _curseForgeApiKey);
+            var meta = await metaClient.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct).ConfigureAwait(false);
+
+        
+
+            if (meta is not null && !string.IsNullOrWhiteSpace(meta.FileName))
+
+            {
+
+                name = Path.GetFileName(meta.FileName.Trim('"'));
+
+                target = Path.Combine(modsDirectory, name);
+
+        
+
+                foreach (var cdn in CurseForgeCdn.Urls((int)file.FileId, name))
+
+                {
+
+                    try
+
+                    {
+
+                        using var retryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+                        retryCts.CancelAfter(TimeSpan.FromSeconds(240));
+
+        
+
+                        using var retryResponse = await _http
+
+                            .GetAsync(cdn, HttpCompletionOption.ResponseHeadersRead, retryCts.Token).ConfigureAwait(false);
+
+                        if (!retryResponse.IsSuccessStatusCode) continue;
+
+        
+
+                        await using (var stream = await retryResponse.Content.ReadAsStreamAsync(retryCts.Token).ConfigureAwait(false))
+
+                        await using (var destination = File.Create(target))
+
+                        {
+
+                            await stream.CopyToAsync(destination, retryCts.Token).ConfigureAwait(false);
+
+                        }
+
+        
+
+                        if (!LooksLikeZip(target))
+
+                        {
+
+                            try { File.Delete(target); } catch (IOException) { }
+
+                            continue;
+
+                        }
+
+        
+
+                        return true;
+
+                    }
+
+                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+
+                    {
+
+                        // 继续试下一个 CDN 域名
+
+                    }
+
+                }
+
+            }
+
+        }
+
         }
 
         unresolved.Enqueue($"{name}  →  https://www.curseforge.com/projects/{file.ProjectId}/files/{file.FileId}");
