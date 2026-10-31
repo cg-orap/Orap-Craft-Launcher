@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:Orion.App.Controls"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="760" d:DesignWidth="1120">
 
@@ -36,7 +37,7 @@
                                    AutomationProperties.AutomationId="ToolboxTabs" />
 
         <!-- ===== 种子地图（离线） ===== -->
-        <Grid Grid.Row="2" Visibility="{Binding IsSeedTab, Converter={StaticResource BoolToVisibility}}"
+        <Grid Grid.Row="2" Visibility="{Binding IsSeedTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsSeedTab}" anim:ContentTransition.Offset="6"
               PreviewMouseWheel="OnSeedPageWheel" PreviewKeyDown="OnSeedPageKeyDown" Focusable="True">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="296" />
@@ -183,7 +184,7 @@
         </Grid>
 
         <!-- ===== 查看截图 ===== -->
-        <Grid Grid.Row="2" Visibility="{Binding IsScreenshotsTab, Converter={StaticResource BoolToVisibility}}">
+        <Grid Grid.Row="2" Visibility="{Binding IsScreenshotsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsScreenshotsTab}" anim:ContentTransition.Offset="6">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -249,7 +250,7 @@
 
         <!-- ===== 游戏默认设置 ===== -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-                      Visibility="{Binding IsDefaultsTab, Converter={StaticResource BoolToVisibility}}">
+                      Visibility="{Binding IsDefaultsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsDefaultsTab}" anim:ContentTransition.Offset="6">
             <StackPanel>
                 <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                     <StackPanel>

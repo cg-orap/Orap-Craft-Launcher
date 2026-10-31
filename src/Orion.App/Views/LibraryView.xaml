@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:Orion.App.Controls"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1120">
 
@@ -73,6 +74,8 @@
         </Border>
 
         <!-- 右侧：当前子页（资源 / 存档 / 空间），各自滚动 -->
-        <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" />
+        <ContentControl Grid.Column="1" Content="{Binding CurrentPage}"
+                           anim:ContentTransition.Watch="{Binding TabIndex}"
+                           anim:ContentTransition.Offset="8" />
     </Grid>
 </UserControl>

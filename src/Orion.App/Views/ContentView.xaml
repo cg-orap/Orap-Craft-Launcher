@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:Orion.App.Controls"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1120">
 
@@ -59,7 +60,7 @@
             </Border>
 
             <!-- ===== 资源包 ===== -->
-            <StackPanel Visibility="{Binding IsPacksTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Visibility="{Binding IsPacksTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsPacksTab}" anim:ContentTransition.Offset="6">
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
                         <Grid>
@@ -136,7 +137,7 @@
             </StackPanel>
 
             <!-- ===== 光影 ===== -->
-            <StackPanel Visibility="{Binding IsShadersTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Visibility="{Binding IsShadersTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsShadersTab}" anim:ContentTransition.Offset="6">
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
                         <Grid>
@@ -203,7 +204,7 @@
             </StackPanel>
 
             <!-- ===== 数据包 ===== -->
-            <StackPanel Visibility="{Binding IsDatapacksTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Visibility="{Binding IsDatapacksTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsDatapacksTab}" anim:ContentTransition.Offset="6">
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
                         <Grid>

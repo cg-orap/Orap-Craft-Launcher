@@ -22,7 +22,6 @@ public partial class MainWindow : Window
             {
                 vm.PropertyChanged += (_, args) =>
                 {
-                    if (args.PropertyName == nameof(ViewModels.MainViewModel.CurrentPage)) AnimatePage();
                 };
             }
         };
@@ -109,22 +108,6 @@ public partial class MainWindow : Window
 
     private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)
         => WindowState = WindowState.Minimized;
-
-    /// <summary>页面切换动效：220ms 淡入 + 8px 上移，节奏与设计稿一致。</summary>
-    private void AnimatePage()
-    {
-        var duration = new Duration(TimeSpan.FromMilliseconds(220));
-        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
-
-        var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, duration) { EasingFunction = ease };
-        PageHost.BeginAnimation(OpacityProperty, fade);
-
-        var slide = new System.Windows.Media.Animation.DoubleAnimation(8, 0, duration) { EasingFunction = ease };
-        if (PageHost.RenderTransform is System.Windows.Media.TranslateTransform translate)
-        {
-            translate.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, slide);
-        }
-    }
 
     /// <summary>让指示条滑到当前选中的导航项旁边（200ms，CubicEase）。</summary>
     private void OnNavSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

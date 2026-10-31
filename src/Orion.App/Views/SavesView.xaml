@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:Orion.App.Controls"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1120">
 
@@ -58,7 +59,7 @@
             </Border>
 
             <!-- ===== 存档 ===== -->
-            <StackPanel Visibility="{Binding IsWorldsTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Visibility="{Binding IsWorldsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsWorldsTab}" anim:ContentTransition.Offset="6">
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
                         <Grid>
@@ -154,7 +155,7 @@
             </StackPanel>
 
             <!-- ===== 截图 ===== -->
-            <StackPanel Visibility="{Binding IsScreenshotsTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Visibility="{Binding IsScreenshotsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsScreenshotsTab}" anim:ContentTransition.Offset="6">
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
                         <Grid>

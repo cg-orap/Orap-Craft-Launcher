@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:controls="clr-namespace:Orion.App.Controls"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1120">
 
@@ -114,7 +115,7 @@
 
             <!-- ===== 概览 ===== -->
             <Grid Margin="0,14,0,0"
-                  Visibility="{Binding IsOverviewTab, Converter={StaticResource BoolToVisibility}}">
+                  Visibility="{Binding IsOverviewTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsOverviewTab}" anim:ContentTransition.Offset="6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="300" />
@@ -195,7 +196,7 @@
 
             <!-- ===== 模组 ===== -->
             <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
-                    Visibility="{Binding IsModsTab, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding IsModsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsModsTab}" anim:ContentTransition.Offset="6">
                 <StackPanel>
                     <TextBlock Text="模组" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
                     <TextBlock Text="这个版本的模组在「模组」页面里集中管理：启用 / 禁用、删除、从 Modrinth 安装。"
@@ -209,7 +210,7 @@
 
             <!-- ===== 存档 ===== -->
             <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
-                    Visibility="{Binding IsSavesTab, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding IsSavesTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsSavesTab}" anim:ContentTransition.Offset="6">
                 <StackPanel>
                     <TextBlock Text="存档" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
                     <TextBlock Text="存档位于该版本的 saves 目录，和其他版本完全隔离。"
@@ -222,7 +223,7 @@
 
             <!-- ===== 日志 ===== -->
             <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
-                    Visibility="{Binding IsLogsTab, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding IsLogsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsLogsTab}" anim:ContentTransition.Offset="6">
                 <StackPanel>
                     <TextBlock Text="日志" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
                     <TextBlock Text="启动与崩溃日志在「日志」页面查看：支持级别筛选、搜索与崩溃报告归档。"
@@ -236,7 +237,7 @@
 
             <!-- ===== 快照 ===== -->
             <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
-                    Visibility="{Binding IsSnapshotTab, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding IsSnapshotTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsSnapshotTab}" anim:ContentTransition.Offset="6">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -390,7 +391,7 @@
 
             <!-- ===== 设置 ===== -->
             <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
-                    Visibility="{Binding IsSettingsTab, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding IsSettingsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsSettingsTab}" anim:ContentTransition.Offset="6">
                 <StackPanel>
                     <TextBlock Text="版本设置" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
                                Margin="0,0,0,10" />

@@ -242,7 +242,10 @@
             <views:VersionsView DataContext="{Binding VersionsPage}" />
         </Grid>
 
-        <Grid Grid.Row="1" Visibility="{Binding IsDetailOpen, Converter={StaticResource BoolToVisibility}}">
+        <Grid Grid.Row="1" Visibility="{Binding IsDetailOpen, Converter={StaticResource BoolToVisibility}}"
+              anim:ContentTransition.Watch="{Binding IsDetailOpen}"
+              anim:ContentTransition.Offset="12"
+              anim:ContentTransition.Duration="240">
             <views:CatalogDetailView DataContext="{Binding Detail}" />
         </Grid>
 
@@ -397,7 +400,10 @@
         </Grid>
 
         <!-- CurseForge 详情：与 Modrinth 详情共用同一套布局（头部 + 介绍 + 历史版本 + 状态行） -->
-        <Grid Grid.Row="1" Visibility="{Binding IsCurseForgeDetailOpen, Converter={StaticResource BoolToVisibility}}">
+        <Grid Grid.Row="1" Visibility="{Binding IsCurseForgeDetailOpen, Converter={StaticResource BoolToVisibility}}"
+              anim:ContentTransition.Watch="{Binding IsCurseForgeDetailOpen}"
+              anim:ContentTransition.Offset="12"
+              anim:ContentTransition.Duration="240">
             <Grid DataContext="{Binding CurseForgeDetail}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
