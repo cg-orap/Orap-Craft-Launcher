@@ -90,6 +90,9 @@ public sealed class CurseForgeDetailViewModel(
 
     public bool HasIcon => Icon is not null;
 
+    /// <summary>类型标签（整合包 / 模组 / 材质包 / 光影）。</summary>
+    public string KindLabel => Row.KindLabel;
+
     public string Categories => _detail is null || _detail.Categories.Count == 0
         ? owner.KindNameOf(Kind)
         : string.Join(" · ", _detail.Categories.Take(3));
@@ -103,6 +106,10 @@ public sealed class CurseForgeDetailViewModel(
             : $"安装到 {instance.Name} → {CurseForgeClient.InstallFolderOf(Kind)}";
 
     public ObservableList<CurseForgeVersionRow> Versions { get; } = [];
+
+    public string VersionsHeader => $"历史版本（{Versions.Count} 个，新到旧）";
+
+    public bool HasVersions => Versions.Count > 0;
 
     public string Status
     {
@@ -168,6 +175,8 @@ public sealed class CurseForgeDetailViewModel(
             OnPropertyChanged(nameof(Description));
             OnPropertyChanged(nameof(Categories));
             OnPropertyChanged(nameof(Downloads));
+            OnPropertyChanged(nameof(VersionsHeader));
+            OnPropertyChanged(nameof(HasVersions));
 
             Status = files.Count == 0
                 ? "没有可用的文件。"

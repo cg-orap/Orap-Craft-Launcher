@@ -182,6 +182,7 @@ public sealed class CatalogViewModel : ObservableObject
         PreviousPageCommand = new AsyncRelayCommand(
             () => SearchAsync((IsCurseForgeSource ? _cfPage : _page) - 1), () => !_busy && HasPreviousPage);
         RefreshCommand = new AsyncRelayCommand(() => SearchAsync(_page, forceRefresh: true), () => !_busy);
+        ToggleFilterCommand = new RelayCommand(() => IsFilterExpanded = !IsFilterExpanded);
         CloseDetailCommand = new RelayCommand(CloseDetail);
         CancelOperationCommand = new RelayCommand(CancelOperation, () => Busy);
     }
@@ -211,6 +212,8 @@ public sealed class CatalogViewModel : ObservableObject
         private set
         {
             if (!SetProperty(ref _detailOpen, value)) return;
+            OnPropertyChanged(nameof(IsListChromeVisible));
+            OnPropertyChanged(nameof(IsListOpen));
             OnPropertyChanged(nameof(IsListOpen));
         }
     }
@@ -219,7 +222,52 @@ public sealed class CatalogViewModel : ObservableObject
     /// The catalogue list is only shown on a resource tab with no detail open. Without the tab
     /// condition its search bar and result card covered the hosted Minecraft version page.
     /// </summary>
-    public bool IsListOpen => !_detailOpen && IsCatalogueTab;
+    public bool IsListOpen => !_detailOpen && !_cfDetailOpen && IsCatalogueTab;
+
+    /// <summary>详情页是独立子界面：打开后隐藏列表头部（标题 + 筛选栏）。</summary>
+    public bool IsListChromeVisible => !_detailOpen && !_cfDetailOpen;
+
+    /// <summary>筛选栏是否展开：折叠后只留一行摘要，把高度让给结果列表。</summary>
+    private bool _isFilterExpanded = true;
+
+    public bool IsFilterExpanded
+    {
+        get => _isFilterExpanded;
+        set
+        {
+            if (!SetProperty(ref _isFilterExpanded, value)) return;
+            OnPropertyChanged(nameof(FilterToggleLabel));
+            OnPropertyChanged(nameof(FilterChevron));
+        }
+    }
+
+    public string FilterToggleLabel => IsFilterExpanded ? "收起筛选" : "展开筛选";
+
+    public string FilterChevron => IsFilterExpanded ? "\uE70E" : "\uE70D";
+
+    public ICommand ToggleFilterCommand { get; }
+
+    /// <summary>折叠时显示的一行摘要，避免收起后不知道当前过滤条件。</summary>
+    public string FilterSummary
+    {
+        get
+        {
+            var sort = SortOptions[Math.Clamp(SortIndex, 0, SortOptions.Count - 1)];
+            var loader = LoaderOptions[Math.Clamp(LoaderIndex, 0, LoaderOptions.Count - 1)];
+            var category = string.IsNullOrWhiteSpace(SelectedCategory) ? "全部分类" : SelectedCategory!;
+
+            return string.Join(" · ", new[]
+            {
+                IsCurseForgeSource ? "CurseForge" : "Modrinth",
+                IsVersionFiltered && !string.IsNullOrWhiteSpace(_main.CurrentInstance?.GameVersion)
+                    ? $"MC {_main.CurrentInstance!.GameVersion}"
+                    : "不限版本",
+                sort,
+                loader,
+                category,
+            });
+        }
+    }
 
     /// <summary>Returns from the detail view to the list.</summary>
     public void CloseDetail()
@@ -302,6 +350,7 @@ public sealed class CatalogViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _sortIndex, Math.Clamp(value, 0, 2))) return;
+            OnPropertyChanged(nameof(FilterSummary));
             _ = RerunSearchAsync();
         }
     }
@@ -317,6 +366,7 @@ public sealed class CatalogViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _loaderIndex, Math.Clamp(value, 0, LoaderOptions.Count - 1))) return;
+            OnPropertyChanged(nameof(FilterSummary));
             _ = RerunSearchAsync();
         }
     }
@@ -392,6 +442,7 @@ public sealed class CatalogViewModel : ObservableObject
             if (!SetProperty(ref _scopeIndex, Math.Clamp(value, 0, 1))) return;
             OnPropertyChanged(nameof(IsVersionFiltered));
             OnPropertyChanged(nameof(ScopeHint));
+            OnPropertyChanged(nameof(FilterSummary));
             _ = RefreshForScopeChangeAsync();
         }
     }
@@ -422,6 +473,7 @@ public sealed class CatalogViewModel : ObservableObject
     public void SyncInstance()
     {
         OnPropertyChanged(nameof(ScopeHint));
+        OnPropertyChanged(nameof(FilterSummary));
 
         if (IsCatalogueTab && IsVersionFiltered && !IsVersionsTab && !IsDetailOpen)
         {
@@ -459,6 +511,7 @@ public sealed class CatalogViewModel : ObservableObject
 
             OnPropertyChanged(nameof(IsModrinthSource));
             OnPropertyChanged(nameof(IsCurseForgeSource));
+            OnPropertyChanged(nameof(FilterSummary));
 
             // CurseForge 没有"游戏版本"这一类，切过去时自动落到模组
             if (clamped == 1 && _kind.ProjectType is null) Kind = Kinds[2];
@@ -493,7 +546,12 @@ public sealed class CatalogViewModel : ObservableObject
     public bool IsCurseForgeDetailOpen
     {
         get => _cfDetailOpen;
-        private set => SetProperty(ref _cfDetailOpen, value);
+        private set
+        {
+            if (!SetProperty(ref _cfDetailOpen, value)) return;
+            OnPropertyChanged(nameof(IsListChromeVisible));
+            OnPropertyChanged(nameof(IsListOpen));
+        }
     }
 
     public ICommand CloseCurseForgeDetailCommand => new RelayCommand(() =>
@@ -578,6 +636,7 @@ public sealed class CatalogViewModel : ObservableObject
         {
             var normalized = string.IsNullOrWhiteSpace(value) ? null : value;
             if (!SetProperty(ref _category, normalized)) return;
+            OnPropertyChanged(nameof(FilterSummary));
             _ = RerunSearchAsync();
         }
     }
