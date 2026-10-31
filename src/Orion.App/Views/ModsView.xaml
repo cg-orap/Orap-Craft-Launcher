@@ -136,34 +136,51 @@
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Width="26" Height="26" CornerRadius="7" VerticalAlignment="Center"
-                                Background="{DynamicResource DangerBrush}">
-                            <TextBlock Text="!" FontSize="14" FontWeight="Bold" Foreground="White"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <!-- 整行标题就是折叠开关：点击区域大，不必瞄准右上角的小箭头 -->
+                        <Grid Background="Transparent" Cursor="Hand"
+                              MouseLeftButtonUp="OnConflictHeaderToggle"
+                              AutomationProperties.AutomationId="ToggleConflictCard"
+                              ToolTip="{Binding ConflictToggleHint}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="模组冲突" FontSize="12.5" FontWeight="SemiBold" />
-                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                <TextBlock Text="{Binding ConflictSummary}" FontSize="10.5"
-                                           Foreground="{DynamicResource MutedTextBrush}" />
-                                <TextBlock Text="  ·  " FontSize="10.5"
-                                           Foreground="{DynamicResource MutedTextBrush}" />
-                                <TextBlock Text="{Binding ConflictScanText}" FontSize="10.5"
-                                           Foreground="{DynamicResource MutedTextBrush}" />
+                            <Border Width="26" Height="26" CornerRadius="7" VerticalAlignment="Center"
+                                    Background="{DynamicResource DangerBrush}">
+                                <TextBlock Text="!" FontSize="14" FontWeight="Bold" Foreground="White"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="模组冲突" FontSize="12.5" FontWeight="SemiBold" />
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <TextBlock Text="{Binding ConflictSummary}" FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                    <TextBlock Text="  ·  " FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                    <TextBlock Text="{Binding ConflictScanText}" FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
 
-                        <Button Grid.Column="2" Content="只看冲突" Style="{StaticResource GhostButton}"
+                            <TextBlock Grid.Column="2" Text="{Binding ConflictChevron}"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="11" VerticalAlignment="Center" Margin="12,0,6,0"
+                                       Foreground="{DynamicResource MutedTextBrush}" />
+                        </Grid>
+
+                        <Button Grid.Column="1" Content="只看冲突" Style="{StaticResource GhostButton}"
                                 FontSize="11" Padding="10,5" Command="{Binding SetModFilterCommand}"
-                                CommandParameter="CONFLICT" VerticalAlignment="Center" />
+                                CommandParameter="CONFLICT" VerticalAlignment="Center" Margin="8,0,0,0" />
                     </Grid>
 
+                    <StackPanel Visibility="{Binding IsConflictCardExpanded, Converter={StaticResource BoolToVisibility}}">
                     <ItemsControl ItemsSource="{Binding Conflicts}" Margin="0,10,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -221,6 +238,7 @@
                     <TextBlock Text="{Binding HiddenConflictText}" Style="{StaticResource CaptionText}"
                                Margin="0,4,0,0" TextWrapping="Wrap"
                                Visibility="{Binding HasHiddenConflicts, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

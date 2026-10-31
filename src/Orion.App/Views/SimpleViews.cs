@@ -26,6 +26,13 @@ public partial class InstancesView : UserControl
 public partial class ModsView : UserControl
 {
     public ModsView() => InitializeComponent();
+
+    /// <summary>点冲突卡片的标题行 = 展开/收起（收起后只留一行摘要）。</summary>
+    private void OnConflictHeaderToggle(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        (DataContext as ViewModels.ModsViewModel)?.ToggleConflictCardCommand.Execute(null);
+        e.Handled = true;
+    }
 }
 
 public partial class BackupView : UserControl

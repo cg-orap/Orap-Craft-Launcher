@@ -129,6 +129,7 @@ public sealed class ModsViewModel : ObservableObject
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !string.IsNullOrWhiteSpace(SearchText) && !IsSearching);
         SearchCurseForgeCommand = new AsyncRelayCommand(SearchCurseForgeAsync, () => !IsPackSearching);
         RepairDependenciesCommand = new AsyncRelayCommand(RepairDependenciesAsync, () => !IsBusy);
+        ToggleConflictCardCommand = new RelayCommand(() => IsConflictCardExpanded = !IsConflictCardExpanded);
         RefreshCurseForgeKeyCommand = new RelayCommand(() => OnPropertyChanged(nameof(HasCurseForgeKey)));
         OpenFolderCommand = new RelayCommand(OpenModsFolder);
         OpenModrinthPageCommand = new RelayCommand(OpenModrinthPage);
@@ -206,7 +207,28 @@ public sealed class ModsViewModel : ObservableObject
         private set => SetProperty(ref _conflictScanText, value);
     }
 
-    public bool HasConflicts => Conflicts.Count > 0;
+    public bool HasConflicts => TotalErrorCount + TotalWarningCount > 0;
+
+    // null = 还没手动切换过，按"有必须处理的就展开、否则收起"给默认值
+    private bool? _conflictExpanded;
+
+    /// <summary>冲突卡片是否展开：收起时只留标题行，列表不渲染（几百条时不占地方也不拖渲染）。</summary>
+    public bool IsConflictCardExpanded
+    {
+        get => _conflictExpanded ?? TotalErrorCount > 0;
+        set
+        {
+            _conflictExpanded = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ConflictChevron));
+            OnPropertyChanged(nameof(ConflictToggleHint));
+        }
+    }
+
+    /// <summary>标题行右侧的箭头：展开时朝上，收起时朝下。</summary>
+    public string ConflictChevron => IsConflictCardExpanded ? "\uE70E" : "\uE70D";
+
+    public string ConflictToggleHint => IsConflictCardExpanded ? "收起冲突列表" : "展开冲突列表";
 
     public int ConflictErrorCount => TotalErrorCount;
 
@@ -295,6 +317,9 @@ public sealed class ModsViewModel : ObservableObject
 
     /// <summary>检查当前实例缺少的必需前置并自动补齐。</summary>
     public ICommand RepairDependenciesCommand { get; private set; } = null!;
+
+    /// <summary>展开/收起模组冲突卡片。</summary>
+    public ICommand ToggleConflictCardCommand { get; private set; } = null!;
     public ICommand RefreshCurseForgeKeyCommand { get; private set; } = null!;
 
     public Instance? SelectedInstance
@@ -465,6 +490,9 @@ public sealed class ModsViewModel : ObservableObject
             // 界面只渲染前 N 条：几百条卡片既看不清也拖慢滚动
             ApplyConflictDisplay(found);
 
+            OnPropertyChanged(nameof(IsConflictCardExpanded));
+            OnPropertyChanged(nameof(ConflictChevron));
+            OnPropertyChanged(nameof(ConflictToggleHint));
             OnPropertyChanged(nameof(HasConflicts));
             OnPropertyChanged(nameof(ConflictErrorCount));
             OnPropertyChanged(nameof(ConflictWarningCount));
