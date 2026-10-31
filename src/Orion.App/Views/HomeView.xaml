@@ -129,6 +129,65 @@
                                     <TextBlock Text="{Binding LaunchButtonText}" Foreground="#FFFFFF" FontSize="15"
                                                FontWeight="SemiBold" VerticalAlignment="Center"
                                                AutomationProperties.AutomationId="LaunchVersionLine" />
+
+                                    <!-- 忙碌三点：启动过程中在按钮内跳动（减少动效时不动） -->
+                                    <StackPanel Orientation="Horizontal" Margin="6,2,0,0" VerticalAlignment="Center"
+                                                Visibility="{Binding IsLaunching, Converter={StaticResource BoolToVisibility}}">
+                                        <Ellipse Width="4" Height="4" Fill="#FFFFFF" Margin="0,0,4,0">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Opacity" Value="0.35" />
+                                                    <Style.Triggers>
+                                                        <EventTrigger RoutedEvent="Loaded">
+                                                            <BeginStoryboard>
+                                                                <Storyboard RepeatBehavior="Forever">
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                     From="0.3" To="1" Duration="0:0:0.45"
+                                                                                     AutoReverse="True" BeginTime="0:0:0" />
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </EventTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <Ellipse Width="4" Height="4" Fill="#FFFFFF" Margin="0,0,4,0">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Opacity" Value="0.35" />
+                                                    <Style.Triggers>
+                                                        <EventTrigger RoutedEvent="Loaded">
+                                                            <BeginStoryboard>
+                                                                <Storyboard RepeatBehavior="Forever">
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                     From="0.3" To="1" Duration="0:0:0.45"
+                                                                                     AutoReverse="True" BeginTime="0:0:0.15" />
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </EventTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <Ellipse Width="4" Height="4" Fill="#FFFFFF">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Opacity" Value="0.35" />
+                                                    <Style.Triggers>
+                                                        <EventTrigger RoutedEvent="Loaded">
+                                                            <BeginStoryboard>
+                                                                <Storyboard RepeatBehavior="Forever">
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                     From="0.3" To="1" Duration="0:0:0.45"
+                                                                                     AutoReverse="True" BeginTime="0:0:0.3" />
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </EventTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                    </StackPanel>
                                 </StackPanel>
                             </Button>
 

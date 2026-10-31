@@ -91,6 +91,15 @@ public sealed class SettingsViewModel : ObservableObject
     }
 
     public ICommand SaveCommand { get; }
+
+    private string _saveLabel = "保存设置";
+
+    /// <summary>保存按钮文案：保存成功后 1.6s 显示"已保存 ✓"，形成明确的成功反馈。</summary>
+    public string SaveLabel
+    {
+        get => _saveLabel;
+        private set => SetProperty(ref _saveLabel, value);
+    }
     public ICommand TestCurseForgeKeyCommand { get; }
     public ICommand DetectJavaCommand { get; }
     public ICommand BrowseJavaCommand { get; }
@@ -289,7 +298,35 @@ public sealed class SettingsViewModel : ObservableObject
 
         Status = "设置已保存。代理与下载源的变更将在下次启动后对新的 HTTP 连接生效。";
         _main.LogsPage.AppendSystem("设置已保存。");
+        _ = FlashSavedAsync();
     }
+
+    /// <summary>氛围动效：保存成功后按钮短暂显示"已保存 ✓"。</summary>
+    private async Task FlashSavedAsync()
+    {
+        _savedFlash?.Cancel();
+
+        var cts = new CancellationTokenSource();
+        _savedFlash = cts;
+        SaveLabel = "已保存 ✓";
+
+        try
+        {
+            await Task.Delay(1600, cts.Token).ConfigureAwait(true);
+            SaveLabel = "保存设置";
+        }
+        catch (TaskCanceledException)
+        {
+            // 又点了一次保存：让新的这次接管文案
+        }
+        finally
+        {
+            if (ReferenceEquals(_savedFlash, cts)) _savedFlash = null;
+            cts.Dispose();
+        }
+    }
+
+    private CancellationTokenSource? _savedFlash;
 
     private async Task DetectJavaAsync()
     {

@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Orion.App.Views.SettingsView"
+<UserControl x:Class="Orion.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -61,7 +61,8 @@
                 <TextBlock Text="{Binding Status}" Style="{StaticResource CaptionText}"
                            VerticalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis"
                            Margin="0,0,12,0" />
-                <Button Content="保存设置" Style="{StaticResource PrimaryButton}" Padding="18,8"
+                <!-- 保存成功时文案短暂变"已保存 ✓"（氛围动效，1.6s 后复原） -->
+                <Button Content="{Binding SaveLabel}" Style="{StaticResource PrimaryButton}" Padding="18,8"
                         Command="{Binding SaveCommand}" AutomationProperties.AutomationId="SettingsSave" />
             </StackPanel>
         </Grid>
