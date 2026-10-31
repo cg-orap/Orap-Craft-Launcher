@@ -34,11 +34,11 @@
 | **C2 重复 jar 名** | 文件名去掉版本号后相同（`xxx-1.0.jar` + `xxx-1.1.jar`） | 确定 |
 | **C3 加载器不匹配** | 实例是 NeoForge/Forge，但 jar 只有 `fabric.mod.json`；反之亦然 | 确定 |
 | **C4 版本范围互斥** | A 需要 `B [1.0,)`，装的是 0.9；或 A 需要 `B [1.0,2.0)`，装的是 2.1 | 确定（已有 `VersionRange`） |
-| **C5 不兼容声明** | `mods.toml` 里 `type = "incompatible"` 的 modId 恰好装着 | 确定 |
+| **C5 不兼容声明** | `mods.toml` 里 `type = "incompatible"` 的 modId 恰好装着 | 确定（但 NeoForge 只记日志不阻断，故列为 Warning） |
 | **C6 同 mixin 配置文件** | 两个 jar 的 `*.mixins.json` 声明同名 mixin 包 | 中（同名不必然冲突，标"可能"） |
 | **C7 核心库版本错配** | `kotlinforforge` / `architectury` / `geckolib` 等被多个模组依赖且范围无交集 | 中 |
 
-C1–C5 直接给"必须处理"，C6–C7 给"建议检查"。**不做**启发式猜测（比如"这两个模组功能重叠"），
+C1–C4 直接给"必须处理"，C5–C7 给"建议检查"（C5 虽然能确定声明存在，但实测 NeoForge 不因此拒绝启动）。**不做**启发式猜测（比如"这两个模组功能重叠"），
 那种只能靠人工，写死在代码里会误报。
 
 ### 实现要点

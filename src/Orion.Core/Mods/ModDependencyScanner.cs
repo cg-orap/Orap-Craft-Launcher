@@ -306,6 +306,10 @@ public static class VersionRange
     {
         if (string.IsNullOrWhiteSpace(range)) return true;
 
+        // mods.toml 里常见的通配写法：* / x / 任意
+        var trimmedRange = range.Trim();
+        if (trimmedRange is "*" or "x" or "X") return true;
+
         var (minimum, minInclusive, maximum, maxInclusive, exact) = Parse(range);
         var current = ParseVersion(version);
 
@@ -327,6 +331,57 @@ public static class VersionRange
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 两个 Maven 范围是否可能存在交集。空白范围（任意版本）永远算有交集。
+    /// </summary>
+    public static bool Overlaps(string left, string right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right)) return true;
+
+        var a = Parse(left);
+        var b = Parse(right);
+
+        // 精确版本：只要落在对方范围内就算有交集
+        if (a.Exact is not null) return Satisfies(a.Exact, right);
+        if (b.Exact is not null) return Satisfies(b.Exact, left);
+
+        // 下界取大、上界取小，看是否还能构成区间
+        var (min, minInclusive) = StrongerLower(a, b);
+        var (max, maxInclusive) = WeakerUpper(a, b);
+
+        if (min is null || max is null) return true;
+
+        var cmp = Compare(ParseVersion(min), ParseVersion(max));
+        if (cmp < 0) return true;
+        return cmp == 0 && minInclusive && maxInclusive;
+    }
+
+    private static (string? Min, bool Inclusive) StrongerLower(
+        (string? Min, bool MinInclusive, string? Max, bool MaxInclusive, string? Exact) a,
+        (string? Min, bool MinInclusive, string? Max, bool MaxInclusive, string? Exact) b)
+    {
+        if (a.Min is null) return (b.Min, b.MinInclusive);
+        if (b.Min is null) return (a.Min, a.MinInclusive);
+
+        var cmp = Compare(ParseVersion(a.Min), ParseVersion(b.Min));
+        if (cmp > 0) return (a.Min, a.MinInclusive);
+        if (cmp < 0) return (b.Min, b.MinInclusive);
+        return (a.Min, a.MinInclusive && b.MinInclusive);
+    }
+
+    private static (string? Max, bool Inclusive) WeakerUpper(
+        (string? Min, bool MinInclusive, string? Max, bool MaxInclusive, string? Exact) a,
+        (string? Min, bool MinInclusive, string? Max, bool MaxInclusive, string? Exact) b)
+    {
+        if (a.Max is null) return (b.Max, b.MaxInclusive);
+        if (b.Max is null) return (a.Max, a.MaxInclusive);
+
+        var cmp = Compare(ParseVersion(a.Max), ParseVersion(b.Max));
+        if (cmp < 0) return (a.Max, a.MaxInclusive);
+        if (cmp > 0) return (b.Max, b.MaxInclusive);
+        return (a.Max, a.MaxInclusive && b.MaxInclusive);
     }
 
     /// <summary>把 "1.2.1" / "1.20.1-47.2.0" 拆成数字数组。</summary>

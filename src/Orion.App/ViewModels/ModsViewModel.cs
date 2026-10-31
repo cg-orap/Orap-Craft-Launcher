@@ -48,6 +48,38 @@ public sealed class ModRow : ObservableObject
     }
 }
 
+/// <summary>冲突里点名的一个文件 + 针对它的「禁用」命令。</summary>
+public sealed record ConflictFileAction(string File, ICommand DisableCommand);
+
+/// <summary>一条冲突的展示行：标题 + 涉及文件 + 逐个禁用按钮。</summary>
+public sealed class ConflictRow
+{
+    private readonly ModsViewModel _owner;
+
+    public ConflictRow(ModConflict conflict, ModsViewModel owner)
+    {
+        _owner = owner;
+        Conflict = conflict;
+        FileActions = [.. conflict.Files.Select(file =>
+            new ConflictFileAction(file,
+                new AsyncRelayCommand(() => _owner.DisableConflictFileAsync(file))))];
+    }
+
+    public ModConflict Conflict { get; }
+
+    public bool IsError => Conflict.IsBlocking;
+    public string Code => Conflict.Code;
+    public string Title => Conflict.Title;
+    public string Detail => Conflict.Detail;
+    public string SeverityLabel => IsError ? "必须处理" : "建议检查";
+
+    /// <summary>涉及的文件名（一行显示）。</summary>
+    public string Files => string.Join(" · ", Conflict.Files);
+
+    /// <summary>每个文件一个「禁用」按钮。</summary>
+    public IReadOnlyList<ConflictFileAction> FileActions { get; }
+}
+
 /// <summary>Modrinth search result row.</summary>
 public sealed class ModrinthRow(ModrinthProject project, ModsViewModel owner)
 {
@@ -108,6 +140,7 @@ public sealed class ModsViewModel : ObservableObject
     {
         "ENABLED" => row.Enabled,
         "DISABLED" => !row.Enabled,
+        "CONFLICT" => ConflictFileNames.Contains(row.FileName),
         _ => true,
     };
 
@@ -122,6 +155,30 @@ public sealed class ModsViewModel : ObservableObject
     public ICommand OpenModrinthPageCommand { get; }
 
     public ObservableList<ModRow> Mods { get; } = [];
+
+    /// <summary>当前版本里检测到的模组冲突（重复 modId、加载器不匹配、版本互斥等）。</summary>
+    public ObservableList<ConflictRow> Conflicts { get; } = [];
+
+    /// <summary>牵涉冲突的文件名，用于「有冲突」筛选。</summary>
+    private readonly HashSet<string> ConflictFileNames = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool HasConflicts => Conflicts.Count > 0;
+
+    public int ConflictErrorCount => Conflicts.Count(c => c.IsError);
+
+    public int ConflictWarningCount => Conflicts.Count(c => !c.IsError);
+
+    public string ConflictSummary
+    {
+        get
+        {
+            if (Conflicts.Count == 0) return "";
+            var parts = new List<string>();
+            if (ConflictErrorCount > 0) parts.Add($"{ConflictErrorCount} 个必须处理");
+            if (ConflictWarningCount > 0) parts.Add($"{ConflictWarningCount} 条建议检查");
+            return string.Join("，", parts);
+        }
+    }
 
     /// <summary>列表筛选：ALL / ENABLED / DISABLED（与设计稿的页签一致）。</summary>
     public string ModFilter
@@ -141,14 +198,20 @@ public sealed class ModsViewModel : ObservableObject
     public ICommand SetModFilterCommand { get; }
 
     /// <summary>模组列表筛选（分段控件用）。</summary>
-    public IReadOnlyList<string> ModFilters { get; } = ["全部", "已启用", "已禁用"];
+    public IReadOnlyList<string> ModFilters { get; } = ["全部", "已启用", "已禁用", "有冲突"];
 
     public int FilterIndex
     {
-        get => _modFilter switch { "ENABLED" => 1, "DISABLED" => 2, _ => 0 };
+        get => _modFilter switch { "ENABLED" => 1, "DISABLED" => 2, "CONFLICT" => 3, _ => 0 };
         set
         {
-            var key = Math.Clamp(value, 0, 2) switch { 1 => "ENABLED", 2 => "DISABLED", _ => "ALL" };
+            var key = Math.Clamp(value, 0, 3) switch
+            {
+                1 => "ENABLED",
+                2 => "DISABLED",
+                3 => "CONFLICT",
+                _ => "ALL",
+            };
             SetModFilterCommand.Execute(key);
             OnPropertyChanged();
         }
@@ -276,6 +339,8 @@ public sealed class ModsViewModel : ObservableObject
             OnPropertyChanged(nameof(EnabledCount));
             OnPropertyChanged(nameof(IncompatibleCount));
 
+            await RefreshConflictsAsync(instance).ConfigureAwait(true);
+
             Status = Mods.Count == 0
                 ? "该版本还没有安装 Mod。"
                 : $"共 {Mods.Count} 个 Mod，{EnabledCount} 个启用" +
@@ -288,6 +353,65 @@ public sealed class ModsViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// 冲突检测：纯离线读 jar，比启动一次快得多。失败不影响模组列表（只是不显示冲突）。
+    /// </summary>
+    public async Task RefreshConflictsAsync(Instance instance)
+    {
+        try
+        {
+            var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
+            var loader = instance.Loader;
+            var gameVersion = instance.GameVersion;
+
+            var found = await Task.Run(() =>
+                ModConflictScanner.Scan(modsDirectory, loader, gameVersion)).ConfigureAwait(true);
+
+            Conflicts.Replace(found.Select(c => new ConflictRow(c, this)));
+
+            ConflictFileNames.Clear();
+            foreach (var conflict in found)
+            {
+                foreach (var file in conflict.Files) ConflictFileNames.Add(file);
+            }
+
+            OnPropertyChanged(nameof(HasConflicts));
+            OnPropertyChanged(nameof(ConflictErrorCount));
+            OnPropertyChanged(nameof(ConflictWarningCount));
+            OnPropertyChanged(nameof(ConflictSummary));
+            ModsView?.Refresh();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Status = "冲突检测失败: " + ex.Message;
+        }
+    }
+
+    /// <summary>把冲突里点名的一个文件禁用（改名 .disabled），失败时回写状态。</summary>
+    public async Task DisableConflictFileAsync(string fileName)
+    {
+        var instance = SelectedInstance;
+        if (instance is null) return;
+
+        var path = Path.Combine(instance.GameDirectory, "mods", fileName);
+        try
+        {
+            if (!File.Exists(path))
+            {
+                Status = $"文件不存在：{fileName}";
+                return;
+            }
+
+            File.Move(path, path + ".disabled");
+            Status = $"已禁用 {fileName}（重命名为 .disabled，可随时改回来）";
+            await LoadModsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Status = "禁用失败: " + ex.Message;
         }
     }
 
