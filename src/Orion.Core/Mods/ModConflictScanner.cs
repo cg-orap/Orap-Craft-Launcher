@@ -199,11 +199,12 @@ public static class ModConflictScanner
 
                 conflicts.Add(new ModConflict(
                     "C4",
-                    ConflictSeverity.Error,
+                    ConflictSeverity.Warning,
                     $"版本不满足：{jar.FileName} 需要 {id} {range}",
                     [jar.FileName, have.File],
-                    $"当前装的是 {id} {have.Version}，但 {jar.FileName} 要求 {range}。" +
-                    "启动时通常会直接报 missing/incompatible 然后停在标题界面。"));
+                    $"当前装的是 {id} {have.Version}，但 {jar.FileName} 写的是 {range}。" +
+                    "整合包里这类版本号常用「MC版本-模组版本」的自定义写法，解析可能有偏差，所以列为建议检查；" +
+                    "真出现 missing/incompatible 报错时优先怀疑这一对。"));
             }
         }
     }
@@ -235,7 +236,7 @@ public static class ModConflictScanner
         }
     }
 
-    // ── C6 共享 mixin 配置（Warning） ──────────────────────────────────────────
+    // ── C6 共享 mixin 配置（Warning，聚合为一条） ─────────────────────────────
     private static void AppendSharedMixins(List<JarSnapshot> jars, List<ModConflict> conflicts)
     {
         var owners = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -249,19 +250,30 @@ public static class ModConflictScanner
             }
         }
 
-        foreach (var (mixin, files) in owners.Where(p => p.Value.Count > 1))
-        {
-            conflicts.Add(new ModConflict(
-                "C6",
-                ConflictSeverity.Warning,
-                $"两个模组带同名的 mixin 配置：{mixin}",
-                files,
-                $"{string.Join("、", files)} 都包含 {mixin}。" +
-                "同名不一定冲突（多数是同一个库被重复打包），但如果启动时报 mixin apply failed，先查这里。"));
-        }
+        var shared = owners.Where(p => p.Value.Count > 1).ToList();
+        if (shared.Count == 0) return;
+
+        // 一次说完：多少份配置、涉及多少个 jar。逐个报在 300+ 模组的包里会刷出几百条。
+        var files = shared
+            .SelectMany(p => p.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var samples = string.Join("、", shared.Select(p => p.Key).Take(3));
+        if (shared.Count > 3) samples += $" 等 {shared.Count} 份";
+
+        conflicts.Add(new ModConflict(
+            "C6",
+            ConflictSeverity.Warning,
+            $"{shared.Count} 份 mixin 配置被多个 jar 重复打包",
+            [.. files.Take(8)],
+            $"例如 {samples}。" +
+            "这通常只是同一个前置库被打进了多个模组，本身不冲突；" +
+            "只有启动日志里出现 mixin apply failed 时才需要按文件名排查。"));
     }
 
-    // ── C7 核心库版本范围没有交集（Warning） ───────────────────────────────────
+    // ── C7 核心库版本范围没有交集（Warning，按库聚合） ─────────────────────────
     private static void AppendCoreLibraryMismatch(List<JarSnapshot> jars, List<ModConflict> conflicts)
     {
         foreach (var library in CoreLibraries)
@@ -270,28 +282,38 @@ public static class ModConflictScanner
                 .SelectMany(j => j.Dependencies
                     .Where(d => d.Mandatory
                                 && d.ModId.Equals(library, StringComparison.OrdinalIgnoreCase)
-                                && !string.IsNullOrWhiteSpace(d.Range))
+                                && !string.IsNullOrWhiteSpace(d.Range)
+                                && !VersionRange.IsWildcard(d.Range))
                     .Select(d => (j.FileName, d.Range)))
+                .Distinct()
                 .ToList();
 
             if (requirements.Count < 2) continue;
 
+            // 只要存在一对互斥就报一次，把涉及的模组一起列出来（不是每对一条）
+            var conflictsHere = new List<(string File, string Range)>();
             for (var i = 0; i < requirements.Count; i++)
             {
                 for (var j = i + 1; j < requirements.Count; j++)
                 {
                     if (VersionRange.Overlaps(requirements[i].Range, requirements[j].Range)) continue;
-
-                    conflicts.Add(new ModConflict(
-                        "C7",
-                        ConflictSeverity.Warning,
-                        $"两个模组要求的 {library} 版本范围没有交集",
-                        [requirements[i].FileName, requirements[j].FileName],
-                        $"{requirements[i].FileName} 要求 {library} {requirements[i].Range}，" +
-                        $"{requirements[j].FileName} 要求 {requirements[j].Range}。" +
-                        "无论装哪个版本，总有一个模组不满足要求。"));
+                    if (!conflictsHere.Contains(requirements[i])) conflictsHere.Add(requirements[i]);
+                    if (!conflictsHere.Contains(requirements[j])) conflictsHere.Add(requirements[j]);
                 }
             }
+
+            if (conflictsHere.Count == 0) continue;
+
+            var ranges = string.Join(" 与 ", conflictsHere.Take(3).Select(r => $"{r.File} 要 {r.Range}"));
+            if (conflictsHere.Count > 3) ranges += $" 等 {conflictsHere.Count} 个模组";
+
+            conflicts.Add(new ModConflict(
+                "C7",
+                ConflictSeverity.Warning,
+                $"要求的 {library} 版本范围互相矛盾",
+                [.. conflictsHere.Select(r => r.File).Take(6)],
+                $"{ranges}。无论装哪个版本，总有一个模组不满足要求，" +
+                "通常表现为某个模组功能异常或加载时报版本不符。"));
         }
     }
 
@@ -359,43 +381,11 @@ public static class ModConflictScanner
                 if (id.Success) outerMods.Add((id.Groups[1].Value, version.Success ? version.Groups[1].Value : null));
             }
 
-            // JarJar 内嵌 jar：bundled 发行版（如 Create Aeronautics）的模块在这里
+            // 这里**不解 JarJar 内嵌 jar**：376 个模组里解一遍内嵌要几秒钟，而内嵌模块只影响
+            // "某个依赖是否已安装"的判断——那属于 ModDependencyScanner 的职责（它仍然读内嵌）。
+            // 冲突检测只看外层 modId 就够，删掉这一步把页面从 ~3s 降到亚秒级。
             var nestedMods = new List<(string, string?)>();
             var nestedMixins = new List<string>();
-            foreach (var nested in zip.Entries.Where(e =>
-                         e.FullName.StartsWith("META-INF/jarjar/", StringComparison.OrdinalIgnoreCase)
-                         && e.FullName.EndsWith(".jar", StringComparison.OrdinalIgnoreCase)))
-            {
-                try
-                {
-                    using var stream = nested.Open();
-                    using var buffer = new MemoryStream();
-                    stream.CopyTo(buffer);
-                    buffer.Position = 0;
-
-                    using var nestedZip = new ZipArchive(buffer, ZipArchiveMode.Read);
-                    var nestedToml = nestedZip.Entries.FirstOrDefault(e =>
-                        e.FullName.Equals("META-INF/neoforge.mods.toml", StringComparison.OrdinalIgnoreCase))
-                        ?? nestedZip.Entries.FirstOrDefault(e =>
-                            e.FullName.Equals("META-INF/mods.toml", StringComparison.OrdinalIgnoreCase));
-
-                    if (nestedToml is not null)
-                    {
-                        using var nestedReader = new StreamReader(nestedToml.Open());
-                        var nestedInfo = ModDependencyScanner.ParseToml(nestedReader.ReadToEnd());
-                        if (nestedInfo is not null)
-                        {
-                            foreach (var (id, version) in nestedInfo.Mods) nestedMods.Add((id, version));
-                        }
-                    }
-
-                    nestedMixins.AddRange(MixinConfigNames(nestedZip));
-                }
-                catch (Exception ex) when (ex is IOException or InvalidDataException)
-                {
-                    // 内嵌 jar 坏了就跳过
-                }
-            }
 
             if (outerMods.Count == 0 && nestedMods.Count == 0 && !hasFabric) return null;
 

@@ -97,7 +97,7 @@ public sealed class ModConflictScannerTests
     }
 
     [Fact]
-    public void InstalledVersionOutsideRequiredRangeIsAnError()
+    public void InstalledVersionOutsideRequiredRangeIsAWarning()
     {
         using var dir = new ModsDir();
         dir.Jar("lib-1.0.0.jar", Toml, "testlib", "1.0.0");
@@ -106,7 +106,7 @@ public sealed class ModConflictScannerTests
         var conflicts = ModConflictScanner.Scan(dir.Path, LoaderKind.NeoForge, "1.21.1");
 
         var c4 = Assert.Single(conflicts.Where(c => c.Code == "C4"));
-        Assert.Equal(ConflictSeverity.Error, c4.Severity);
+        Assert.Equal(ConflictSeverity.Warning, c4.Severity);
         Assert.Contains("testlib", c4.Title);
         Assert.Contains("addon-1.0.jar", c4.Files);
     }
@@ -212,6 +212,22 @@ public sealed class ModConflictScannerTests
     [InlineData("[1.0,1.5]", "[1.5,2.0]", true)]
     [InlineData("[1.0,1.4)", "[1.5,2.0]", false)]
     public void VersionRangeOverlapIsComputable(string left, string right, bool expected) =>
+        Assert.Equal(expected, VersionRange.Overlaps(left, right));
+
+[Theory]
+    [InlineData("0.3.31+mc1.20.1", "[0.3.31-beta.53,)", true)]     // 构建元数据不参与比较
+    [InlineData("1.20.1-1.3.2", "[1.20-1.2,)", true)]
+    [InlineData("1.0.0-beta.2", "[1.0.0,)", false)]                 // 预发布小于正式版
+    [InlineData("1.0.0", "[1.0.0-beta.2,)", true)]
+    [InlineData("2.0.0", "[1.0,2.0)", false)]
+    public void VersionComparisonUnderstandsPrereleaseAndBuildMetadata(string version, string range, bool expected) =>
+        Assert.Equal(expected, VersionRange.Satisfies(version, range));
+
+    [Theory]
+    [InlineData("*", "[9.2.14,)", true)]
+    [InlineData("[9.2.14,)", "*", true)]
+    [InlineData("x", "[1.0,2.0)", true)]
+    public void WildcardRangesOverlapEverything(string left, string right, bool expected) =>
         Assert.Equal(expected, VersionRange.Overlaps(left, right));
 
     private sealed class ModsDir : IDisposable

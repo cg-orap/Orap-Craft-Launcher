@@ -162,11 +162,55 @@ public sealed class ModsViewModel : ObservableObject
     /// <summary>牵涉冲突的文件名，用于「有冲突」筛选。</summary>
     private readonly HashSet<string> ConflictFileNames = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 冲突检测结果缓存：键是实例，值是"目录指纹 + 结果"。
+    /// 打开一次 300+ 模组的页面要读几千个 zip 条目，重复进页面没必要重算。
+    /// </summary>
+    private readonly Dictionary<string, (string Fingerprint, IReadOnlyList<ModConflict> Result)> _conflictCache = [];
+
+    /// <summary>模组列表缓存：一次会话里重复进页面不必再把几百个 jar 读一遍。</summary>
+    private readonly Dictionary<string, (string Fingerprint, IReadOnlyList<ModInfo> Result)> _modsCache = [];
+
+    private string _modScanText = "";
+    public string ModScanText
+    {
+        get => _modScanText;
+        private set => SetProperty(ref _modScanText, value);
+    }
+
+    /// <summary>界面上最多显示几条冲突（其余折叠成一行提示，避免一次渲染上百张卡片）。</summary>
+    private const int MaxVisibleConflicts = 8;
+
+    private int _hiddenConflictCount;
+
+    public int HiddenConflictCount
+    {
+        get => _hiddenConflictCount;
+        private set
+        {
+            if (!SetProperty(ref _hiddenConflictCount, value)) return;
+            OnPropertyChanged(nameof(HasHiddenConflicts));
+            OnPropertyChanged(nameof(HiddenConflictText));
+        }
+    }
+
+    public bool HasHiddenConflicts => HiddenConflictCount > 0;
+
+    public string HiddenConflictText => $"还有 {HiddenConflictCount} 条未展开（同类问题已合并，导出报告可看全部）";
+
+    /// <summary>冲突检测耗时，用于判断卡顿是不是这一步造成的。</summary>
+    private string _conflictScanText = "";
+    public string ConflictScanText
+    {
+        get => _conflictScanText;
+        private set => SetProperty(ref _conflictScanText, value);
+    }
+
     public bool HasConflicts => Conflicts.Count > 0;
 
-    public int ConflictErrorCount => Conflicts.Count(c => c.IsError);
+    public int ConflictErrorCount => TotalErrorCount;
 
-    public int ConflictWarningCount => Conflicts.Count(c => !c.IsError);
+    public int ConflictWarningCount => TotalWarningCount;
 
     public string ConflictSummary
     {
@@ -333,7 +377,25 @@ public sealed class ModsViewModel : ObservableObject
 
         try
         {
-            var mods = await ModScanner.ScanAsync(instance.GameDirectory).ConfigureAwait(true);
+            var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
+            var fingerprint = await Task.Run(() => Fingerprint(modsDirectory)).ConfigureAwait(true);
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            IReadOnlyList<ModInfo> mods;
+
+            if (_modsCache.TryGetValue(instance.Id, out var cachedMods) && cachedMods.Fingerprint == fingerprint)
+            {
+                mods = cachedMods.Result;
+                ModScanText = "列表：已缓存";
+            }
+            else
+            {
+                mods = await ModScanner.ScanAsync(instance.GameDirectory).ConfigureAwait(true);
+                _modsCache[instance.Id] = (fingerprint, mods);
+                stopwatch.Stop();
+                ModScanText = $"列表：{stopwatch.Elapsed.TotalSeconds:0.0} 秒";
+            }
+
             Mods.Replace(mods.Select(m => new ModRow(m, this, ModScanner.IsCompatibleWith(m, instance.Loader))));
 
             OnPropertyChanged(nameof(EnabledCount));
@@ -344,7 +406,8 @@ public sealed class ModsViewModel : ObservableObject
             Status = Mods.Count == 0
                 ? "该版本还没有安装 Mod。"
                 : $"共 {Mods.Count} 个 Mod，{EnabledCount} 个启用" +
-                  (IncompatibleCount > 0 ? $"，{IncompatibleCount} 个与当前加载器不匹配" : "");
+                  (IncompatibleCount > 0 ? $"，{IncompatibleCount} 个与当前加载器不匹配" : "") +
+                  $"（{ModScanText}；{ConflictScanText}）";
         }
         catch (Exception ex)
         {
@@ -366,17 +429,41 @@ public sealed class ModsViewModel : ObservableObject
             var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
             var loader = instance.Loader;
             var gameVersion = instance.GameVersion;
+            var instanceId = instance.Id;
 
-            var found = await Task.Run(() =>
-                ModConflictScanner.Scan(modsDirectory, loader, gameVersion)).ConfigureAwait(true);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            Conflicts.Replace(found.Select(c => new ConflictRow(c, this)));
+            var fingerprint = await Task.Run(() => Fingerprint(modsDirectory)).ConfigureAwait(true);
+
+            IReadOnlyList<ModConflict> found;
+            var cached = _conflictCache.TryGetValue(instanceId, out var hit)
+                         && hit.Fingerprint == fingerprint;
+
+            if (cached)
+            {
+                found = hit.Result;
+            }
+            else
+            {
+                found = await Task.Run(() =>
+                    ModConflictScanner.Scan(modsDirectory, loader, gameVersion)).ConfigureAwait(true);
+
+                _conflictCache[instanceId] = (fingerprint, found);
+            }
+
+            stopwatch.Stop();
+            ConflictScanText = cached
+                ? "冲突检测：已缓存"
+                : $"冲突检测：{stopwatch.Elapsed.TotalSeconds:0.00} 秒（{fingerprint}）";
 
             ConflictFileNames.Clear();
             foreach (var conflict in found)
             {
                 foreach (var file in conflict.Files) ConflictFileNames.Add(file);
             }
+
+            // 界面只渲染前 N 条：几百条卡片既看不清也拖慢滚动
+            ApplyConflictDisplay(found);
 
             OnPropertyChanged(nameof(HasConflicts));
             OnPropertyChanged(nameof(ConflictErrorCount));
@@ -387,6 +474,61 @@ public sealed class ModsViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Status = "冲突检测失败: " + ex.Message;
+        }
+    }
+
+    /// <summary>错误全部显示，警告只显示前 N 条，剩下的折叠成一行。</summary>
+    private void ApplyConflictDisplay(IReadOnlyList<ModConflict> found)
+    {
+        var errors = found.Where(c => c.IsBlocking).ToList();
+        var warnings = found.Where(c => !c.IsBlocking).ToList();
+
+        var visible = errors.Concat(warnings.Take(Math.Max(0, MaxVisibleConflicts - errors.Count))).ToList();
+        var hidden = warnings.Count - warnings.Take(Math.Max(0, MaxVisibleConflicts - errors.Count)).Count();
+
+        Conflicts.Replace(visible.Select(c => new ConflictRow(c, this)));
+        HiddenConflictCount = Math.Max(0, hidden);
+        TotalErrorCount = errors.Count;
+        TotalWarningCount = warnings.Count;
+    }
+
+    private int _totalErrorCount;
+    private int _totalWarningCount;
+
+    private int TotalErrorCount
+    {
+        get => _totalErrorCount;
+        set => SetProperty(ref _totalErrorCount, value);
+    }
+
+    private int TotalWarningCount
+    {
+        get => _totalWarningCount;
+        set => SetProperty(ref _totalWarningCount, value);
+    }
+
+    /// <summary>mods 目录指纹：文件数 + 最新写入时间。变了才重算冲突。</summary>
+    private static string Fingerprint(string modsDirectory)
+    {
+        try
+        {
+            if (!Directory.Exists(modsDirectory)) return "empty";
+
+            var count = 0;
+            var newest = 0L;
+
+            foreach (var path in Directory.EnumerateFiles(modsDirectory, "*.jar"))
+            {
+                count++;
+                var ticks = File.GetLastWriteTimeUtc(path).Ticks;
+                if (ticks > newest) newest = ticks;
+            }
+
+            return $"{count} 个 jar / 最新 {new DateTime(newest, DateTimeKind.Utc).ToLocalTime():MM-dd HH:mm}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "unknown";
         }
     }
 

@@ -333,12 +333,23 @@ public static class VersionRange
         return true;
     }
 
+    /// <summary>范围是不是通配符（* / x / 任意）。</summary>
+    public static bool IsWildcard(string range)
+    {
+        var text = range.Trim();
+        return text is "*" or "x" or "X" or "任意"
+               || text.Equals("any", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
-    /// 两个 Maven 范围是否可能存在交集。空白范围（任意版本）永远算有交集。
+    /// 两个 Maven 范围是否可能存在交集。空白范围与通配符永远算有交集。
     /// </summary>
     public static bool Overlaps(string left, string right)
     {
         if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right)) return true;
+
+        // "*"/"x" 在 mods.toml 里表示"任意版本"，和谁都有交集（否则 C7 会误报）
+        if (IsWildcard(left) || IsWildcard(right)) return true;
 
         var a = Parse(left);
         var b = Parse(right);
@@ -384,30 +395,56 @@ public static class VersionRange
         return (a.Max, a.MaxInclusive && b.MaxInclusive);
     }
 
-    /// <summary>把 "1.2.1" / "1.20.1-47.2.0" 拆成数字数组。</summary>
-    internal static int[] ParseVersion(string version)
+    /// <summary>
+    /// 版本键：数字核心 + 预发布后缀。Maven/语义化版本里
+    /// <c>1.2.3-beta.1</c> 小于 <c>1.2.3</c>，而 <c>1.2.3+build</c> 与 <c>1.2.3</c> 相等。
+    /// 只比数字会把 <c>0.3.31-beta.53</c> 当成 [0,3,31,53]，比 0.3.31 还大，于是误报"版本不满足"。
+    /// </summary>
+    internal readonly record struct VersionKey(int[] Numbers, string? PreRelease);
+
+    internal static VersionKey ParseVersion(string version)
     {
+        var text = version.Trim();
+
+        // 构建元数据（+xxx）不参与比较
+        var plus = text.IndexOf('+');
+        if (plus >= 0) text = text[..plus];
+
+        string? pre = null;
+        var dash = text.IndexOf('-');
+        if (dash > 0)
+        {
+            pre = text[(dash + 1)..].Trim();
+            text = text[..dash];
+        }
+
         var numbers = new List<int>();
-        foreach (Match match in Regex.Matches(version, @"\d+"))
+        foreach (Match match in Regex.Matches(text, @"\d+"))
         {
             numbers.Add(int.TryParse(match.Value, out var value) ? value : 0);
             if (numbers.Count >= 4) break;
         }
 
-        return numbers.Count == 0 ? [0] : [.. numbers];
+        return new VersionKey(numbers.Count == 0 ? [0] : [.. numbers], string.IsNullOrWhiteSpace(pre) ? null : pre);
     }
 
-    internal static int Compare(int[] left, int[] right)
+    internal static int Compare(VersionKey left, VersionKey right)
     {
-        var length = Math.Max(left.Length, right.Length);
+        var length = Math.Max(left.Numbers.Length, right.Numbers.Length);
         for (var i = 0; i < length; i++)
         {
-            var a = i < left.Length ? left[i] : 0;
-            var b = i < right.Length ? right[i] : 0;
+            var a = i < left.Numbers.Length ? left.Numbers[i] : 0;
+            var b = i < right.Numbers.Length ? right.Numbers[i] : 0;
             if (a != b) return a < b ? -1 : 1;
         }
 
-        return 0;
+        // 数字相同：没有预发布后缀的更大（1.0.0 > 1.0.0-beta）
+        if (left.PreRelease is null && right.PreRelease is null) return 0;
+        if (left.PreRelease is null) return 1;
+        if (right.PreRelease is null) return -1;
+
+        return string.Compare(left.PreRelease, right.PreRelease,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static (string? Min, bool MinInclusive, string? Max, bool MaxInclusive, string? Exact) Parse(string range)
