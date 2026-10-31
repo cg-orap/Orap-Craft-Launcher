@@ -400,6 +400,8 @@ public sealed class ModsViewModel : ObservableObject
         SelectedInstance = instance;
         IsBusy = true;
 
+        var switchWatch = System.Diagnostics.Stopwatch.StartNew();
+
         try
         {
             var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
@@ -426,13 +428,18 @@ public sealed class ModsViewModel : ObservableObject
             OnPropertyChanged(nameof(EnabledCount));
             OnPropertyChanged(nameof(IncompatibleCount));
 
-            await RefreshConflictsAsync(instance).ConfigureAwait(true);
-
-            Status = Mods.Count == 0
+            // 先把列表状态刷出来：冲突扫描可能要几秒，不应该拖着状态行一起等
+            switchWatch.Stop();
+            var baseStatus = Mods.Count == 0
                 ? "该版本还没有安装 Mod。"
                 : $"共 {Mods.Count} 个 Mod，{EnabledCount} 个启用" +
-                  (IncompatibleCount > 0 ? $"，{IncompatibleCount} 个与当前加载器不匹配" : "") +
-                  $"（{ModScanText}；{ConflictScanText}）";
+                  (IncompatibleCount > 0 ? $"，{IncompatibleCount} 个与当前加载器不匹配" : "");
+
+            Status = $"{baseStatus}（{ModScanText}；切换 {switchWatch.ElapsedMilliseconds} ms）";
+
+            await RefreshConflictsAsync(instance).ConfigureAwait(true);
+
+            Status = $"{baseStatus}（{ModScanText}；{ConflictScanText}；切换 {switchWatch.ElapsedMilliseconds} ms）";
         }
         catch (Exception ex)
         {
