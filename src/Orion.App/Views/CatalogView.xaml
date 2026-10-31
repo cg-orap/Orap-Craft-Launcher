@@ -119,17 +119,24 @@
                     <TextBlock Text="资源市场" FontSize="17" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
                                Text="一键安装到当前实例，或作为新版本创建。点击卡片在右侧查看详情。" />
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <WrapPanel Margin="0,10,0,0" Orientation="Horizontal">
                         <TextBlock Text="来源" Style="{StaticResource CaptionText}" VerticalAlignment="Center"
                                    Margin="0,0,10,0" />
-                        <controls:SegmentedControl Grid.Column="1" ItemsSource="{Binding Sources}"
+                        <controls:SegmentedControl ItemsSource="{Binding Sources}"
                                                    SelectedIndex="{Binding SourceIndex, Mode=TwoWay}"
                                                    AutomationProperties.AutomationId="CatalogSourceSwitch" />
-                    </Grid>
+
+                        <!-- 搜索范围：默认只列当前实例 MC 版本能用的内容，可切到不限版本 -->
+                        <TextBlock Text="范围" Style="{StaticResource CaptionText}" VerticalAlignment="Center"
+                                   Margin="16,0,10,0" />
+                        <controls:SegmentedControl ItemsSource="{Binding SearchScopes}"
+                                                   SelectedIndex="{Binding ScopeIndex, Mode=TwoWay}"
+                                                   AutomationProperties.AutomationId="CatalogScopeSwitch" />
+                    </WrapPanel>
+
+                    <TextBlock Text="{Binding ScopeHint}" Style="{StaticResource CaptionText}"
+                               TextWrapping="Wrap" Margin="0,8,0,0" MaxWidth="720"
+                               AutomationProperties.AutomationId="CatalogScopeHint" />
                     <controls:SegmentedControl Margin="0,8,0,0" ItemsSource="{Binding Kinds}"
                                                DisplayMemberPath="Name"
                                                SelectedIndex="{Binding KindIndex, Mode=TwoWay}" />

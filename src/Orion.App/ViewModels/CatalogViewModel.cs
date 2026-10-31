@@ -141,7 +141,7 @@ public sealed class CatalogViewModel : ObservableObject
         new(StringComparer.OrdinalIgnoreCase);
 
     private string CacheKey(int page) =>
-        $"{_kind.Key}|{_category}|{SearchText.Trim()}|{page}|{_main.CurrentInstance?.GameVersion}|{_main.CurrentInstance?.Loader}";
+        $"{_kind.Key}|{_category}|{SearchText.Trim()}|{page}|{_main.CurrentInstance?.GameVersion}|{_main.CurrentInstance?.Loader}|scope{ScopeIndex}";
 
     private void InitializeKindCommand()
     {
@@ -273,6 +273,76 @@ public sealed class CatalogViewModel : ObservableObject
 
     // ── 来源滑块：0 = Modrinth，1 = CurseForge ─────────────
     public IReadOnlyList<string> Sources { get; } = ["Modrinth", "CurseForge"];
+
+    /// <summary>搜索范围：0 = 按当前实例的 MC 版本过滤，1 = 不限版本。</summary>
+    public IReadOnlyList<string> SearchScopes { get; } = ["按当前版本", "不限版本"];
+
+    private int _scopeIndex;
+
+    public int ScopeIndex
+    {
+        get => _scopeIndex;
+        set
+        {
+            if (!SetProperty(ref _scopeIndex, Math.Clamp(value, 0, 1))) return;
+            OnPropertyChanged(nameof(IsVersionFiltered));
+            OnPropertyChanged(nameof(ScopeHint));
+            _ = RefreshForScopeChangeAsync();
+        }
+    }
+
+    public bool IsVersionFiltered => ScopeIndex == 0;
+
+    /// <summary>把当前过滤条件写清楚，避免"搜不到"时不知道是被版本过滤掉了。</summary>
+    public string ScopeHint
+    {
+        get
+        {
+            var instance = _main.CurrentInstance;
+            if (!IsVersionFiltered)
+            {
+                return "不限版本：会列出所有 Minecraft 版本的内容，安装时再按文件兼容性挑版本。";
+            }
+
+            return instance is null
+                ? "当前没有选中版本，搜索不按版本过滤。"
+                : $"只列出支持 {instance.GameVersion} 的内容；机械动力这类没有 {instance.GameVersion} 版本的模组不会出现，可切到「不限版本」。";
+        }
+    }
+
+    /// <summary>
+    /// 侧栏切换当前实例时调用：范围提示要跟着变；如果当前是"按当前版本"过滤，
+    /// 结果也应换到新版本的（否则列表还停在旧版本的搜索结果上）。
+    /// </summary>
+    public void SyncInstance()
+    {
+        OnPropertyChanged(nameof(ScopeHint));
+
+        if (IsCatalogueTab && IsVersionFiltered && !IsVersionsTab && !IsDetailOpen)
+        {
+            _ = SearchAsync(0);
+        }
+    }
+
+    /// <summary>切换搜索范围后重跑当前搜索（有搜索词时按新条件搜，否则刷新列表）。</summary>
+    private async Task RefreshForScopeChangeAsync()
+    {
+        try
+        {
+            if (IsModrinthSource)
+            {
+                await SearchAsync(0).ConfigureAwait(true);
+            }
+            else
+            {
+                await SearchCurseForgeAsync().ConfigureAwait(true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Status = "按新范围重新搜索失败: " + ex.Message;
+        }
+    }
 
     public int SourceIndex
     {
@@ -514,7 +584,8 @@ public sealed class CatalogViewModel : ObservableObject
             // Mods must match the selected version *and* loader; shaders and resource packs have no
             // loader category on Modrinth (filtering by one returns nothing), so only the Minecraft
             // version is applied there. Modpacks carry their own loader, so they are unfiltered.
-            if (_kind.Key is "mod" or "shader" or "resourcepack" && _main.CurrentInstance is { } instance)
+            if (IsVersionFiltered && _kind.Key is "mod" or "shader" or "resourcepack"
+                && _main.CurrentInstance is { } instance)
             {
                 if (!string.IsNullOrWhiteSpace(instance.GameVersion)) query.GameVersion = instance.GameVersion;
 
@@ -1176,8 +1247,10 @@ public sealed class CatalogViewModel : ObservableObject
         try
         {
             var instance = _main.CurrentInstance;
+            var versionFilter = IsVersionFiltered ? instance?.GameVersion : null;
+
             var result = await _main.Context.CurseForge
-                .SearchPageAsync(kind, SearchText, instance?.GameVersion, page, PageSize)
+                .SearchPageAsync(kind, SearchText, versionFilter, page, PageSize)
                 .ConfigureAwait(true);
 
             var packs = result.Packs;

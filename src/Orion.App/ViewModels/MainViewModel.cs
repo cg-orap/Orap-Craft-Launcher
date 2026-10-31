@@ -454,7 +454,7 @@ public sealed class MainViewModel : ObservableObject
             Home.RaisePropertyChanged(nameof(HomeViewModel.LaunchVersionLine));
             ModsPage?.SyncInstance();
             InstancesPage?.SyncSelection();
-            ModsPage?.SyncInstance();
+            CatalogPage?.SyncInstance();
 
             Context.Settings.LastInstanceId = value?.Id;
             _ = Context.SettingsStore.SaveAsync(Context.Settings);
