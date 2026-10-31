@@ -154,9 +154,103 @@ public sealed class HomeViewModel : ObservableObject
             _main.CurrentInstance = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(InstanceTitle));
+            OnPropertyChanged(nameof(InstanceAvatarBrush));
+            RefreshInstanceIcon();
             OnPropertyChanged(nameof(InstanceSubtitle));
             OnPropertyChanged(nameof(LaunchVersionLine));
             _ = RefreshAsync();
+        }
+    }
+
+    /// <summary>
+    /// 实例头像：优先用整合包自带的 icon.png（很多 CF/Modrinth 包都带），
+    /// 没有就用"名字哈希 → 固定渐变 + 首字母"，比原来的浅灰占位清楚得多。
+    /// </summary>
+    public System.Windows.Media.Brush InstanceAvatarBrush
+    {
+        get
+        {
+            var seed = _main.CurrentInstance?.Name ?? "Orap Craft";
+            var hash = 0;
+            foreach (var ch in seed) hash = (hash * 31 + ch) & 0x7FFFFFFF;
+
+            var hue = hash % 360;
+            var from = ColorFromHue(hue, 0.55, 0.62);
+            var to = ColorFromHue((hue + 38) % 360, 0.65, 0.42);
+
+            return new System.Windows.Media.LinearGradientBrush(from, to, 45);
+        }
+    }
+
+    private static System.Windows.Media.Color ColorFromHue(int hue, double saturation, double lightness)
+    {
+        var h = hue / 360.0;
+        var s = saturation;
+        var l = lightness;
+
+        double R, G, B;
+        if (s == 0) { R = G = B = l; }
+        else
+        {
+            var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            var p = 2 * l - q;
+            R = HueToRgb(p, q, h + 1.0 / 3);
+            G = HueToRgb(p, q, h);
+            B = HueToRgb(p, q, h - 1.0 / 3);
+        }
+
+        return System.Windows.Media.Color.FromRgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255));
+    }
+
+    private static double HueToRgb(double p, double q, double t)
+    {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1.0 / 6) return p + (q - p) * 6 * t;
+        if (t < 1.0 / 2) return q;
+        if (t < 2.0 / 3) return p + (q - p) * (2.0 / 3 - t) * 6;
+        return p;
+    }
+
+    private System.Windows.Media.ImageSource? _instanceIcon;
+
+    /// <summary>整合包自带的图标（&lt;gameDir&gt;/icon.png）；没有就是 null。</summary>
+    public System.Windows.Media.ImageSource? InstanceIcon
+    {
+        get => _instanceIcon;
+        private set
+        {
+            _instanceIcon = value;
+            OnPropertyChanged(nameof(InstanceIcon));
+            OnPropertyChanged(nameof(HasInstanceIcon));
+        }
+    }
+
+    public bool HasInstanceIcon => _instanceIcon is not null;
+
+    /// <summary>从实例目录里的 icon.png 读图标（读不到就当作没有，界面回落到渐变首字母）。</summary>
+    public void RefreshInstanceIcon()
+    {
+        var gameDirectory = _main.CurrentInstance?.GameDirectory;
+        if (string.IsNullOrWhiteSpace(gameDirectory)) { InstanceIcon = null; return; }
+
+        var path = System.IO.Path.Combine(gameDirectory, "icon.png");
+        if (!System.IO.File.Exists(path)) { InstanceIcon = null; return; }
+
+        try
+        {
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            image.BeginInit();
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.IgnoreImageCache;
+            image.UriSource = new Uri(path);
+            image.EndInit();
+            image.Freeze();
+            InstanceIcon = image;
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or NotSupportedException or UriFormatException)
+        {
+            InstanceIcon = null;
         }
     }
 

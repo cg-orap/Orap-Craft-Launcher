@@ -75,8 +75,12 @@ public static class ModDependencyScanner
         {
             if (installed.TryGetValue(dependency.ModId, out var version))
             {
-                // 已安装：只有当版本不满足范围时才算问题
+                // 已安装：只有当版本不满足范围时才算问题。
+                // 注意：很多 Forge 模组的 mods.toml 里 version 是没被替换的占位符
+                // （"${file.jarVersion}"），这种值没法比较——直接当"已安装"处理，
+                // 否则补好的前置会被反复报成"缺失"，用户永远修不完。
                 if (string.IsNullOrWhiteSpace(dependency.VersionRange)
+                    || ModDependencyRepair.IsUnresolvedVersion(version)
                     || VersionRange.Satisfies(version, dependency.VersionRange))
                 {
                     continue;

@@ -182,6 +182,13 @@
                                     Command="{Binding OpenDownloadFolderCommand}"
                                     AutomationProperties.AutomationId="OpenDownloadFolderButton"
                                     ToolTip="在资源管理器里打开下载目录（可在设置里改）" />
+
+                            <!-- 下载中：实时速度 + 百分比 -->
+                            <TextBlock Text="{Binding DownloadSpeedText}" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"
+                                       FontFamily="Consolas"
+                                       AutomationProperties.AutomationId="CatalogDownloadSpeed"
+                                       Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="{Binding FilterToggleLabel}" Style="{StaticResource GhostButton}"
                                     FontSize="11" Padding="10,4" Command="{Binding ToggleFilterCommand}"
                                     AutomationProperties.AutomationId="CatalogFilterToggle" />

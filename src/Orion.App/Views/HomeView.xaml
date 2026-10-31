@@ -1,4 +1,4 @@
-<UserControl x:Class="Orion.App.Views.HomeView"
+﻿<UserControl x:Class="Orion.App.Views.HomeView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -87,20 +87,19 @@
                 <Border Style="{StaticResource HomeCard}" Padding="24,20">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
-                            <Border Width="72" Height="72" CornerRadius="10" ClipToBounds="True" Margin="0,0,16,0">
+                            <!-- 实例头像：有整合包图标就显示图标，否则用"名字哈希渐变 + 首字母" -->
+                            <Border Width="72" Height="72" CornerRadius="12" ClipToBounds="True" Margin="0,0,16,0"
+                                    Background="{Binding InstanceAvatarBrush}"
+                                    BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
+                                    AutomationProperties.AutomationId="InstanceAvatar">
                                 <Grid>
-                                    <Rectangle Fill="{DynamicResource SurfaceAltBg}" />
-                                    <Rectangle Height="26" VerticalAlignment="Bottom" Opacity="0.55">
-                                        <Rectangle.Fill>
-                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
-                                                <GradientStop Color="#00000000" Offset="1" />
-                                            </LinearGradientBrush>
-                                        </Rectangle.Fill>
-                                    </Rectangle>
                                     <TextBlock Text="{Binding InstanceTitle, Converter={StaticResource Initial}}"
-                                               FontSize="22" FontWeight="Bold" Foreground="#66FFFFFF"
-                                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,6" />
+                                               FontSize="28" FontWeight="Bold" Foreground="#F2FFFFFF"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding HasInstanceIcon, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                                    <Image Source="{Binding InstanceIcon}" Stretch="UniformToFill"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           Visibility="{Binding HasInstanceIcon, Converter={StaticResource BoolToVisibility}}" />
                                 </Grid>
                             </Border>
 

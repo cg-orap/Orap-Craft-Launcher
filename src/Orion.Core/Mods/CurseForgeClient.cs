@@ -170,6 +170,38 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         }
     }
 
+    /// <summary>
+    /// 按 slug 精确查找项目 id。
+    ///
+    /// 补前置时只靠 searchFilter 关键词搜名字并不可靠：搜 "patchouli" 会返回一堆无关模组，
+    /// 搜 "geckolib3" 更是直接搜不到（它的 slug 是 geckolib）。
+    /// CurseForge 的搜索接口支持 slug= 精确匹配，优先用它。
+    /// </summary>
+    public async Task<int?> FindProjectIdBySlugAsync(string slug, CancellationToken ct = default)
+    {
+        if (!HasKey || string.IsNullOrWhiteSpace(slug)) return null;
+
+        var url = $"{Base}mods/search?gameId=432&slug={Uri.EscapeDataString(slug)}&pageSize=10";
+
+        try
+        {
+            using var response = await SendAsync(HttpMethod.Get, url, ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var payload = await response.Content.ReadFromJsonAsync<SearchResponse>(JsonOptions, ct).ConfigureAwait(false);
+            var data = payload?.Data;
+            if (data is null || data.Count == 0) return null;
+
+            // 优先完全一致的 slug，否则退一步用第一条
+            var exact = data.FirstOrDefault(d => string.Equals(d.Slug, slug, StringComparison.OrdinalIgnoreCase));
+            return (exact ?? data[0]).Id;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>项目详情（含描述与截图）。</summary>
     public async Task<CurseForgeModDetail?> GetModAsync(int modId, CancellationToken ct = default)
     {
@@ -444,6 +476,7 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
     {
         [JsonPropertyName("id")] public int Id { get; init; }
         [JsonPropertyName("name")] public string? Name { get; init; }
+        [JsonPropertyName("slug")] public string? Slug { get; init; }
         [JsonPropertyName("summary")] public string? Summary { get; init; }
         [JsonPropertyName("downloadCount")] public long DownloadCount { get; init; }
         [JsonPropertyName("dateModified")] public DateTimeOffset? DateModified { get; init; }

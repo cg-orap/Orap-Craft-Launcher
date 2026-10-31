@@ -55,6 +55,9 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
         ct = timeout.Token;
 
         var modsDirectory = Path.Combine(gameDirectory, "mods");
+        Orion.Core.Diagnostics.AppLog.Info("deps", "repair-start",
+            ("dir", gameDirectory), ("missing", missing.Count),
+            ("gameVersion", gameVersion ?? "(null)"), ("loader", modLoaderType?.ToString() ?? "(null)"));
         Directory.CreateDirectory(modsDirectory);
         Directory.CreateDirectory(cacheDirectory);
 
@@ -82,6 +85,9 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                 if (installedPath is null)
                 {
                     failed.Add($"{dependency.ModId}（被 {dependency.RequiredBy} 需要，版本 {Describe(dependency.VersionRange)}）");
+                    Orion.Core.Diagnostics.AppLog.Warn("deps", "repair-no-candidate",
+                        ("modId", dependency.ModId), ("requiredBy", dependency.RequiredBy),
+                        ("range", dependency.VersionRange));
                     continue;
                 }
 
@@ -96,6 +102,8 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                                            or TaskCanceledException)
             {
                 failed.Add($"{dependency.ModId}：{ex.Message}");
+                Orion.Core.Diagnostics.AppLog.Warn("deps", "repair-one-failed",
+                    ("modId", dependency.ModId), ("error", ex.Message));
             }
         }
 
@@ -108,6 +116,75 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
     /// 候选项目：CurseForge 没有 modId → 项目 的映射，只能换几种关键词搜同一批结果再逐个核对。
     /// aeronautics_bundled 这种"某个发行版里的模块"名字，靠截断后缀往往能搜到宿主项目。
     /// </summary>
+    /// <summary>
+    /// jar 里声明的版本是否是"没被替换的占位符"（Forge 的 ${file.jarVersion} 之类）。
+    /// 这类值不能拿去比版本范围。
+    /// </summary>
+    internal static bool IsUnresolvedVersion(string? version) =>
+        string.IsNullOrWhiteSpace(version) || version.Contains("${", StringComparison.Ordinal);
+
+    /// <summary>
+    /// modId 是否算"同一个东西"：完全一致，或只差结尾数字（geckolib 与 geckolib3）。
+    /// 只做这么窄的放宽——避免把无关模组当成前置装进去。
+    /// </summary>
+    internal static bool SameMod(string jarModId, string wantedModId)
+    {
+        if (string.Equals(jarModId, wantedModId, StringComparison.OrdinalIgnoreCase)) return true;
+
+        static string StripDigits(string value) => System.Text.RegularExpressions.Regex.Replace(value, "\\d+$", "");
+
+        return string.Equals(StripDigits(jarModId), StripDigits(wantedModId), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 已知"modId 与 CurseForge slug 不同"的对照表。
+    /// 这几个人气模组的 slug 和 modId 差得比较远，光靠规则推不出来。
+    /// </summary>
+    private static readonly Dictionary<string, string> KnownSlugs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["tconstruct"] = "tinkers-construct",
+        ["ftblibrary"] = "ftb-library-forge",
+        ["farmersdelight"] = "farmers-delight",
+        ["architectury"] = "architectury-api",
+        ["geckolib3"] = "geckolib",
+        ["citadel"] = "citadel",
+        ["citadel2"] = "citadel",
+        ["alexsmobs"] = "alexs-mobs",
+        ["apotheosis"] = "apotheosis",
+        ["placebo"] = "placebo",
+        ["attributefix"] = "attributefix",
+        ["bookshelf"] = "bookshelf-lib",
+        ["corgilib"] = "corgilib",
+    };
+
+    /// <summary>
+    /// modId → 可能的 CurseForge slug：原名、去掉结尾数字（geckolib3 → geckolib）、
+    /// 下划线换连字符、去掉常见后缀。
+    /// </summary>
+    internal static IReadOnlyList<string> SlugCandidates(string modId)
+    {
+        var candidates = new List<string>();
+        void Add(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            var trimmed = value.Trim();
+            if (trimmed.Length < 2) return;
+            if (!candidates.Contains(trimmed, StringComparer.OrdinalIgnoreCase)) candidates.Add(trimmed);
+        }
+
+        if (KnownSlugs.TryGetValue(modId, out var known)) Add(known);
+
+        Add(modId);
+        Add(modId.Replace('_', '-'));
+        Add(System.Text.RegularExpressions.Regex.Replace(modId, "\\d+$", ""));           // geckolib3 → geckolib
+        Add(System.Text.RegularExpressions.Regex.Replace(modId, "^(lib|mod)[-_]?", "", RegexOptions.IgnoreCase)); // libx → x
+        Add(modId.Replace("_library", "", StringComparison.OrdinalIgnoreCase)
+                 .Replace("_api", "", StringComparison.OrdinalIgnoreCase)
+                 .Replace("_core", "", StringComparison.OrdinalIgnoreCase));
+
+        return candidates;
+    }
+
     private async Task<IReadOnlyList<CurseForgePack>> SearchCandidatesAsync(
         string modId, string? gameVersion, CancellationToken ct)
     {
@@ -130,6 +207,27 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
 
         var seen = new HashSet<int>();
         var result = new List<CurseForgePack>();
+
+        // 先用 slug 精确匹配（CurseForge 支持 slug= 精确查询）。
+        // 关键词搜索对 patchouli / curios / geckolib3 / titanium 这些名字基本没用：
+        // 要么被同名小模组淹没，要么 slug 与 modId 不同（geckolib3 → geckolib）。
+        foreach (var slug in SlugCandidates(modId))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                var id = await client.FindProjectIdBySlugAsync(slug, ct).ConfigureAwait(false);
+                if (id is null || !seen.Add(id.Value)) continue;
+
+                var pack = await client.GetPackAsync(id.Value, ct).ConfigureAwait(false);
+                if (pack is not null) result.Add(pack);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                // 单个 slug 失败不影响后面的模糊搜索
+            }
+        }
 
         // 先放已知的宿主项目，命中就不用搜索
         if (KnownBundledProjects.TryGetValue(modId, out var knownId))
@@ -194,6 +292,9 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
             if (file is null) continue;
 
             progress?.Report($"尝试 {candidate.Name} → {file.FileName}…");
+            Orion.Core.Diagnostics.AppLog.Info("deps", "candidate-file",
+                ("modId", dependency.ModId), ("project", candidate.Id), ("file", file.FileName),
+                ("gameVersions", string.Join('|', file.GameVersions)));
 
             var temporary = Path.Combine(cacheDirectory, "dep-" + Guid.NewGuid().ToString("N") + ".jar");
             try
@@ -205,19 +306,37 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                 catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
                 {
                     progress?.Report($"{candidate.Name} 下载失败（{ex.Message}），换下一个候选…");
+                    Orion.Core.Diagnostics.AppLog.Warn("deps", "download-failed",
+                        ("modId", dependency.ModId), ("file", file.FileName), ("error", ex.Message));
                     continue;
                 }
 
                 var info = ReadModId(temporary, dependency.ModId);
-                if (info is null) continue;
+                if (info is null)
+                {
+                    Orion.Core.Diagnostics.AppLog.Warn("deps", "jar-no-modid",
+                        ("modId", dependency.ModId), ("file", file.FileName));
+                    continue;
+                }
 
                 var (modId, version) = info.Value;
-                if (!string.Equals(modId, dependency.ModId, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!SameMod(modId, dependency.ModId))
+                {
+                    Orion.Core.Diagnostics.AppLog.Warn("deps", "jar-modid-mismatch",
+                        ("wanted", dependency.ModId), ("got", modId), ("file", file.FileName));
+                    continue;
+                }
 
-                if (!string.IsNullOrWhiteSpace(dependency.VersionRange)
+                // 很多 Forge 模组的 mods.toml 里 version 是没被替换的占位符（例如 "${file.jarVersion}"），
+                // 拿它去比版本范围必然失败，于是"正确的文件"被当成不合格丢掉。
+                // 这种情况跳过版本范围检查：版本/加载器/modId 已经在前面核对过了。
+                if (!IsUnresolvedVersion(version)
+                    && !string.IsNullOrWhiteSpace(dependency.VersionRange)
                     && !VersionRange.Satisfies(version, dependency.VersionRange))
                 {
                     progress?.Report($"{candidate.Name} 版本 {version} 不满足 {dependency.VersionRange}，继续找…");
+                    Orion.Core.Diagnostics.AppLog.Warn("deps", "jar-version-rejected",
+                        ("modId", dependency.ModId), ("version", version), ("range", dependency.VersionRange));
                     continue;
                 }
 

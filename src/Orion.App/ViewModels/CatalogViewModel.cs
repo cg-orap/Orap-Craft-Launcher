@@ -161,6 +161,11 @@ public sealed class CatalogViewModel : ObservableObject
     {
         // 占位：真正的赋值在构造函数内完成（见 SelectKindCommand = ...）。
     }
+    private readonly System.Windows.Threading.DispatcherTimer _downloadWatch = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(500),
+    };
+
     public CatalogViewModel(MainViewModel main)
     {
         _main = main;
@@ -186,8 +191,13 @@ public sealed class CatalogViewModel : ObservableObject
         ToggleFilterCommand = new RelayCommand(() => IsFilterExpanded = !IsFilterExpanded);
         CloseDetailCommand = new RelayCommand(CloseDetail);
         CancelOperationCommand = new RelayCommand(CancelOperation, () => Busy);
+        _downloadWatch.Tick += (_, _) =>
+        {
+            OnPropertyChanged(nameof(DownloadSpeedText));
+            OnPropertyChanged(nameof(IsDownloading));
+        };
+        _downloadWatch.Start();
     }
-
     public RelayCommand CancelOperationCommand { get; }
 
     /// <summary>Stops the running install; the downloader reacts to the cancellation token.</summary>
@@ -328,6 +338,28 @@ public sealed class CatalogViewModel : ObservableObject
 
     /// <summary>下载中心顶部的「打开下载目录」。</summary>
     public ICommand OpenDownloadFolderCommand { get; }
+
+    /// <summary>
+    /// 当前下载任务的实时速度/百分比（下载中心顶部显示）。
+    /// 直接读 Activities 里正在跑的那一项，避免再开一套进度通道。
+    /// </summary>
+    public string DownloadSpeedText
+    {
+        get
+        {
+            var running = _main.Activities.Items.FirstOrDefault(a => a.State == ActivityState.Running);
+            if (running is null) return "";
+
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(running.Speed)) parts.Add(running.Speed);
+            if (!string.IsNullOrWhiteSpace(running.PercentText)) parts.Add(running.PercentText);
+            if (parts.Count == 0) return "";
+
+            return "正在下载：" + string.Join(" · ", parts);
+        }
+    }
+
+    public bool IsDownloading => _main.Activities.Items.Any(a => a.State == ActivityState.Running);
 
     /// <summary>下载前询问保存位置（详情页等子视图通过宿主转发）。</summary>
     public bool ConfirmDownload(string title) => _main.ConfirmDownloadLocation(title);
