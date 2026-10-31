@@ -33,7 +33,11 @@
             <DataTemplate DataType="{x:Type vm:InstancesViewModel}">
                 <views:InstancesView />
             </DataTemplate>
-            <DataTemplate DataType="{x:Type vm:ContentViewModel}">
+            <DataTemplate DataType="{x:Type vm:SpaceViewModel}">
+            <views:SpaceView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type vm:ContentViewModel}">
             <views:ContentView />
         </DataTemplate>
 

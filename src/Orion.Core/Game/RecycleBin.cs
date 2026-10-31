@@ -27,6 +27,25 @@ public static class RecycleBin
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHFileOperation(ref SHFILEOPSTRUCT operation);
 
+    /// <summary>Recycles a single file. Throws IOException when the shell refuses.</summary>
+    public static void RemoveFile(string path)
+    {
+        if (!File.Exists(path)) return;
+
+        var operation = new SHFILEOPSTRUCT
+        {
+            wFunc = FO_DELETE,
+            pFrom = path + '\0' + '\0',
+            fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI,
+        };
+
+        var result = SHFileOperation(ref operation);
+        if (result != 0 || operation.fAnyOperationsAborted)
+        {
+            throw new IOException($"无法移除到回收站（代码 {result}）。");
+        }
+    }
+
     /// <summary>Recycles a directory. Throws IOException when the shell refuses.</summary>
     public static void RemoveDirectory(string path)
     {

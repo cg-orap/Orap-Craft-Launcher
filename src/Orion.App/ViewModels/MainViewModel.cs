@@ -151,6 +151,7 @@ public sealed class MainViewModel : ObservableObject
         VersionPickerPage = new VersionPickerViewModel(this);
         ModsPage = new ModsViewModel(this);
         ContentPage = new ContentViewModel(this);
+        SpacePage = new SpaceViewModel(this);
         DownloadsPage = new DownloadsViewModel(this);
         SettingsPage = new SettingsViewModel(this);
         LogsPage = new LogsViewModel(this);
@@ -179,6 +180,7 @@ public sealed class MainViewModel : ObservableObject
             },
             new NavItem("mods", "Mod 管理", "\uE7B8", "资源"),
             new NavItem("content", "资源", "\uE838", "资源"),   // 文件夹打开图标，别和 Mod 管理重复
+            new NavItem("space", "空间", "\uE9D9", "系统"),
             new NavItem("downloads", "下载管理", "\uE81C", "任务"),
             new NavItem("toolbox", "工具箱", "\uE90F", "系统"),
         new NavItem("backup", "备份", "\uE8F1", "系统"),
@@ -269,6 +271,8 @@ public sealed class MainViewModel : ObservableObject
     public ModsViewModel ModsPage { get; }
 
     public ContentViewModel ContentPage { get; }
+
+    public SpaceViewModel SpacePage { get; }
     public DownloadsViewModel DownloadsPage { get; }
     public SettingsViewModel SettingsPage { get; }
     public LogsViewModel LogsPage { get; }
@@ -575,6 +579,7 @@ public sealed class MainViewModel : ObservableObject
             "instances" => InstancesPage,
             "mods" => ModsPage,
             "content" => ContentPage,
+            "space" => SpacePage,
             "downloads" => DownloadsPage,
             "settings" => SettingsPage,
             "logs" => LogsPage,
@@ -588,6 +593,7 @@ public sealed class MainViewModel : ObservableObject
         if (key == "instances") _ = InstancesPage.LoadAsync();
         if (key == "mods") _ = ModsPage.LoadModsAsync();
         if (key == "content") { ContentPage.SyncInstance(); _ = ContentPage.RefreshAsync(); }
+        if (key == "space") _ = SpacePage.RefreshAsync();
         if (key == "home") _ = Home.RefreshAsync();
     }
 
