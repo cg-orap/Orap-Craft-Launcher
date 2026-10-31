@@ -41,6 +41,9 @@ public sealed class GamePaths
     public string RuntimeDir => Path.Combine(Root, "runtime");
     public string InstancesDir => Path.Combine(Root, "instances");
     public string CacheDir => Path.Combine(Root, "cache");
+
+    /// <summary>默认下载目录（用户没自定义时用这里）。</summary>
+    public string DownloadsDir => Path.Combine(Root, "downloads");
     public string LogsDir => Path.Combine(Root, "logs");
     public string AccountsFile => Path.Combine(Root, "accounts.json");
     public string SettingsFile => Path.Combine(Root, "settings.json");

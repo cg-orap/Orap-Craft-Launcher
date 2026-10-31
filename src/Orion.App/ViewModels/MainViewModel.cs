@@ -31,7 +31,18 @@ public sealed class ActivityItem : ObservableObject
 
     public string Title { get => _title; set => SetProperty(ref _title, value); }
     public string Detail { get => _detail; set => SetProperty(ref _detail, value); }
-    public double Fraction { get => _fraction; set => SetProperty(ref _fraction, value); }
+    public double Fraction
+    {
+        get => _fraction;
+        set
+        {
+            if (!SetProperty(ref _fraction, value)) return;
+            OnPropertyChanged(nameof(PercentText));
+        }
+    }
+
+    /// <summary>进度百分比文本（下载管理行里显示具体数值，进度条只看大概）。</summary>
+    public string PercentText => _fraction <= 0 ? "" : _fraction >= 1 ? "100%" : $"{_fraction * 100:0.0}%";
     public string Speed { get => _speed; set => SetProperty(ref _speed, value); }
     public string? Error { get => _error; set => SetProperty(ref _error, value); }
     public DateTimeOffset StartedAt { get; } = DateTimeOffset.Now;
@@ -340,6 +351,77 @@ public sealed class MainViewModel : ObservableObject
     public bool IsDownloadsSelected => NavKey == "downloads";
     public bool IsSettingsSelected => NavKey == "settings";
     public bool IsLogsSelected => NavKey == "logs";
+
+    /// <summary>当前生效的下载目录（用户自定义优先，否则 &lt;数据根&gt;\downloads）。</summary>
+    public string EffectiveDownloadsDir =>
+        Core.Game.DownloadPaths.Resolve(Context.Paths, Context.Settings.DownloadDirectory);
+
+    /// <summary>下载目录是否就是默认目录（界面显示"（默认）"用）。</summary>
+    public bool IsDefaultDownloadDir =>
+        Core.Game.DownloadPaths.IsDefault(Context.Paths, Context.Settings.DownloadDirectory);
+
+    /// <summary>写入下载目录设置并立即生效（null/空白 = 恢复默认）。</summary>
+    public void SetDownloadDirectory(string? directory)
+    {
+        var normalized = string.IsNullOrWhiteSpace(directory) ? null : directory.Trim();
+        Context.Settings.DownloadDirectory = normalized;
+        _ = Context.SettingsStore.SaveAsync(Context.Settings);
+
+        OnPropertyChanged(nameof(EffectiveDownloadsDir));
+        OnPropertyChanged(nameof(IsDefaultDownloadDir));
+    }
+
+    /// <summary>在资源管理器里打开下载目录（不存在就先建出来，避免"打开没反应"）。</summary>
+    public void OpenDownloadFolder()
+    {
+        try
+        {
+            var directory = EffectiveDownloadsDir;
+            Directory.CreateDirectory(directory);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{directory}\"")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("download", "open-folder-failed", ("error", ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// 下载前询问保存位置：返回 false 表示用户取消，不要继续下载。
+    /// 默认目录 / 选择其他目录 / 取消；选择的自定义目录会被记住（下次仍会询问，可在设置里关掉）。
+    /// </summary>
+    public bool ConfirmDownloadLocation(string title)
+    {
+        if (!Context.Settings.AskDownloadLocation) return true;
+
+        var defaultDir = Core.Game.DownloadPaths.Default(Context.Paths);
+        var current = EffectiveDownloadsDir;
+
+        var answer = MessageBox.Show(
+            $"要把「{title}」下载到默认目录吗？\n\n默认目录：{defaultDir}\n当前目录：{current}\n\n" +
+            "「是」用当前目录下载\n「否」选择其他目录\n「取消」不下载",
+            "选择下载位置",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (answer == MessageBoxResult.Cancel) return false;
+        if (answer == MessageBoxResult.Yes) return true;
+
+        var picker = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "选择下载目录",
+            InitialDirectory = Directory.Exists(current) ? current : defaultDir,
+            Multiselect = false,
+        };
+
+        if (picker.ShowDialog() != true) return false;
+
+        SetDownloadDirectory(picker.FolderName);
+        return true;
+    }
 
     public Account? CurrentAccount
     {

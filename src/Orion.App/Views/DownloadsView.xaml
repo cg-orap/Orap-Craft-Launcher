@@ -33,7 +33,7 @@
                 <WrapPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="打开日志目录" Style="{StaticResource GhostButton}"
                             Command="{Binding OpenLogFolderCommand}" Margin="0,0,8,0" />
-                    <Button Content="打开缓存目录" Style="{StaticResource GhostButton}"
+                    <Button Content="打开下载目录" Style="{StaticResource GhostButton}"
                             Command="{Binding OpenDownloadsFolderCommand}" Margin="0,0,8,0" />
                     <Button Content="清除已完成" Style="{StaticResource GhostButton}"
                             Command="{Binding ClearFinishedCommand}" />
@@ -79,7 +79,17 @@
                                 </Border>
                             </StackPanel>
 
-                            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" anim:AnimatedValue.To="{Binding Fraction}" Maximum="1" Margin="0,8,0,0" />
+                            <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ProgressBar Grid.Column="0" anim:AnimatedValue.To="{Binding Fraction}" Maximum="1" />
+                                <TextBlock Grid.Column="1" Text="{Binding PercentText}" FontSize="11.5"
+                                           FontFamily="Consolas" Margin="10,0,0,0" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextBrush}"
+                                           AutomationProperties.AutomationId="DownloadPercent" />
+                            </Grid>
 
                             <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Detail}" Style="{StaticResource CaptionText}"
                                        TextWrapping="Wrap" Margin="0,6,0,0" />

@@ -311,7 +311,32 @@
                                 <TextBox Text="{Binding MaxConcurrency, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,12"
                                          Width="120" HorizontalAlignment="Left" />
 
-                                <TextBlock Text="代理（例如 http://127.0.0.1:7890）" Style="{StaticResource CaptionText}" />
+                                <TextBlock Text="下载目录（整合包、模组等下载文件的保存位置）" Style="{StaticResource CaptionText}"
+                                           Margin="0,0,0,6" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding DownloadDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.AutomationId="DownloadDirectoryBox" />
+                                    <Button Grid.Column="1" Content="浏览…" Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding BrowseDownloadDirectoryCommand}" Margin="8,0,0,0" Padding="12,6" />
+                                    <Button Grid.Column="2" Content="打开" Style="{StaticResource GhostButton}"
+                                            Command="{Binding OpenDownloadDirectoryCommand}" Margin="8,0,0,0" Padding="12,6" />
+                                    <Button Grid.Column="3" Content="恢复默认" Style="{StaticResource GhostButton}"
+                                            Command="{Binding ResetDownloadDirectoryCommand}" Margin="8,0,0,0" Padding="12,6" />
+                                </Grid>
+                                <TextBlock Text="{Binding DownloadDirectoryHint}" Style="{StaticResource CaptionText}"
+                                           TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <CheckBox Content="每次下载前询问保存位置（默认目录 / 自定义目录）"
+                                          IsChecked="{Binding AskDownloadLocation, Mode=TwoWay}" Margin="0,8,0,0"
+                                          AutomationProperties.AutomationId="AskDownloadLocationToggle" />
+
+                                <TextBlock Text="代理（例如 http://127.0.0.1:7890）" Style="{StaticResource CaptionText}"
+                                           Margin="0,14,0,0" />
                                 <TextBox Text="{Binding ProxyUrl, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" />
 
                                 <TextBlock Text="镜像仅作为传输替代，所有文件仍按官方 SHA-1 校验。启动器不会关闭 TLS 证书验证。"

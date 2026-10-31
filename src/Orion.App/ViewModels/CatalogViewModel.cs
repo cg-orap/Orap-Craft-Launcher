@@ -177,6 +177,7 @@ public sealed class CatalogViewModel : ObservableObject
         _kind = Kinds[0];
 
         SearchCommand = new AsyncRelayCommand(() => SearchAsync(0), () => !_busy);
+        OpenDownloadFolderCommand = new RelayCommand(() => _main.OpenDownloadFolder());
         NextPageCommand = new AsyncRelayCommand(
             () => SearchAsync((IsCurseForgeSource ? _cfPage : _page) + 1), () => !_busy && HasNextPage);
         PreviousPageCommand = new AsyncRelayCommand(
@@ -324,6 +325,12 @@ public sealed class CatalogViewModel : ObservableObject
     };
 
     public AsyncRelayCommand SearchCommand { get; }
+
+    /// <summary>下载中心顶部的「打开下载目录」。</summary>
+    public ICommand OpenDownloadFolderCommand { get; }
+
+    /// <summary>下载前询问保存位置（详情页等子视图通过宿主转发）。</summary>
+    public bool ConfirmDownload(string title) => _main.ConfirmDownloadLocation(title);
     public AsyncRelayCommand NextPageCommand { get; }
     public AsyncRelayCommand PreviousPageCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
@@ -987,6 +994,8 @@ public sealed class CatalogViewModel : ObservableObject
             return;
         }
 
+        if (!_main.ConfirmDownloadLocation(displayName)) return;
+
         if (_main.CurrentInstance is not { } instance)
         {
             Status = "请先在「版本管理」中创建或选择一个版本。";
@@ -1135,6 +1144,9 @@ public sealed class CatalogViewModel : ObservableObject
     /// <summary>Installs a pack file from disk (<c>.mrpack</c> or a Modrinth <c>.zip</c> export).</summary>
     public async Task InstallPackFileAsync(string path, string? name, CancellationToken ct = default)
     {
+        // 下载前询问保存位置（用户可在设置里关掉）。取消就什么都不做。
+        if (!_main.ConfirmDownloadLocation(name ?? Path.GetFileName(path))) return;
+
         var activity = _main.Activities.Begin($"安装整合包 {name ?? Path.GetFileName(path)}", path);
 
         Busy = true;
@@ -1474,6 +1486,8 @@ public sealed class CatalogViewModel : ObservableObject
             Status = "请先选择一个版本，再安装" + KindNameOf(kind) + "。";
             return;
         }
+
+        if (!_main.ConfirmDownloadLocation(row.Title)) return;
 
         Busy = true;
         var activity = _main.Activities.Begin($"安装 {row.Title}", KindNameOf(kind));

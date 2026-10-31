@@ -88,9 +88,57 @@ public sealed class SettingsViewModel : ObservableObject
         OpenDataFolderCommand = new RelayCommand(() => OpenFolder(_main.Context.Paths.Root));
         OpenLogsCommand = new RelayCommand(() => OpenFolder(_main.Context.Paths.LogsDir));
         OpenAccountsCommand = new RelayCommand(() => _main.Navigate("home"));
+        BrowseDownloadDirectoryCommand = new RelayCommand(BrowseDownloadDirectory);
+        OpenDownloadDirectoryCommand = new RelayCommand(() => _main.OpenDownloadFolder());
+        ResetDownloadDirectoryCommand = new RelayCommand(() => DownloadDirectory = _main.Context.Paths.DownloadsDir);
     }
 
     public ICommand SaveCommand { get; }
+
+    public ICommand BrowseDownloadDirectoryCommand { get; }
+    public ICommand OpenDownloadDirectoryCommand { get; }
+    public ICommand ResetDownloadDirectoryCommand { get; }
+
+    /// <summary>下载目录（可自定义；空白 = 默认 &lt;数据根&gt;\downloads）。</summary>
+    public string DownloadDirectory
+    {
+        get => _downloadDirectory;
+        set
+        {
+            if (!SetProperty(ref _downloadDirectory, value)) return;
+            OnPropertyChanged(nameof(DownloadDirectoryHint));
+        }
+    }
+
+    private string _downloadDirectory = "";
+
+    public string DownloadDirectoryHint =>
+        "实际使用：" + (string.IsNullOrWhiteSpace(DownloadDirectory)
+            ? _main.Context.Paths.DownloadsDir + "（默认）"
+            : _main.Context.Paths.Resolve(DownloadDirectory.Trim()));
+
+    /// <summary>每次下载前是否询问保存位置。</summary>
+    public bool AskDownloadLocation
+    {
+        get => _askDownloadLocation;
+        set => SetProperty(ref _askDownloadLocation, value);
+    }
+
+    private bool _askDownloadLocation = true;
+
+    private void BrowseDownloadDirectory()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "选择下载目录",
+            InitialDirectory = Directory.Exists(DownloadDirectoryHint.Replace("实际使用：", "").Replace("（默认）", ""))
+                ? DownloadDirectoryHint.Replace("实际使用：", "").Replace("（默认）", "")
+                : _main.Context.Paths.DownloadsDir,
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() == true) DownloadDirectory = dialog.FolderName;
+    }
 
     private string _saveLabel = "保存设置";
 
@@ -271,6 +319,8 @@ public sealed class SettingsViewModel : ObservableObject
         ForceUtf8Console = settings.ForceUtf8Console;
         MicrosoftClientId = settings.MicrosoftClientId ?? "";
         CurseForgeApiKey = settings.CurseForgeApiKey ?? "";
+        DownloadDirectory = settings.DownloadDirectory ?? "";
+        AskDownloadLocation = settings.AskDownloadLocation;
 
         OnPropertyChanged(nameof(DataRoot));
     }
@@ -291,6 +341,8 @@ public sealed class SettingsViewModel : ObservableObject
         settings.ForceUtf8Console = ForceUtf8Console;
         settings.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();
         settings.CurseForgeApiKey = string.IsNullOrWhiteSpace(CurseForgeApiKey) ? null : CurseForgeApiKey.Trim();
+        settings.DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory) ? null : DownloadDirectory.Trim();
+        settings.AskDownloadLocation = AskDownloadLocation;
         // 用户清空自己的 Key 时回退到内置分发 Key，不要因此把 CurseForge 关掉
         _main.Context.CurseForge.SetApiKey(Orion.Core.Mods.CurseForgeDefaults.Resolve(settings.CurseForgeApiKey));
 

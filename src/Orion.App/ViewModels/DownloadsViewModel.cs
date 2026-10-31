@@ -19,7 +19,7 @@ public sealed class DownloadsViewModel : ObservableObject
 
         SaveConcurrencyCommand = new AsyncRelayCommand(SaveConcurrencyAsync);
         OpenLogFolderCommand = new RelayCommand(() => OpenFolder(_main.Context.Paths.LogsDir));
-        OpenDownloadsFolderCommand = new RelayCommand(() => OpenFolder(Path.Combine(_main.Context.Paths.Root, "cache")));
+        OpenDownloadsFolderCommand = new RelayCommand(() => _main.OpenDownloadFolder());
         ClearFinishedCommand = new RelayCommand(ClearFinished);
         CancelTaskCommand = new RelayCommand(CancelTask);
         RefreshCommand = new RelayCommand(() => OnPropertyChanged(nameof(Items)));

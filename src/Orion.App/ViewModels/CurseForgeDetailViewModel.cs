@@ -190,6 +190,8 @@ public sealed class CurseForgeDetailViewModel(
 
     public async Task InstallAsync(CurseForgeVersionRow version)
     {
+        if (!owner.ConfirmDownload(version.Name)) return;
+
         Status = $"正在安装 {version.FileName}…";
         await owner.InstallCurseForgeVersionAsync(Row, version.File).ConfigureAwait(true);
         Status = owner.Status;

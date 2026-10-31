@@ -176,13 +176,16 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Button Content="{Binding FilterToggleLabel}" Style="{StaticResource GhostButton}"
-                                FontSize="11" Padding="10,4" Command="{Binding ToggleFilterCommand}"
-                                AutomationProperties.AutomationId="CatalogFilterToggle">
-                            <Button.ContextMenu>
-                                <ContextMenu />
-                            </Button.ContextMenu>
-                        </Button>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="打开下载目录" Style="{StaticResource GhostButton}"
+                                    FontSize="11" Padding="10,4" Margin="0,0,8,0"
+                                    Command="{Binding OpenDownloadFolderCommand}"
+                                    AutomationProperties.AutomationId="OpenDownloadFolderButton"
+                                    ToolTip="在资源管理器里打开下载目录（可在设置里改）" />
+                            <Button Content="{Binding FilterToggleLabel}" Style="{StaticResource GhostButton}"
+                                    FontSize="11" Padding="10,4" Command="{Binding ToggleFilterCommand}"
+                                    AutomationProperties.AutomationId="CatalogFilterToggle" />
+                        </StackPanel>
                         <TextBlock Grid.Column="1" Text="{Binding FilterSummary}" Style="{StaticResource CaptionText}"
                                    VerticalAlignment="Center" Margin="10,0,0,0"
                                    TextTrimming="CharacterEllipsis"

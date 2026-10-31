@@ -38,6 +38,15 @@ public sealed class LauncherSettings
     /// <summary>减少动效：关闭位移/缩放，只保留极短的透明度过渡（无障碍设置）。</summary>
     [JsonPropertyName("reduceMotion")] public bool ReduceMotion { get; set; }
 
+    /// <summary>
+    /// 下载保存目录。为空表示用默认目录（数据根目录下的 downloads）。
+    /// 整合包 zip、手动下载的模组文件等都放这里；游戏本体仍按标准布局放在 libraries/versions。
+    /// </summary>
+    [JsonPropertyName("downloadDirectory")] public string? DownloadDirectory { get; set; }
+
+    /// <summary>每次下载前是否弹框询问保存位置（默认是）。</summary>
+    [JsonPropertyName("askDownloadLocation")] public bool AskDownloadLocation { get; set; } = true;
+
     [JsonPropertyName("microsoftClientId")] public string? MicrosoftClientId { get; set; }
     [JsonPropertyName("selectedAccountId")] public string? SelectedAccountId { get; set; }
     [JsonPropertyName("lastInstanceId")] public string? LastInstanceId { get; set; }
