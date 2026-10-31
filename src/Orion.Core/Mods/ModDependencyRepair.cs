@@ -55,6 +55,9 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
         ct = timeout.Token;
 
         var modsDirectory = Path.Combine(gameDirectory, "mods");
+
+        // 补进来的文件不能和已装的东西打架（例如 colorwheel ↔ irisfly）
+        var installedModIds = ModDependencyScanner.ReadInstalledIds(modsDirectory);
         Orion.Core.Diagnostics.AppLog.Info("deps", "repair-start",
             ("dir", gameDirectory), ("missing", missing.Count),
             ("gameVersion", gameVersion ?? "(null)"), ("loader", modLoaderType?.ToString() ?? "(null)"));
@@ -79,7 +82,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
 
             try
             {
-                var installedPath = await TryInstallOneAsync(dependency, modsDirectory, cacheDirectory,
+                var installedPath = await TryInstallOneAsync(dependency, installedModIds, modsDirectory, cacheDirectory,
                     gameVersion, modLoaderType, progress, ct).ConfigureAwait(false);
 
                 if (installedPath is null)
@@ -279,6 +282,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
     }
     private async Task<string?> TryInstallOneAsync(
         RequiredDependency dependency,
+        IReadOnlySet<string> installedModIds,
         string modsDirectory,
         string cacheDirectory,
         string? gameVersion,
@@ -332,6 +336,21 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                     Orion.Core.Diagnostics.AppLog.Warn("deps", "jar-modid-mismatch",
                         ("wanted", dependency.ModId), ("got", modId), ("file", file.FileName));
                     continue;
+                }
+
+                // 补前置不能把整合包搞坏：如果这个文件声明了与某个已装模组不兼容，就跳过。
+                // （真实案例：自动补进来的 colorwheel 与 irisfly 冲突，游戏直接崩）
+                var incompatible = ModDependencyScanner.ReadIncompatible(temporary);
+                if (incompatible.Count > 0)
+                {
+                    var clash = incompatible.FirstOrDefault(id => installedModIds.Contains(id));
+                    if (clash is not null)
+                    {
+                        progress?.Report($"{candidate.Name} 与已安装的 {clash} 不兼容，跳过…");
+                        Orion.Core.Diagnostics.AppLog.Warn("deps", "candidate-incompatible",
+                            ("modId", dependency.ModId), ("file", file.FileName), ("conflictsWith", clash ?? "(unknown)"));
+                        continue;
+                    }
                 }
 
                 // 很多 Forge 模组的 mods.toml 里 version 是没被替换的占位符（例如 "${file.jarVersion}"），

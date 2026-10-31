@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orion.Core.Diagnostics;
@@ -500,6 +500,76 @@ public sealed class PackArchiveInstaller
     }
 
     /// <summary>
+    /// 把 mods 里 <c>curseforge-&lt;projectID&gt;-&lt;fileID&gt;.jar</c> 这类占位文件名改回真实文件名。
+    ///
+    /// 为什么值得做：整合包自带的完整性检查（例如 Better MC 的 "Too Many Changes Warning"）
+    /// 会把这些名字对不上清单的文件算成"用户改过整合包"，于是一进游戏就弹一堆警告。
+    /// 改名需要查 CurseForge 元数据，所以单独做成一步、由用户点按钮触发。
+    /// </summary>
+    public async Task<int> NormalizePlaceholderNamesAsync(
+        string gameDirectory,
+        IProgress<string>? output = null,
+        CancellationToken ct = default)
+    {
+        var modsDirectory = Path.Combine(gameDirectory, "mods");
+        AppLog.Info("packs", "rename-start", ("dir", modsDirectory), ("hasKey", !string.IsNullOrWhiteSpace(_curseForgeApiKey)));
+
+        if (!Directory.Exists(modsDirectory) || string.IsNullOrWhiteSpace(_curseForgeApiKey)) return 0;
+
+        var placeholders = new List<(string Path, int Project, int FileId)>();
+
+        foreach (var path in Directory.EnumerateFiles(modsDirectory, "*.jar"))
+        {
+            var stem = Path.GetFileNameWithoutExtension(path);
+            var match = System.Text.RegularExpressions.Regex.Match(stem, @"^curseforge-(\d+)-(\d+)$");
+            if (!match.Success) continue;
+
+            placeholders.Add((path, int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value)));
+        }
+
+        AppLog.Info("packs", "rename-placeholders", ("count", placeholders.Count));
+        if (placeholders.Count == 0) return 0;
+
+        output?.Report($"发现 {placeholders.Count} 个文件用的是占位名，正在改回真实文件名…");
+
+        var metaClient2 = new CurseForgeClient(_http, _curseForgeApiKey);
+        var renamed = 0;
+
+        foreach (var (path, project, fileId) in placeholders)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var meta = await metaClient2.GetFileAsync(project, fileId, ct).ConfigureAwait(false);
+            var target = CurseForgeCdn.NormalizeFileName(meta?.FileName);
+            if (target is null)
+            {
+                AppLog.Warn("packs", "rename-no-metadata", ("project", project), ("file", fileId));
+                continue;
+            }
+
+            var destination = Path.Combine(modsDirectory, target);
+            if (string.Equals(destination, path, StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                // 目标已存在（同名文件）就不动，避免覆盖
+                if (File.Exists(destination)) continue;
+
+                File.Move(path, destination);
+                renamed++;
+                AppLog.Info("packs", "renamed", ("from", Path.GetFileName(path)), ("to", target));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                AppLog.Warn("packs", "rename-failed", ("from", Path.GetFileName(path)), ("error", ex.Message));
+            }
+        }
+
+        output?.Report($"已把 {renamed} 个文件改回真实名字。");
+        return renamed;
+    }
+
+    /// <summary>
     /// 按安装报告重下"当时没下下来"的文件。
     ///
     /// 报告里记的是 projectID + fileID，和整合包 manifest 一致，
@@ -731,11 +801,31 @@ public sealed class PackArchiveInstaller
         List<string>? warnings,
         CancellationToken ct)
     {
-        var name = CurseForgeCdn.NormalizeFileName(file.FileName)
-                   ?? $"curseforge-{file.ProjectId}-{file.FileId}.jar";
+        // 文件名优先用真实名字：manifest 里通常没有，就先查一次元数据。
+        // 用 curseforge-<projectID>-<fileID>.jar 这种占位名会导致
+        //   ① 用户看不懂 ② 整合包自带的完整性检查（如 Better MC 的 "Too Many Changes"）把这些当成被人改过
+        //   ③ 更新时对不上原来的文件
+        var resolvedName = CurseForgeCdn.NormalizeFileName(file.FileName);
+
+        if (resolvedName is null && !string.IsNullOrWhiteSpace(_curseForgeApiKey))
+        {
+            try
+            {
+                var metaClient = new CurseForgeClient(_http, _curseForgeApiKey);
+                var meta = await metaClient.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct)
+                    .ConfigureAwait(false);
+                resolvedName = CurseForgeCdn.NormalizeFileName(meta?.FileName);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                // 查不到就用占位名继续下载，至少别让文件缺失
+            }
+        }
+
+        var name = resolvedName ?? $"curseforge-{file.ProjectId}-{file.FileId}.jar";
 
         // 1) 先按已有信息试：CDN 直链（需要文件名）→ API download-url → curseforge 跳转
-        if (await TryDownloadAsync(file, CurseForgeCdn.Urls((int)file.FileId, file.FileName), modsDirectory,
+        if (await TryDownloadAsync(file, CurseForgeCdn.Urls((int)file.FileId, resolvedName), modsDirectory,
                 name, warnings, ct).ConfigureAwait(false))
         {
             return true;

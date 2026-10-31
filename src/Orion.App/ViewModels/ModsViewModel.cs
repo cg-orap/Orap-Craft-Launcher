@@ -811,13 +811,24 @@ public sealed class ModsViewModel : ObservableObject
 
         try
         {
-            var recovered = await _main.Context.PackArchives
-                .RepairIncompleteAsync(instance.GameDirectory,
-                    new Progress<string>(line => Status = line)).ConfigureAwait(true);
+            var progress = new Progress<string>(line => Status = line);
 
-            Status = recovered == 0
-                ? "安装报告里没有可补的文件（或重试仍失败，详见 .orap-install-report.json）。"
-                : $"已补下 {recovered} 个文件，请点「重新扫描」后启动。";
+            var recovered = await _main.Context.PackArchives
+                .RepairIncompleteAsync(instance.GameDirectory, progress).ConfigureAwait(true);
+
+            // 顺手把 curseforge-<id>-<id>.jar 这类占位名改回真实文件名：
+            // 否则整合包自带的完整性检查会把它们当成"用户改过整合包"。
+            var renamed = await _main.Context.PackArchives
+                .NormalizePlaceholderNamesAsync(instance.GameDirectory, progress).ConfigureAwait(true);
+
+            if (recovered == 0 && renamed == 0)
+            {
+                Status = "没有需要修复的文件（缺失清单为空、文件名都正常）。";
+            }
+            else
+            {
+                Status = $"已补下 {recovered} 个文件、改名 {renamed} 个，请点「重新扫描」后启动。";
+            }
 
             _main.Activities.Finish(activity, recovered == 0 ? ActivityState.Failed : ActivityState.Completed, Status);
             _main.LogsPage.AppendSystem(Status);

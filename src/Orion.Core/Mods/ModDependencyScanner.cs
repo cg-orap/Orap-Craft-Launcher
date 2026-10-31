@@ -263,6 +263,95 @@ public static class ModDependencyScanner
     /// 够用的 TOML 解析：只关心 [[mods]] 与 [[dependencies.xxx]] 两个表，
     /// 不引入 TOML 库（发布是单文件、离线可还原的）。
     /// </summary>
+    /// <summary>读出某个 jar 声明"与哪些模组不兼容"（type = "incompatible"）。</summary>
+    public static IReadOnlyList<string> ReadIncompatible(string jarPath)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(jarPath);
+            var toml = zip.Entries.FirstOrDefault(e =>
+                           e.FullName.Equals(NeoForgeToml, StringComparison.OrdinalIgnoreCase))
+                       ?? zip.Entries.FirstOrDefault(e =>
+                           e.FullName.Equals(ForgeToml, StringComparison.OrdinalIgnoreCase));
+            if (toml is null) return [];
+
+            using var reader = new StreamReader(toml.Open());
+            return ParseIncompatible(reader.ReadToEnd());
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>解析 <c>[[dependencies.x]]</c> 里 <c>type = "incompatible"</c> 的 modId。</summary>
+    internal static IReadOnlyList<string> ParseIncompatible(string toml)
+    {
+        var result = new List<string>();
+        string? currentId = null;
+        var incompatible = false;
+
+        void Flush()
+        {
+            if (incompatible && !string.IsNullOrWhiteSpace(currentId) && !result.Contains(currentId!))
+            {
+                result.Add(currentId!);
+            }
+
+            currentId = null;
+            incompatible = false;
+        }
+
+        foreach (var rawLine in toml.Split('\n'))
+        {
+            var line = StripInlineComment(rawLine).Trim();
+            if (line.Length == 0) continue;
+
+            if (line.StartsWith("[[", StringComparison.Ordinal))
+            {
+                Flush();
+                continue;
+            }
+
+            var equals = line.IndexOf('=');
+            if (equals <= 0) continue;
+
+            var key = line[..equals].Trim().ToLowerInvariant();
+            var value = line[(equals + 1)..].Trim().Trim('"', '\'');
+
+            switch (key)
+            {
+                case "modid":
+                    currentId = value;
+                    break;
+                case "type" when value.Contains("incompatible", StringComparison.OrdinalIgnoreCase):
+                case "mandatory" when value.Equals("false", StringComparison.OrdinalIgnoreCase):
+                    incompatible = true;
+                    break;
+            }
+        }
+
+        Flush();
+        return result;
+    }
+
+    /// <summary>当前 mods 目录里已经装了哪些 modId（用于"别补进来一个和它冲突的"）。</summary>
+    public static IReadOnlySet<string> ReadInstalledIds(string modsDirectory)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!Directory.Exists(modsDirectory)) return ids;
+
+        foreach (var jar in Directory.EnumerateFiles(modsDirectory, "*.jar"))
+        {
+            var info = ReadJar(jar);
+            if (info is null) continue;
+
+            foreach (var (id, _) in info.Mods) ids.Add(id);
+        }
+
+        return ids;
+    }
+
     internal static JarInfo? ParseToml(string toml)
     {
         var mods = new List<(string Id, string Version)>();
