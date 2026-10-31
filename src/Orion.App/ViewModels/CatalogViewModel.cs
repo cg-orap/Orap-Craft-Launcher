@@ -653,12 +653,16 @@ public sealed class CatalogViewModel : ObservableObject
         private set
         {
             if (!SetProperty(ref _busy, value)) return;
+            OnPropertyChanged(nameof(ShowSkeleton));
             SearchCommand.RaiseCanExecuteChanged();
             NextPageCommand.RaiseCanExecuteChanged();
             PreviousPageCommand.RaiseCanExecuteChanged();
             RefreshCommand.RaiseCanExecuteChanged();
         }
     }
+
+    /// <summary>首次搜索还没结果时显示骨架屏。</summary>
+    public bool ShowSkeleton => Busy && Results.Count == 0 && CurseForgeResults.Count == 0;
 
     public string PageText => _totalHits == 0 && _cfTotalHits == 0
         ? ""

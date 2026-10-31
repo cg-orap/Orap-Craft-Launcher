@@ -371,8 +371,15 @@ public sealed class ModsViewModel : ObservableObject
     public bool IsBusy
     {
         get => _isBusy;
-        private set => SetProperty(ref _isBusy, value);
+        private set
+        {
+            if (!SetProperty(ref _isBusy, value)) return;
+            OnPropertyChanged(nameof(ShowSkeleton));
+        }
     }
+
+    /// <summary>首次加载且还没有任何行时显示骨架屏（有数据就不显示，避免闪一下）。</summary>
+    public bool ShowSkeleton => IsBusy && Mods.Count == 0;
 
     public bool IsSearching
     {

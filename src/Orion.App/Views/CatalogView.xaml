@@ -294,79 +294,84 @@
 
             <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6"
                     Visibility="{Binding IsModrinthSource, Converter={StaticResource BoolToVisibility}}">
-                <ListBox ItemsSource="{Binding Results}" Background="Transparent" BorderThickness="0"
-                         anim:StaggerIn.IsEnabled="True"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         PreviewMouseLeftButtonUp="OnResultClick"
-                         AutomationProperties.AutomationId="CatalogList"
-                         ItemTemplate="{StaticResource MarketRowTemplate}">
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="Margin" Value="0,0,0,2" />
-                            <Setter Property="Cursor" Value="Hand" />
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Row" Background="Transparent" CornerRadius="8"
-                                                Padding="12,10" BorderThickness="1" BorderBrush="Transparent">
-                                            <Grid>
-                                                <ContentPresenter />
-                                                <!-- hover/选中：强调色淡罩在内容之上，120ms 过渡 -->
-                                                <Border x:Name="Hover" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
-                                                        Background="{DynamicResource AccentBrush}" />
-                                                <Border x:Name="Selected" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
-                                                        Background="{DynamicResource AccentBrush}" />
-                                                </Grid>
-                                            </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                                         To="0.08" Duration="0:0:0.12">
-                                                            <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                                         To="0" Duration="0:0:0.12" />
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
-                                            </Trigger>
-                                            <Trigger Property="IsSelected" Value="True">
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
-                                                                         To="0.16" Duration="0:0:0.12">
-                                                            <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
-                                                                         To="0" Duration="0:0:0.12" />
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                </ListBox>
+            <Grid>
+                    <ListBox ItemsSource="{Binding Results}" Background="Transparent" BorderThickness="0"
+                             anim:StaggerIn.IsEnabled="True"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             PreviewMouseLeftButtonUp="OnResultClick"
+                             AutomationProperties.AutomationId="CatalogList"
+                             ItemTemplate="{StaticResource MarketRowTemplate}">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Margin" Value="0,0,0,2" />
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Row" Background="Transparent" CornerRadius="8"
+                                                    Padding="12,10" BorderThickness="1" BorderBrush="Transparent">
+                                                <Grid>
+                                                    <ContentPresenter />
+                                                    <!-- hover/选中：强调色淡罩在内容之上，120ms 过渡 -->
+                                                    <Border x:Name="Hover" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
+                                                            Background="{DynamicResource AccentBrush}" />
+                                                    <Border x:Name="Selected" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
+                                                            Background="{DynamicResource AccentBrush}" />
+                                                    </Grid>
+                                                </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                                             To="0.08" Duration="0:0:0.12">
+                                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.12" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                                             To="0.16" Duration="0:0:0.12">
+                                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.12" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+                <!-- 首次搜索骨架屏 -->
+                <controls:SkeletonList Rows="6"
+                                       Visibility="{Binding ShowSkeleton, Converter={StaticResource BoolToVisibility}}" />
+            </Grid>
             </Border>
 
             <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6"
