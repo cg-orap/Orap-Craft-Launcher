@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:anim="clr-namespace:Orion.App.Animations"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1000">
 
@@ -97,7 +98,8 @@
                     <TextBlock DockPanel.Dock="Top" Text="{Binding VersionsHeader}"
                                Style="{StaticResource SectionTitle}" Margin="4,4,0,8" />
 
-                    <ListBox ItemsSource="{Binding Versions}" Background="Transparent" BorderThickness="0"
+                    <ListBox ItemsSource="{Binding Versions}"
+                         anim:StaggerIn.IsEnabled="True" Background="Transparent" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.AutomationId="VersionList">
                         <ListBox.ItemContainerStyle>

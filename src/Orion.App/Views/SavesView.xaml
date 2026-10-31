@@ -83,7 +83,8 @@
                             </WrapPanel>
                         </Grid>
 
-                        <ItemsControl ItemsSource="{Binding Worlds}" Margin="0,10,0,0">
+                        <ItemsControl ItemsSource="{Binding Worlds}"
+                         anim:StaggerIn.IsEnabled="True" Margin="0,10,0,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="8"

@@ -37,23 +37,38 @@ public static class StaggerIn
 
     private static void Animate(ItemsControl items)
     {
+        // 减少动效：直接显示，不做交错
+        if (Motion.ReduceMotion)
+        {
+            foreach (var item in items.Items)
+            {
+                if (items.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement element)
+                {
+                    element.Opacity = 1;
+                }
+            }
+
+            return;
+        }
+
         var index = 0;
         foreach (var item in items.Items)
         {
             if (items.ItemContainerGenerator.ContainerFromItem(item) is not FrameworkElement container) continue;
 
-            var delay = TimeSpan.FromMilliseconds(Math.Min(index, 12) * 40);
+            // 只对前 StaggerMax 项做交错，其余一起出现：否则 376 行要等十几秒
+            var staggerIndex = Math.Min(index, Motion.StaggerMax);
+            var delay = TimeSpan.FromMilliseconds(staggerIndex * Motion.StaggerStep);
             index++;
 
             container.Opacity = 0;
-            var transform = container.RenderTransform as TranslateTransform ?? new TranslateTransform();
-            container.RenderTransform = transform;
+            var translate = Motion.EnsureTranslate(container);
 
-            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var duration = TimeSpan.FromMilliseconds(Motion.Base + 40);
             container.BeginAnimation(UIElement.OpacityProperty,
-                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220)) { BeginTime = delay, EasingFunction = ease });
-            transform.BeginAnimation(TranslateTransform.YProperty,
-                new DoubleAnimation(10, 0, TimeSpan.FromMilliseconds(220)) { BeginTime = delay, EasingFunction = ease });
+                new DoubleAnimation(0, 1, duration) { BeginTime = delay, EasingFunction = Motion.Enter });
+            translate.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(6, 0, duration) { BeginTime = delay, EasingFunction = Motion.Enter });
         }
     }
 }
