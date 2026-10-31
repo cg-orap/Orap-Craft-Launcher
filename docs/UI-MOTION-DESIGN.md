@@ -304,3 +304,22 @@ public static class Motion
 - 行 hover 的"可见反馈"来自模板里既有的高亮，那部分仍是瞬时；
 - 下一轮要做的不是继续加动画，而是**先统一行高亮的来源**：把模板内各自为政的 hover 高亮收敛到
   一个遮罩层，并让遮罩色与主题的 `SurfaceHover` 拉开一点对比（例如叠一层 `AccentBrush` 6% 透明度）。
+
+### 行 hover 的第二轮排查（找到真凶）
+
+用"单像素采样"（比整帧差更抗干扰）在 1.2s 慢放版本上测：
+
+| 时刻 | 像素 RGB |
+|---|---|
+| 静止 | 247, 249, 252 |
+| +80 ms | **230, 235, 242**（已到终态） |
+| +250…1400 ms | 230, 235, 242（不再变化） |
+
+`230,235,242` 正好是 **Snow 主题的 `SurfaceHover` = #E6EBF2**，也就是"瞬时高亮"用的那个颜色。
+顺着颜色找源码，确认了真凶：全站有 **8 处各自的隐式 `ListBoxItem` 样式**（`CatalogView` ×3、
+`CatalogDetailView`、`InstancesView`、`ModsView` ×2、`VersionPickerView`、`LoginWindow`），
+它们把全局样式完全遮住，各自在 `IsMouseOver` 里直接 `Setter Background`。我改的全局样式对这些列表无效。
+
+**下一轮的明确任务**：把这 8 处收敛成一份共享的行样式（`Themes/Controls.xaml` 里那份动画版），
+局部样式只保留必要的差异（内边距/圆角），hover/选中一律走同一个动画遮罩。
+在此之前，行 hover 仍是瞬时——这一点不做掩饰。

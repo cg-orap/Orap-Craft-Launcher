@@ -550,12 +550,12 @@
                 <ControlTemplate TargetType="ListBoxItem">
                     <Border x:Name="Bd" Background="Transparent" CornerRadius="9" Padding="1">
                         <Grid>
-                            <!-- 全站列表行的 hover/选中统一 120ms 过渡，不再瞬间换底色 -->
-                            <Border x:Name="Hover" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
-                                    Background="{DynamicResource SurfaceHover}" />
-                            <Border x:Name="Selected" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
-                                    Background="{DynamicResource ChipBg}" />
                             <ContentPresenter />
+                            <!-- hover/选中：强调色淡罩盖在内容"之上"（行内容是不透明卡片，放下面看不见），120ms 过渡 -->
+                            <Border x:Name="Hover" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
+                                    Background="{DynamicResource AccentBrush}" />
+                            <Border x:Name="Selected" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
+                                    Background="{DynamicResource AccentBrush}" />
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -564,7 +564,7 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                         To="1" Duration="0:0:0.12">
+                                                         To="0.08" Duration="0:0:0.12">
                                             <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                     </Storyboard>
@@ -584,7 +584,7 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
-                                                         To="1" Duration="0:0:0.12">
+                                                         To="0.16" Duration="0:0:0.12">
                                             <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                     </Storyboard>
