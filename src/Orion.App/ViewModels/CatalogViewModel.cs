@@ -347,19 +347,25 @@ public sealed class CatalogViewModel : ObservableObject
     {
         get
         {
+            // 速度来自 TransferMeter：所有下载路径（整合包文件、模组、游戏文件）都会往它报字节数，
+            // 这里只负责拼成一行字。任何任务在跑就显示，不再依赖 ActivityItem.Speed 是否被填。
+            var speed = Orion.Core.Net.TransferMeter.FormatSpeed();
             var running = _main.Activities.Items.FirstOrDefault(a => a.State == ActivityState.Running);
-            if (running is null) return "";
+            var percent = running?.PercentText;
 
-            var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(running.Speed)) parts.Add(running.Speed);
-            if (!string.IsNullOrWhiteSpace(running.PercentText)) parts.Add(running.PercentText);
+            var parts = new List<string>(2);
+            if (!string.IsNullOrWhiteSpace(speed)) parts.Add(speed);
+            if (!string.IsNullOrWhiteSpace(percent)) parts.Add(percent);
+
             if (parts.Count == 0) return "";
-
             return "正在下载：" + string.Join(" · ", parts);
         }
     }
 
-    public bool IsDownloading => _main.Activities.Items.Any(a => a.State == ActivityState.Running);
+    public bool IsDownloading =>
+        _main.Activities.Items.Any(a => a.State == ActivityState.Running)
+        || Busy
+        || !string.IsNullOrEmpty(Orion.Core.Net.TransferMeter.FormatSpeed());
 
     /// <summary>下载前询问保存位置（详情页等子视图通过宿主转发）。</summary>
     public bool ConfirmDownload(string title) => _main.ConfirmDownloadLocation(title);
@@ -1412,8 +1418,11 @@ public sealed class CatalogViewModel : ObservableObject
                 Status = $"正在下载 {file.FileName}…";
                 var downloadProgress = new Progress<long>(percent =>
                 {
-                    Status = $"正在下载 {file.FileName}… {percent}%";
-                    _main.Activities.Report(activity, percent / 100.0 * 0.25, $"下载整合包 {percent}%", "");
+                    var speedText = Orion.Core.Net.TransferMeter.FormatSpeed();
+                    Status = string.IsNullOrEmpty(speedText)
+                        ? $"正在下载 {file.FileName}… {percent}%"
+                        : $"正在下载 {file.FileName}… {percent}%  ·  {speedText}";
+                    _main.Activities.Report(activity, percent / 100.0 * 0.25, $"下载整合包 {percent}%", speedText);
                 });
 
                 var zip = await _main.Context.CurseForge
@@ -1568,8 +1577,11 @@ public sealed class CatalogViewModel : ObservableObject
                 // 进度同时写进活动条目：任务面板上能看到百分比，而不是一直"进行中"
                 var progress = new Progress<long>(percent =>
                 {
-                    Status = $"正在下载 {file.FileName}… {percent}%";
-                    _main.Activities.Report(activity, percent / 100.0 * 0.25, $"下载整合包 {percent}%", "");
+                    var speedText = Orion.Core.Net.TransferMeter.FormatSpeed();
+                    Status = string.IsNullOrEmpty(speedText)
+                        ? $"正在下载 {file.FileName}… {percent}%"
+                        : $"正在下载 {file.FileName}… {percent}%  ·  {speedText}";
+                    _main.Activities.Report(activity, percent / 100.0 * 0.25, $"下载整合包 {percent}%", speedText);
                 });
 
                 var zip = await _main.Context.CurseForge
@@ -1619,7 +1631,13 @@ public sealed class CatalogViewModel : ObservableObject
             Status = $"正在下载 {file.FileName}…";
             var saved = await _main.Context.CurseForge
                 .DownloadFileAsync(file, target,
-                    new Progress<long>(percent => Status = $"正在下载 {file.FileName}… {percent}%"),
+                    new Progress<long>(percent =>
+                    {
+                        var speedText = Orion.Core.Net.TransferMeter.FormatSpeed();
+                        Status = string.IsNullOrEmpty(speedText)
+                            ? $"正在下载 {file.FileName}… {percent}%"
+                            : $"正在下载 {file.FileName}… {percent}%  ·  {speedText}";
+                    }),
                     _installCts.Token)
                 .ConfigureAwait(true);
 

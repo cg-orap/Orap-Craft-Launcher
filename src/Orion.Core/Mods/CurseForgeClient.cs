@@ -386,6 +386,8 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         {
             await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             written += read;
+            // 界面上的"实时下载速度"来自这里（下载中心 → 装整合包/装模组都走这条路）
+            Net.TransferMeter.Report(read);
             if (total > 0) progress?.Report((long)(written * 100.0 / total));
         }
 
@@ -455,9 +457,14 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
 
     private static string Sanitize(string fileName, string fallback)
     {
-        var name = string.IsNullOrWhiteSpace(fileName) ? fallback + ".zip" : fileName;
+        var name = string.IsNullOrWhiteSpace(fileName) ? fallback : fileName;
         foreach (var invalid in Path.GetInvalidFileNameChars()) name = name.Replace(invalid, '_');
-        return name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? name : name + ".zip";
+
+        if (string.IsNullOrWhiteSpace(Path.GetExtension(name))) name += ".zip";
+
+        // 注意：绝不能给 .jar 再补一个 .zip —— 变成 xxx.jar.zip 之后 Forge/NeoForge 根本不加载它，
+        // 用户看到的就是"装了但没生效"。
+        return name;
     }
 
     /// <summary>

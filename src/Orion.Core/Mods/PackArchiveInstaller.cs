@@ -1,4 +1,4 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orion.Core.Diagnostics;
@@ -600,6 +600,21 @@ public sealed class PackArchiveInstaller
         }
     }
 
+    /// <summary>拷贝流的同时把字节数报给 TransferMeter（界面上的实时下载速度来自这里）。</summary>
+    private static async Task CopyWithMeterAsync(Stream source, Stream destination, CancellationToken ct)
+    {
+        var buffer = new byte[81920];
+
+        while (true)
+        {
+            var read = await source.ReadAsync(buffer, ct).ConfigureAwait(false);
+            if (read <= 0) break;
+
+            await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+            Orion.Core.Net.TransferMeter.Report(read);
+        }
+    }
+
     /// <summary>删除下载失败留下的半截文件（失败也无所谓）。</summary>
     private static void TryDeleteFile(string path)
     {
@@ -821,7 +836,7 @@ public sealed class PackArchiveInstaller
                 await using (var stream = await response.Content.ReadAsStreamAsync(perFile.Token).ConfigureAwait(false))
                 await using (var destination = File.Create(target))
                 {
-                    await stream.CopyToAsync(destination, perFile.Token).ConfigureAwait(false);
+                    await CopyWithMeterAsync(stream, destination, perFile.Token).ConfigureAwait(false);
                 }
 
                 // 只认真正的 jar/zip：小 JSON、HTML 错误页、截断文件一律丢弃并换下一个源

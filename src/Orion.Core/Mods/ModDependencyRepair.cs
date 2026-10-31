@@ -84,7 +84,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
 
                 if (installedPath is null)
                 {
-                    failed.Add($"{dependency.ModId}（被 {dependency.RequiredBy} 需要，版本 {Describe(dependency.VersionRange)}）");
+                    failed.Add($"{dependency.ModId}（被 {dependency.RequiredBy} 需要，{NoCandidateNote(dependency)}）");
                     Orion.Core.Diagnostics.AppLog.Warn("deps", "repair-no-candidate",
                         ("modId", dependency.ModId), ("requiredBy", dependency.RequiredBy),
                         ("range", dependency.VersionRange));
@@ -135,6 +135,12 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
 
         return string.Equals(StripDigits(jarModId), StripDigits(wantedModId), StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>找不到候选时给用户看的说明（区分"版本不对"和"根本搜不到"）。</summary>
+    private static string NoCandidateNote(RequiredDependency dependency) =>
+        VersionRange.IsUnconstrained(dependency.VersionRange)
+            ? "CurseForge 上搜不到这个模组，可能是别的模组内嵌的库"
+            : $"CurseForge 上搜不到满足版本 {Describe(dependency.VersionRange)} 的文件";
 
     /// <summary>
     /// 已知"modId 与 CurseForge slug 不同"的对照表。
