@@ -27,6 +27,11 @@
         <Style x:Key="RailItemStyle" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
             <Setter Property="Cursor" Value="Hand" />
+            <!-- 悬停提示：模板里那个空 Grid 没有背景、命中不到，ToolTip 必须挂在 ListBoxItem 上 -->
+            <Setter Property="ToolTip" Value="{Binding Title}" />
+            <Setter Property="ToolTipService.Placement" Value="Right" />
+            <Setter Property="ToolTipService.HorizontalOffset" Value="6" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="250" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -204,11 +209,7 @@
                              SelectionChanged="OnNavSelectionChanged"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Hidden">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid ToolTip="{Binding Title}" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
+
                     </ListBox>
                 </DockPanel>
                 </Grid>
