@@ -129,6 +129,7 @@ public sealed class ModsViewModel : ObservableObject
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !string.IsNullOrWhiteSpace(SearchText) && !IsSearching);
         SearchCurseForgeCommand = new AsyncRelayCommand(SearchCurseForgeAsync, () => !IsPackSearching);
         RepairDependenciesCommand = new AsyncRelayCommand(RepairDependenciesAsync, () => !IsBusy);
+        RepairFromLogCommand = new AsyncRelayCommand(RepairFromLogAsync, () => !IsBusy);
         ToggleConflictCardCommand = new RelayCommand(() => IsConflictCardExpanded = !IsConflictCardExpanded);
         RefreshCurseForgeKeyCommand = new RelayCommand(() => OnPropertyChanged(nameof(HasCurseForgeKey)));
         OpenFolderCommand = new RelayCommand(OpenModsFolder);
@@ -317,6 +318,9 @@ public sealed class ModsViewModel : ObservableObject
 
     /// <summary>检查当前实例缺少的必需前置并自动补齐。</summary>
     public ICommand RepairDependenciesCommand { get; private set; } = null!;
+
+    /// <summary>从崩溃日志里补齐前置。</summary>
+    public ICommand RepairFromLogCommand { get; private set; } = null!;
 
     /// <summary>展开/收起模组冲突卡片。</summary>
     public ICommand ToggleConflictCardCommand { get; private set; } = null!;
@@ -750,6 +754,73 @@ public sealed class ModsViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = "补齐失败: " + ex.Message;
+            _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// 从游戏崩溃日志里补齐前置：游戏自己会说"缺 iceberg / libx"，
+    /// 这比靠 jar 元数据推断更准（有些模组把依赖写在别处，扫描会漏）。
+    /// </summary>
+    public async Task RepairFromLogAsync()
+    {
+        var instance = SelectedInstance ?? _main.CurrentInstance;
+        if (instance is null)
+        {
+            Status = "请先选择一个版本。";
+            return;
+        }
+
+        var report = Orion.Core.Mods.MissingModLogParser.FindNewestReport(instance.GameDirectory);
+        if (report is null)
+        {
+            Status = "没找到日志（crash-reports 或 logs/latest.log），请先启动一次游戏。";
+            return;
+        }
+
+        var missing = Orion.Core.Mods.MissingModLogParser.ParseFile(report);
+        if (missing.Count == 0)
+        {
+            Status = $"日志里没有发现缺失前置：{Path.GetFileName(report)}";
+            return;
+        }
+
+        IsBusy = true;
+        var activity = _main.Activities.Begin($"按日志补齐前置（{instance.Name}）",
+            $"日志里发现 {missing.Count} 个缺失");
+        Status = $"日志里发现 {missing.Count} 个缺失前置，正在补齐…";
+
+        try
+        {
+            var required = missing
+                .Select(m => new Orion.Core.Mods.RequiredDependency(m.ModId, m.RequiredBy, "任意"))
+                .ToList();
+
+            var result = await _main.Context.DependencyRepair.RepairAsync(
+                instance.GameDirectory,
+                required,
+                instance.GameVersion,
+                instance.Loader == LoaderKind.Vanilla ? null : Orion.Core.Mods.CurseForgeClient.LoaderTypeOf(instance.Loader),
+                Path.Combine(instance.GameDirectory, ".orap-cache"),
+                new Progress<string>(line => Status = line)).ConfigureAwait(true);
+
+            Status = result.Remaining.Count == 0
+                ? $"已按日志补齐 {result.Installed.Count} 个前置。"
+                : $"补齐 {result.Installed.Count} 个，仍有 {result.Remaining.Count} 个没补上：" +
+                  string.Join('、', result.Remaining.Select(r => r.ModId).Take(6));
+
+            _main.Activities.Finish(activity,
+                result.Remaining.Count == 0 ? ActivityState.Completed : ActivityState.Failed, Status);
+            _main.LogsPage.AppendSystem(Status);
+            await LoadModsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Status = "按日志补齐失败: " + ex.Message;
             _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
         }
         finally

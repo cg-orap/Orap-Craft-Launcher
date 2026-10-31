@@ -315,6 +315,74 @@ public sealed class HomeViewModel : ObservableObject
         return JavaDetector.SelectFor(requiredMajor, runtimes);
     }
 
+    /// <summary>
+    /// 启动前预检：扫描 mods 目录的必需前置，缺就自动补齐；补不上再问用户要不要硬启动。
+    /// 返回 false 表示用户选择取消启动。
+    /// </summary>
+    private async Task<bool> PreflightDependenciesAsync(Core.Instances.Instance instance)
+    {
+        var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
+        if (!Directory.Exists(modsDirectory)) return true;
+
+        IReadOnlyList<Core.Mods.RequiredDependency> missing;
+        try
+        {
+            var scan = Core.Mods.ModDependencyScanner.Scan(modsDirectory);
+            missing = scan.Missing;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 扫描失败不该拦住启动
+            return true;
+        }
+
+        if (missing.Count == 0) return true;
+
+        LaunchStatus = $"检测到 {missing.Count} 个缺失前置，正在自动补齐…";
+
+        try
+        {
+            var result = await _main.Context.DependencyRepair.RepairAsync(
+                instance.GameDirectory,
+                missing,
+                instance.GameVersion,
+                instance.Loader == Core.Instances.LoaderKind.Vanilla
+                    ? null
+                    : Core.Mods.CurseForgeClient.LoaderTypeOf(instance.Loader),
+                Path.Combine(instance.GameDirectory, ".orap-cache"),
+                new Progress<string>(line => LaunchStatus = line)).ConfigureAwait(true);
+
+            if (result.Remaining.Count == 0)
+            {
+                LaunchStatus = result.Installed.Count > 0
+                    ? $"已自动补齐 {result.Installed.Count} 个前置。"
+                    : LaunchStatus;
+                return true;
+            }
+
+            var list = string.Join("\n", result.Remaining.Take(10)
+                .Select(m => $"· {m.ModId}（被 {m.RequiredBy} 需要）"));
+            var answer = MessageBox.Show(
+                $"还有 {result.Remaining.Count} 个前置没补上：\n\n{list}\n\n" +
+                "现在启动很可能会停在「Error loading mods」界面。仍要启动吗？",
+                "前置缺失",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            return answer == MessageBoxResult.Yes;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+            var answer = MessageBox.Show(
+                "检查前置时网络出错：" + ex.Message + "\n\n仍要尝试启动吗？",
+                "检查前置失败",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            return answer == MessageBoxResult.Yes;
+        }
+    }
+
     private async Task LaunchAsync()
     {
         var instance = _main.CurrentInstance;
@@ -345,6 +413,9 @@ public sealed class HomeViewModel : ObservableObject
                 return;
             }
         }
+
+        // 启动前先查一遍缺失前置：整合包最常见的崩溃就是缺前置（Error loading mods）。
+        if (!await PreflightDependenciesAsync(instance).ConfigureAwait(true)) return;
 
         var activity = _main.Activities.Begin($"启动 {instance.Name}", instance.Subtitle);
         IsLaunching = true;

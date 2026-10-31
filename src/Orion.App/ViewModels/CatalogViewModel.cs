@@ -1218,6 +1218,23 @@ public sealed class CatalogViewModel : ObservableObject
                 : "整合包安装失败：" + (result.Error ?? "未知错误");
 
             _main.LogsPage.AppendSystem(Status);
+
+            // 安装报告里如果还有"前置没补上"，直接弹出来并引导到模组页——
+            // 否则用户只会看到游戏启动时那片红字 "Error loading mods"。
+            var missingNote = result.Warnings?.FirstOrDefault(w => w.Contains("前置", StringComparison.Ordinal)
+                                                                   || w.Contains("缺失", StringComparison.Ordinal));
+            if (result.Success && missingNote is not null)
+            {
+                var details = string.Join("\n", result.Warnings!.Take(14));
+                var go = System.Windows.MessageBox.Show(
+                    details + "\n\n现在启动游戏很可能会停在「Error loading mods」界面。\n" +
+                    "要打开「Mod 管理」用『按日志补齐』再补一次吗？",
+                    "前置没补齐",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Warning);
+
+                if (go == System.Windows.MessageBoxResult.Yes) _main.Navigate("mods");
+            }
         }
         catch (OperationCanceledException)
         {

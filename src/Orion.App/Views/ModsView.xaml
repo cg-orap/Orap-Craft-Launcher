@@ -168,6 +168,10 @@
                                     Command="{Binding RepairDependenciesCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
                                     ToolTip="扫描 mods 里每个 mods.toml 的必需依赖，缺的用 CurseForge 自动下载补齐"
                                     AutomationProperties.AutomationId="RepairDependencies" />
+                                    <Button Content="按日志补齐" Style="{StaticResource GhostButton}"
+                                            Command="{Binding RepairFromLogCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                            AutomationProperties.AutomationId="RepairFromLogButton"
+                                            ToolTip="读取 crash-reports / logs/latest.log，按游戏自己报的『缺少 xxx』去补齐（比扫描更准）" />
                         </WrapPanel>
                     </Grid>
 
