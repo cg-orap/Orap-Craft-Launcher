@@ -142,6 +142,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
     /// </summary>
     private static readonly Dictionary<string, string> KnownSlugs = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["kotlinforforge"] = "kotlin-for-forge",
         ["tconstruct"] = "tinkers-construct",
         ["ftblibrary"] = "ftb-library-forge",
         ["farmersdelight"] = "farmers-delight",

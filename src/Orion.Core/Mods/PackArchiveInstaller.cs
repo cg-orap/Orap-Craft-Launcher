@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orion.Core.Diagnostics;
@@ -500,6 +500,82 @@ public sealed class PackArchiveInstaller
     }
 
     /// <summary>
+    /// 按安装报告重下"当时没下下来"的文件。
+    ///
+    /// 报告里记的是 projectID + fileID，和整合包 manifest 一致，
+    /// 所以不需要再靠 modId 搜名字——这是补全一个"装了一半"的整合包最可靠的办法。
+    /// </summary>
+    public async Task<int> RepairIncompleteAsync(
+        string gameDirectory,
+        IProgress<string>? output = null,
+        CancellationToken ct = default)
+    {
+        var reportPath = Path.Combine(gameDirectory, ".orap-install-report.json");
+        if (!File.Exists(reportPath)) return 0;
+
+        List<(long Project, long File)> pending;
+        try
+        {
+            using var document = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath, ct).ConfigureAwait(false));
+            if (!document.RootElement.TryGetProperty("failures", out var failures) ||
+                failures.ValueKind != JsonValueKind.Array)
+            {
+                return 0;
+            }
+
+            pending = [];
+            foreach (var entry in failures.EnumerateArray())
+            {
+                var text = entry.GetString();
+                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                // 形如 "curseforge-1111501-8747159.jar  →  https://..."
+                var match = System.Text.RegularExpressions.Regex.Match(text, @"curseforge-(\d+)-(\d+)\.jar");
+                if (match.Success)
+                {
+                    pending.Add((long.Parse(match.Groups[1].Value), long.Parse(match.Groups[2].Value)));
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            AppLog.Warn("packs", "install-report-unreadable", ("error", ex.Message));
+            return 0;
+        }
+
+        if (pending.Count == 0) return 0;
+
+        var modsDirectory = Path.Combine(gameDirectory, "mods");
+        Directory.CreateDirectory(modsDirectory);
+
+        output?.Report($"安装报告里还有 {pending.Count} 个文件没下下来，正在重试…");
+
+        var recovered = 0;
+        var stillFailed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var warnings = new List<string>();
+
+        foreach (var (project, fileId) in pending)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var attempt = new CurseForgeFile { ProjectId = project, FileId = fileId };
+            var ok = await DownloadCurseForgeFileCoreAsync(attempt, modsDirectory, stillFailed, warnings, ct)
+                .ConfigureAwait(false);
+
+            if (ok) recovered++;
+        }
+
+        output?.Report(recovered == 0
+            ? "重试仍未成功，请按报告里的链接手动下载。"
+            : $"已补下 {recovered}/{pending.Count} 个文件。");
+
+        await WriteInstallReportAsync(gameDirectory, "(重试后)", pending.Count, recovered,
+            stillFailed.ToArray()).ConfigureAwait(false);
+
+        return recovered;
+    }
+
+    /// <summary>
     /// 把安装结果写到 &lt;gameDir&gt;/.orap-install-report.json：
     /// 下次"为什么缺模组"可以直接看这个文件，不用再猜。
     /// </summary>
@@ -640,42 +716,91 @@ public sealed class PackArchiveInstaller
         List<string>? warnings,
         CancellationToken ct)
     {
-        var name = string.IsNullOrWhiteSpace(file.FileName)
-            ? $"curseforge-{file.ProjectId}-{file.FileId}.jar"
-            : Path.GetFileName(file.FileName!.Trim('"'));
+        var name = CurseForgeCdn.NormalizeFileName(file.FileName)
+                   ?? $"curseforge-{file.ProjectId}-{file.FileId}.jar";
 
-        var candidates = new List<string>();
-
-        void AddCdnCandidates(string? fileName)
+        // 1) 先按已有信息试：CDN 直链（需要文件名）→ API download-url → curseforge 跳转
+        if (await TryDownloadAsync(file, CurseForgeCdn.Urls((int)file.FileId, file.FileName), modsDirectory,
+                name, warnings, ct).ConfigureAwait(false))
         {
-            foreach (var url in CurseForgeCdn.Urls((int)file.FileId, fileName)) candidates.Add(url);
+            return true;
         }
 
-        AddCdnCandidates(file.FileName);
+        // 2) 全都失败：如果 manifest 里没有文件名，就问一次文件元数据再拼 CDN。
+        //    整合包 manifest 只给 projectID + fileID；作者禁用 API 下载时 download-url 返回 data=null，
+        //    没有文件名就再也拼不出链接——这就是"同一个包 PCL 能装、我们装不上"的那批文件。
+        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey) && CurseForgeCdn.NormalizeFileName(file.FileName) is null)
+        {
+            global::Orion.Core.Mods.CurseForgeFile? meta = null;
+            try
+            {
+                var metaClient = new CurseForgeClient(_http, _curseForgeApiKey);
+                meta = await metaClient.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                AppLog.Warn("packs", "file-metadata-failed",
+                    ("project", file.ProjectId), ("file", file.FileId), ("error", ex.Message));
+            }
 
+            var resolved = CurseForgeCdn.NormalizeFileName(meta?.FileName);
+            if (resolved is not null)
+            {
+                AppLog.Info("packs", "file-name-resolved",
+                    ("project", file.ProjectId), ("file", file.FileId), ("name", resolved));
+
+                if (await TryDownloadAsync(file, CurseForgeCdn.Urls((int)file.FileId, resolved), modsDirectory,
+                        resolved, warnings, ct).ConfigureAwait(false))
+                {
+                    return true;
+                }
+            }
+        }
+
+        unresolved.Enqueue($"{name}  →  {CurseForgeCdn.BrowserUrl((int)file.ProjectId, (int)file.FileId)}");
+        return false;
+    }
+
+    /// <summary>
+    /// 依次尝试候选地址（CDN 直链 / 官方 download-url / curseforge 跳转），成功返回 true。
+    /// 只接受真正的 zip/jar；顺带把资源包和光影分流到对应目录。
+    /// </summary>
+    private async Task<bool> TryDownloadAsync(
+        CurseForgeFile file,
+        IReadOnlyList<string> cdnUrls,
+        string modsDirectory,
+        string name,
+        List<string>? warnings,
+        CancellationToken ct)
+    {
+        var target = Path.Combine(modsDirectory, name);
+
+        var candidates = new List<string>(cdnUrls);
+
+        // curseforge 的跳转接口不需要 Key，但对禁用第三方下载的文件同样会 403
         candidates.Add($"https://www.curseforge.com/api/v1/mods/{file.ProjectId}/files/{file.FileId}/download");
 
-        // With an API key the official endpoint is authoritative (it returns the real CDN URL).
+        // 带 Key 时官方接口最权威（返回真实 CDN 地址；作者禁用时返回 data=null）
         if (!string.IsNullOrWhiteSpace(_curseForgeApiKey))
         {
-            candidates.Insert(0, $"https://api.curseforge.com/v1/mods/{file.ProjectId}/files/{file.FileId}/download-url");
+            candidates.Insert(0,
+                $"https://api.curseforge.com/v1/mods/{file.ProjectId}/files/{file.FileId}/download-url");
         }
-
-        var target = Path.Combine(modsDirectory, name);
 
         foreach (var url in candidates)
         {
+            ct.ThrowIfCancellationRequested();
+
             try
             {
                 using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 // 大整合包的模组能有几十 MB，60s 在慢速 CDN 上会把文件截断（留下打不开的 jar）
                 perFile.CancelAfter(TimeSpan.FromSeconds(240));
 
-                // 带 Key 时第一个候选是 API 接口：返回的是 {"data":"真实地址"}，必须先解出地址再下文件，
-                // 否则会把几十字节的 JSON 当成 jar 写进 mods（这就是"zip END header not found"的来源）。
                 var downloadUrl = url;
                 if (url.Contains("/download-url", StringComparison.OrdinalIgnoreCase))
                 {
+                    // 该接口返回 {"data":"真实地址"}：必须解出来再下，否则会把 JSON 当 jar 写进 mods
                     downloadUrl = await ResolveCurseForgeUrlAsync(url, perFile.Token).ConfigureAwait(false) ?? "";
                     if (string.IsNullOrWhiteSpace(downloadUrl)) continue;
                 }
@@ -702,7 +827,7 @@ public sealed class PackArchiveInstaller
                 // 只认真正的 jar/zip：小 JSON、HTML 错误页、截断文件一律丢弃并换下一个源
                 if (!LooksLikeZip(target))
                 {
-                    try { File.Delete(target); } catch (IOException) { }
+                    TryDeleteFile(target);
                     continue;
                 }
 
@@ -710,109 +835,18 @@ public sealed class PackArchiveInstaller
                 var routed = PackFileClassifier.Route(target, Path.GetDirectoryName(modsDirectory)!, out var kind);
                 if (warnings is not null && kind is PackFileKind.ResourcePack or PackFileKind.ShaderPack)
                 {
-                    warnings.Add($"{Path.GetFileName(routed)} 识别为{(kind == PackFileKind.ResourcePack ? "资源包" : "光影")}，已放到 {PackFileClassifier.FolderFor(kind)}/");
+                    warnings.Add($"{Path.GetFileName(routed)} 识别为资源包/光影，已放到对应目录");
                 }
 
                 return true;
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
             {
-                // 半截文件（超时/断流）必须删掉，否则会留在 mods 里让 Forge 启动失败
+                // 半截文件（超时/断流）必须删掉，否则会留在 mods 里让游戏启动失败
                 TryDeleteFile(target);
             }
-
-        // 文件名缺失或所有候选都失败：用 API 把文件名问出来，再走一次 ForgeCDN。
-
-        // 整合包的 manifest 只有 id 对，作者又可能禁止 API 直接下载（download-url 403），
-
-        // 没有文件名就完全拼不出 CDN 链接——PCL 这类启动器也是先查文件名再拼。
-
-        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey) && string.IsNullOrWhiteSpace(file.FileName))
-
-        {
-
-            var metaClient = new CurseForgeClient(_http, _curseForgeApiKey);
-            var meta = await metaClient.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct).ConfigureAwait(false);
-
-        
-
-            if (meta is not null && !string.IsNullOrWhiteSpace(meta.FileName))
-
-            {
-
-                name = Path.GetFileName(meta.FileName.Trim('"'));
-
-                target = Path.Combine(modsDirectory, name);
-
-        
-
-                foreach (var cdn in CurseForgeCdn.Urls((int)file.FileId, name))
-
-                {
-
-                    try
-
-                    {
-
-                        using var retryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-
-                        retryCts.CancelAfter(TimeSpan.FromSeconds(240));
-
-        
-
-                        using var retryResponse = await _http
-
-                            .GetAsync(cdn, HttpCompletionOption.ResponseHeadersRead, retryCts.Token).ConfigureAwait(false);
-
-                        if (!retryResponse.IsSuccessStatusCode) continue;
-
-        
-
-                        await using (var stream = await retryResponse.Content.ReadAsStreamAsync(retryCts.Token).ConfigureAwait(false))
-
-                        await using (var destination = File.Create(target))
-
-                        {
-
-                            await stream.CopyToAsync(destination, retryCts.Token).ConfigureAwait(false);
-
-                        }
-
-        
-
-                        if (!LooksLikeZip(target))
-
-                        {
-
-                            try { File.Delete(target); } catch (IOException) { }
-
-                            continue;
-
-                        }
-
-        
-
-                        return true;
-
-                    }
-
-                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
-
-                    {
-
-                        // 继续试下一个 CDN 域名
-
-                    }
-
-                }
-
-            }
-
         }
 
-        }
-
-        unresolved.Enqueue($"{name}  →  https://www.curseforge.com/projects/{file.ProjectId}/files/{file.FileId}");
         return false;
     }
     private sealed class CurseForgeManifest

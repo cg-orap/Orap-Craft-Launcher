@@ -130,6 +130,7 @@ public sealed class ModsViewModel : ObservableObject
         SearchCurseForgeCommand = new AsyncRelayCommand(SearchCurseForgeAsync, () => !IsPackSearching);
         RepairDependenciesCommand = new AsyncRelayCommand(RepairDependenciesAsync);
         RepairFromLogCommand = new AsyncRelayCommand(RepairFromLogAsync);
+        RepairPackFilesCommand = new AsyncRelayCommand(RepairPackFileAsync);
         ToggleConflictCardCommand = new RelayCommand(() => IsConflictCardExpanded = !IsConflictCardExpanded);
         RefreshCurseForgeKeyCommand = new RelayCommand(() => OnPropertyChanged(nameof(HasCurseForgeKey)));
         OpenFolderCommand = new RelayCommand(OpenModsFolder);
@@ -321,6 +322,9 @@ public sealed class ModsViewModel : ObservableObject
 
     /// <summary>从崩溃日志里补齐前置。</summary>
     public ICommand RepairFromLogCommand { get; private set; } = null!;
+
+    /// <summary>按安装报告补下整合包缺失文件。</summary>
+    public ICommand RepairPackFilesCommand { get; private set; } = null!;
 
     /// <summary>展开/收起模组冲突卡片。</summary>
     public ICommand ToggleConflictCardCommand { get; private set; } = null!;
@@ -774,6 +778,54 @@ public sealed class ModsViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = "补齐失败: " + ex.Message;
+            _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// 按安装报告（.orap-install-report.json）补下整合包里当时没下下来的文件。
+    /// 报告里是 projectID + fileID，比按 modId 搜名字可靠得多。
+    /// </summary>
+    public async Task RepairPackFileAsync()
+    {
+        var instance = SelectedInstance ?? _main.CurrentInstance;
+        if (instance is null)
+        {
+            Status = "请先选择一个版本。";
+            return;
+        }
+
+        if (IsBusy)
+        {
+            Status = "正在执行上一个操作，请稍候再点。";
+            return;
+        }
+
+        IsBusy = true;
+        var activity = _main.Activities.Begin($"补下整合包缺失文件（{instance.Name}）", "读取安装报告…");
+        Status = "正在读取安装报告…";
+
+        try
+        {
+            var recovered = await _main.Context.PackArchives
+                .RepairIncompleteAsync(instance.GameDirectory,
+                    new Progress<string>(line => Status = line)).ConfigureAwait(true);
+
+            Status = recovered == 0
+                ? "安装报告里没有可补的文件（或重试仍失败，详见 .orap-install-report.json）。"
+                : $"已补下 {recovered} 个文件，请点「重新扫描」后启动。";
+
+            _main.Activities.Finish(activity, recovered == 0 ? ActivityState.Failed : ActivityState.Completed, Status);
+            _main.LogsPage.AppendSystem(Status);
+            if (recovered > 0) await LoadModsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or System.Net.Http.HttpRequestException or InvalidOperationException)
+        {
+            Status = "补下缺失文件失败：" + ex.Message;
             _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
         }
         finally

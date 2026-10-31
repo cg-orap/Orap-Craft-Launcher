@@ -423,6 +423,14 @@ public sealed class HomeViewModel : ObservableObject
         {
             var scan = Core.Mods.ModDependencyScanner.Scan(modsDirectory);
             missing = scan.Missing;
+
+            // 版本略旧只是提醒，不该拦住启动（很多模组写的是裸露版本号，我们不能当真）
+            if (scan.VersionMismatch.Count > 0)
+            {
+                Core.Diagnostics.AppLog.Info("deps", "version-mismatch",
+                    ("count", scan.VersionMismatch.Count),
+                    ("mods", string.Join(',', scan.VersionMismatch.Take(8).Select(m => m.ModId))));
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

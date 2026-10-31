@@ -9,6 +9,7 @@ public sealed record RequiredDependency(string ModId, string VersionRange, strin
 /// <summary>扫描结果：已装模组 + 缺失的必需依赖 + KubeJS 脚本引用了但不存在的命名空间。</summary>
 public sealed record DependencyScan(
     IReadOnlyList<RequiredDependency> Missing,
+    IReadOnlyList<RequiredDependency> VersionMismatch,
     int ModCount,
     int DependencyCount,
     IReadOnlyList<MissingScriptReference>? ScriptReferences = null);
@@ -40,7 +41,7 @@ public static class ModDependencyScanner
     {
         if (!Directory.Exists(modsDirectory))
         {
-            return new DependencyScan(Array.Empty<RequiredDependency>(), 0, 0);
+            return new DependencyScan(Array.Empty<RequiredDependency>(), Array.Empty<RequiredDependency>(), 0, 0);
         }
 
         var installed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -69,6 +70,7 @@ public static class ModDependencyScanner
         }
 
         var missing = new List<RequiredDependency>();
+        var mismatched = new List<RequiredDependency>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var dependency in required)
@@ -79,15 +81,15 @@ public static class ModDependencyScanner
                 // 注意：很多 Forge 模组的 mods.toml 里 version 是没被替换的占位符
                 // （"${file.jarVersion}"），这种值没法比较——直接当"已安装"处理，
                 // 否则补好的前置会被反复报成"缺失"，用户永远修不完。
-                if (string.IsNullOrWhiteSpace(dependency.VersionRange)
+                if (VersionRange.IsUnconstrained(dependency.VersionRange)
                     || ModDependencyRepair.IsUnresolvedVersion(version)
                     || VersionRange.Satisfies(version, dependency.VersionRange))
                 {
                     continue;
                 }
 
-                var tooOld = dependency with { VersionRange = dependency.VersionRange };
-                if (seen.Add($"old:{tooOld.ModId}")) missing.Add(tooOld);
+                // 版本不满足范围 ≠ 没装。把它单独归类：启动前不该因为"版本略旧"就拦住用户。
+                if (seen.Add($"old:{dependency.ModId}")) mismatched.Add(dependency);
                 continue;
             }
 
@@ -98,7 +100,7 @@ public static class ModDependencyScanner
         var kubeJs = Path.Combine(Path.GetDirectoryName(modsDirectory) ?? modsDirectory, "kubejs");
         var scripts = KubeJsScriptScanner.Scan(kubeJs, installed.Keys);
 
-        return new DependencyScan(missing, modCount, required.Count, scripts);
+        return new DependencyScan(missing, mismatched, modCount, required.Count, scripts);
     }
 
     /// <summary>Minecraft / Forge / NeoForge 这些内置模块永远"已安装"，不用去找。</summary>
@@ -132,6 +134,37 @@ public static class ModDependencyScanner
     internal sealed record JarInfo(string PrimaryModId, IReadOnlyList<(string Id, string Version)> Mods,
         IReadOnlyList<(string ModId, string VersionRange, bool Mandatory)> Dependencies);
 
+    /// <summary>测试/诊断用：把解析失败的原因也带出来（生产代码只用 ReadJar）。</summary>
+    internal static JarInfo? ReadJarForTests(string path, out string? error)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(path);
+            var toml = zip.Entries.FirstOrDefault(e =>
+                           e.FullName.Equals(NeoForgeToml, StringComparison.OrdinalIgnoreCase))
+                       ?? zip.Entries.FirstOrDefault(e =>
+                           e.FullName.Equals(ForgeToml, StringComparison.OrdinalIgnoreCase));
+
+            if (toml is not null)
+            {
+                using var reader = new StreamReader(toml.Open());
+                var info = ParseToml(reader.ReadToEnd());
+                error = info is null ? "ParseToml 返回 null" : null;
+                return info;
+            }
+
+            var fabric = zip.Entries.FirstOrDefault(e =>
+                e.FullName.Equals(FabricJson, StringComparison.OrdinalIgnoreCase));
+            error = fabric is null ? "没有 mods.toml / neoforge.mods.toml / fabric.mod.json" : "fabric 未在诊断路径解析";
+            return null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.GetType().Name + ": " + ex.Message;
+            return null;
+        }
+    }
+
     private static JarInfo? ReadJar(string path)
     {
         try
@@ -160,7 +193,17 @@ public static class ModDependencyScanner
             // Fabric 模组没有依赖版本范围语义（version 字段是字符串），这里只记录它存在
             var fabric = zip.Entries.FirstOrDefault(e =>
                 e.FullName.Equals(FabricJson, StringComparison.OrdinalIgnoreCase));
-            if (fabric is null) return null;
+
+            if (fabric is null)
+            {
+                // 有些"all"发行包（例如 kotlinforforge-*-all.jar）外层根本没有 mods.toml，
+                // 真正的模组全在 META-INF/jarjar/*.jar 里。不读内嵌 jar 就会把它当成没装，
+                // 于是永远报"缺 kotlinforforge"。
+                var nestedOnly = ReadNestedMods(zip);
+                if (nestedOnly.Count == 0) return null;
+
+                return new JarInfo(nestedOnly[0].Id, nestedOnly, []);
+            }
 
             using var fabricReader = new StreamReader(fabric.Open());
             var json = fabricReader.ReadToEnd();
@@ -225,6 +268,11 @@ public static class ModDependencyScanner
         var mods = new List<(string Id, string Version)>();
         var dependencies = new List<(string ModId, string VersionRange, bool Mandatory)>();
 
+        // 有些模组（如 Moogs 系列）不用 [[mods]] 表，而是 TOML 的内联数组：
+        //   mods = [ { modId = 'mss', version = '2.2.0', ... }, ]
+        // 只认 [[mods]] 会把这些模组当成"没装"，进而把它们的依赖报成缺失。
+        ParseInlineMods(toml, mods);
+
         string? primary = null;
         var section = "";
 
@@ -251,7 +299,11 @@ public static class ModDependencyScanner
             {
                 if (key.Equals("modId", StringComparison.OrdinalIgnoreCase))
                 {
-                    mods.Add((value, "0"));
+                    if (!mods.Any(m => string.Equals(m.Id, value, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        mods.Add((value, "0"));
+                    }
+
                     primary ??= value;
                 }
                 else if (key.Equals("version", StringComparison.OrdinalIgnoreCase) && mods.Count > 0)
@@ -297,6 +349,44 @@ public static class ModDependencyScanner
         return new JarInfo(primary, mods, dependencies);
     }
 
+    /// <summary>
+    /// 解析 <c>mods = [ { modId = 'x', version = '1.0' }, ... ]</c> 这种内联写法。
+    /// 只认 [[mods]] 会把使用内联写法的模组当成"没装"，并把它们的依赖报成缺失。
+    /// </summary>
+    private static void ParseInlineMods(string toml, List<(string Id, string Version)> mods)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            toml, @"(^|\n)\s*mods\s*=\s*\[(?<body>[\s\S]*?)\]\s*(\n|$)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (!match.Success) return;
+        var body = match.Groups["body"].Value;
+        if (!body.Contains('{')) return;
+
+        foreach (System.Text.RegularExpressions.Match table in System.Text.RegularExpressions.Regex.Matches(body, @"\{[^{}]*\}"))
+        {
+            var id = ExtractTomlValue(table.Value, "modId");
+            if (string.IsNullOrWhiteSpace(id)) continue;
+
+            var version = ExtractTomlValue(table.Value, "version") ?? "0";
+            if (!mods.Any(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase)))
+            {
+                mods.Add((id, version));
+            }
+        }
+    }
+
+    /// <summary>从名字/数字字面量里取一个键的值（单引号或双引号）。</summary>
+    private static string? ExtractTomlValue(string table, string key)
+    {
+        const string pattern = @"\s*=\s*(?:'(?<single>[^']*)'|""(?<double>[^""]*)"")";
+        var match = System.Text.RegularExpressions.Regex.Match(table, key + pattern,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (!match.Success) return null;
+        return match.Groups["single"].Success ? match.Groups["single"].Value : match.Groups["double"].Value;
+    }
+
 }
 
 /// <summary>
@@ -306,6 +396,25 @@ public static class ModDependencyScanner
 /// </summary>
 public static class VersionRange
 {
+
+    /// <summary>
+    /// 这个"版本范围"其实没有范围语义。
+    /// 很多模组写的是裸版本号（<c>4.7.5.1</c>、<c>1</c>、<c>2.0.0-beta.1</c>），
+    /// 按 Maven 语法它是"精确匹配"，但作者的真实意图是"这个版本以上/任意"。
+    /// 拿它做严格比较会把装好的模组报成缺前置——这里统一当作"不限定"。
+    /// </summary>
+    public static bool IsUnconstrained(string? range)
+    {
+        if (string.IsNullOrWhiteSpace(range)) return true;
+
+        // 出现了范围/比较符号才算真的有约束
+        foreach (var ch in range)
+        {
+            if (ch is '[' or '(' or ')' or ']' or ',' or '<' or '>' or '=' or '+' or '*') return false;
+        }
+
+        return true;
+    }
     public static bool Satisfies(string version, string range)
     {
         if (string.IsNullOrWhiteSpace(range)) return true;

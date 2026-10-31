@@ -89,8 +89,9 @@ public sealed class ModDependencyScannerTests
     }
 
     [Fact]
-    public void InstalledButTooOldIsStillReported()
+    public void InstalledButTooOldIsReportedAsVersionMismatchNotMissing()
     {
+        // 版本略旧 ≠ 没装：前者只提醒（VersionMismatch），后者才该拦启动、才该自动补齐
         var mods = CreateMods(
             ("tracks.jar", TracksToml),
             ("simulated.jar", ModToml("simulated", "0.9.0")));
@@ -98,8 +99,10 @@ public sealed class ModDependencyScannerTests
         try
         {
             var scan = ModDependencyScanner.Scan(mods);
-            var missing = Assert.Single(scan.Missing);
-            Assert.Equal("simulated", missing.ModId);
+            Assert.Empty(scan.Missing);
+
+            var mismatch = Assert.Single(scan.VersionMismatch);
+            Assert.Equal("simulated", mismatch.ModId);
         }
         finally
         {
