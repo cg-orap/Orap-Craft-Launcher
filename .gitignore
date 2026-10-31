@@ -31,3 +31,6 @@ artifacts/
 # UI 概念稿（React 原型）
 design/node_modules/
 design/dist/
+
+# 本地 CurseForge API Key（分发用，绝不入库）
+src/Orion.Core/Mods/CurseForgeKey.Local.cs

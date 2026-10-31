@@ -20,8 +20,19 @@ namespace Orion.Core.Mods;
 /// </summary>
 public static class CurseForgeDefaults
 {
-    /// <summary>内置的分发用 Key；留空表示不内置。</summary>
-    public const string ApiKey = "";
+    /// <summary>
+    /// 内置的分发用 Key。
+    ///
+    /// 真正的密钥放在 **不进版本库** 的 <c>Mods/CurseForgeKey.Local.cs</c> 里：
+    /// 该文件存在时，Orion.Core.csproj 会定义 ORAP_LOCAL_CF_KEY，这里就取它的值；
+    /// 不存在（干净克隆 / 公开仓库）时就是空串 = 不内置，行为与之前一致。
+    /// </summary>
+    public static string ApiKey =>
+#if ORAP_LOCAL_CF_KEY
+        CurseForgeKeyLocal.ApiKey;
+#else
+        string.Empty;
+#endif
 
     /// <summary>是否内置了 Key（界面据此提示"已内置，可不填"）。</summary>
     public static bool HasBuiltInKey => !string.IsNullOrWhiteSpace(ApiKey);

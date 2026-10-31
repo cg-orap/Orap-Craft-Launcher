@@ -10,4 +10,9 @@
     <InternalsVisibleTo Include="Orion.Tests" />
   </ItemGroup>
 
+  <!-- 本地 CurseForge Key（Mods/CurseForgeKey.Local.cs）存在时才内置；该文件不进版本库 -->
+  <PropertyGroup Condition="Exists('Mods\CurseForgeKey.Local.cs')">
+    <DefineConstants>$(DefineConstants);ORAP_LOCAL_CF_KEY</DefineConstants>
+  </PropertyGroup>
+
 </Project>
