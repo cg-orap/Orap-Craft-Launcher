@@ -1,4 +1,4 @@
-<UserControl x:Class="Orion.App.Views.SettingsView"
+﻿<UserControl x:Class="Orion.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -324,6 +324,14 @@
                                 <TextBlock Text="CurseForge" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="API Key 可选，用于自动下载 CF 整合包的全部模组；留空时只能靠公开 CDN 猜测，部分模组会缺失。"
                                            Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+
+                                <!-- 内置了分发 Key 时提示：可以不填 -->
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="6" Padding="10,7"
+                                        Margin="0,8,0,0"
+                                        Visibility="{Binding HasBuiltInCurseForgeKey, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                                               Text="本版本已内置一把分发用 Key，留空即可直接用 CurseForge；在这里填写会以你的 Key 为准（推荐填自己的，配额独立）。" />
+                                </Border>
                                 <Grid Margin="0,10,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />

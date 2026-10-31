@@ -210,6 +210,23 @@ settings.json 设置
 因此作者的下载计数与平台的收益链路保持完整；启动器既不缓存对外分发，也不绕过任何授权。
 没有 API Key 时只会尝试公开 CDN 路径，失败的文件会**明确列出浏览器链接**由用户自行下载，
 并且该次安装会被标记为「不完整」而不是「成功」。
+
+### 4.1.1 把启动器分享给别人时的 CurseForge Key（可选）
+
+默认情况下，CurseForge 相关功能需要**每个用户自己**在「设置 → 网络与下载」填一把免费 API Key，
+而 Key 落盘时用 Windows DPAPI（当前用户作用域）加密，**换机器/换账户解不开**，所以打包 `settings.json`
+是没用的。
+
+若希望别人解压即用，可以让构建时**内置一把"分发专用"Key**：
+
+1. 打开 `src/Orion.Core/Mods/CurseForgeDefaults.cs`，把 `ApiKey` 从 `""` 改成你自己的 Key；
+2. 重新构建：`powershell -ExecutionPolicy Bypass -File build\verify.ps1 -DotnetRoot D:\dotnet`；
+3. 界面会在设置里提示"已内置一把分发用 Key"；用户自己填的 Key 仍然优先（配额独立）。
+
+代价（务必知情）：
+- Key 会被打包进 exe，任何人都能扫出来 → 建议单独申请一把，不要用主账号的；
+- 共用一把 Key 就是共用每日配额，人多容易 429；
+- 填了真 Key 后**不要把这个文件推到公开仓库**，或者只把它留在自己的构建分支里。
 ---
 
 ## 5. 已知限制

@@ -62,10 +62,12 @@ public sealed class LauncherContext : IAsyncDisposable
 
         // Declared but never constructed: the CurseForge/zip dispatch threw a
         // NullReferenceException the first time it ran.
-        CurseForge = new Mods.CurseForgeClient(http, settings.CurseForgeApiKey);
+        // CurseForge：用户填的 Key 优先，其次用编译期内置的分发 Key（见 CurseForgeDefaults）
+        var curseForgeKey = Mods.CurseForgeDefaults.Resolve(settings.CurseForgeApiKey);
+        CurseForge = new Mods.CurseForgeClient(http, curseForgeKey);
         Translator = new Translation.TranslationService(http);
         DependencyRepair = new Mods.ModDependencyRepair(CurseForge, http);
-        PackArchives = new Mods.PackArchiveInstaller(paths, Instances, Loaders, Importer, http, settings.CurseForgeApiKey,
+        PackArchives = new Mods.PackArchiveInstaller(paths, Instances, Loaders, Importer, http, curseForgeKey,
             DependencyRepair);
         
     }

@@ -206,6 +206,9 @@ public sealed class SettingsViewModel : ObservableObject
     }
 
     /// <summary>CurseForge API key: enables the official download-url endpoint for CF packs.</summary>
+    /// <summary>本版本是否内置了分发用 Key（内置时界面会提示"留空即可"）。</summary>
+    public bool HasBuiltInCurseForgeKey => Orion.Core.Mods.CurseForgeDefaults.HasBuiltInKey;
+
     public string CurseForgeApiKey
     {
         get => _curseForgeApiKey;
@@ -288,7 +291,8 @@ public sealed class SettingsViewModel : ObservableObject
         settings.ForceUtf8Console = ForceUtf8Console;
         settings.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();
         settings.CurseForgeApiKey = string.IsNullOrWhiteSpace(CurseForgeApiKey) ? null : CurseForgeApiKey.Trim();
-        _main.Context.CurseForge.SetApiKey(settings.CurseForgeApiKey);
+        // 用户清空自己的 Key 时回退到内置分发 Key，不要因此把 CurseForge 关掉
+        _main.Context.CurseForge.SetApiKey(Orion.Core.Mods.CurseForgeDefaults.Resolve(settings.CurseForgeApiKey));
 
         await _main.Context.SettingsStore.SaveAsync(settings).ConfigureAwait(true);
 
