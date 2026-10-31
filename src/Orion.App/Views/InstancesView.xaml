@@ -274,14 +274,56 @@
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Row" Background="Transparent" CornerRadius="8"
                                                     Padding="2" BorderThickness="1" BorderBrush="Transparent">
-                                                <ContentPresenter />
-                                            </Border>
+                                                <Grid>
+                                                    <ContentPresenter />
+                                                    <!-- hover/选中：强调色淡罩在内容之上，120ms 过渡 -->
+                                                    <Border x:Name="Hover" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
+                                                            Background="{DynamicResource AccentBrush}" />
+                                                    <Border x:Name="Selected" CornerRadius="8" Opacity="0" IsHitTestVisible="False"
+                                                            Background="{DynamicResource AccentBrush}" />
+                                                    </Grid>
+                                                </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                                             To="0.08" Duration="0:0:0.12">
+                                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.12" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
                                                 </Trigger>
                                                 <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                                             To="0.16" Duration="0:0:0.12">
+                                                                <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.12" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
+                                                                                                <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>

@@ -69,14 +69,59 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
                         <Border x:Name="Fill" CornerRadius="6" Background="Transparent" Padding="8,6" Margin="0,1">
-                            <ContentPresenter />
+                            <Grid>
+                                <ContentPresenter />
+                                <!-- hover/选中：强调色淡罩在内容之上，120ms 过渡（原来是瞬换底色） -->
+                                <Border x:Name="Hover" CornerRadius="5" Opacity="0" IsHitTestVisible="False"
+                                        Background="{DynamicResource AccentBrush}" />
+                                <Border x:Name="Selected" CornerRadius="5" Opacity="0" IsHitTestVisible="False"
+                                        Background="{DynamicResource AccentBrush}" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                             To="0.08" Duration="0:0:0.12">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.12" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Fill" Property="Background" Value="{DynamicResource SurfaceAltBg}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                             To="0.16" Duration="0:0:0.12">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Selected" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.12" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
