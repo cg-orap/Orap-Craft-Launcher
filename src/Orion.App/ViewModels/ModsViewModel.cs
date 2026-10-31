@@ -128,8 +128,8 @@ public sealed class ModsViewModel : ObservableObject
         RescanCommand = new AsyncRelayCommand(LoadModsAsync, () => SelectedInstance is not null);
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !string.IsNullOrWhiteSpace(SearchText) && !IsSearching);
         SearchCurseForgeCommand = new AsyncRelayCommand(SearchCurseForgeAsync, () => !IsPackSearching);
-        RepairDependenciesCommand = new AsyncRelayCommand(RepairDependenciesAsync, () => !IsBusy);
-        RepairFromLogCommand = new AsyncRelayCommand(RepairFromLogAsync, () => !IsBusy);
+        RepairDependenciesCommand = new AsyncRelayCommand(RepairDependenciesAsync);
+        RepairFromLogCommand = new AsyncRelayCommand(RepairFromLogAsync);
         ToggleConflictCardCommand = new RelayCommand(() => IsConflictCardExpanded = !IsConflictCardExpanded);
         RefreshCurseForgeKeyCommand = new RelayCommand(() => OnPropertyChanged(nameof(HasCurseForgeKey)));
         OpenFolderCommand = new RelayCommand(OpenModsFolder);
@@ -372,6 +372,13 @@ public sealed class ModsViewModel : ObservableObject
         }
     }
 
+    /// <summary>可执行状态依赖 IsBusy 的命令集合（IsBusy 变化时统一刷新）。</summary>
+    private IEnumerable<ICommand> BusyBoundCommands =>
+    [
+        RescanCommand, SearchCommand, CheckUpdatesCommand, SearchCurseForgeCommand,
+        SelectAllUpdatesCommand, UpdateSelectedCommand,
+    ];
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -379,6 +386,13 @@ public sealed class ModsViewModel : ObservableObject
         {
             if (!SetProperty(ref _isBusy, value)) return;
             OnPropertyChanged(nameof(ShowSkeleton));
+
+            // 其它按钮的 CanExecute 依赖 IsBusy；不通知的话它们会一直停在"灰"的状态
+            foreach (var command in BusyBoundCommands)
+            {
+                if (command is AsyncRelayCommand async) async.RaiseCanExecuteChanged();
+                else if (command is RelayCommand relay) relay.RaiseCanExecuteChanged();
+            }
         }
     }
 
@@ -719,6 +733,12 @@ public sealed class ModsViewModel : ObservableObject
             return;
         }
 
+        if (IsBusy)
+        {
+            Status = "正在执行上一个操作，请稍候再点（超过 3 分钟会自动放弃）。";
+            return;
+        }
+
         var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
         var scan = Orion.Core.Mods.ModDependencyScanner.Scan(modsDirectory);
 
@@ -772,6 +792,12 @@ public sealed class ModsViewModel : ObservableObject
         if (instance is null)
         {
             Status = "请先选择一个版本。";
+            return;
+        }
+
+        if (IsBusy)
+        {
+            Status = "正在执行上一个操作，请稍候再点。";
             return;
         }
 

@@ -245,7 +245,16 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
     {
         if (!HasKey) return null;
 
-        var url = $"{Base}mods/{pack.Id}/files?pageSize=50";
+        // 关键：把 gameVersion / modLoaderType 交给服务端过滤。
+        // CurseForge 的文件列表默认按时间倒序，热门模组前 50 条往往全是新版本的文件，
+        // 客户端自己过滤会"一个都不剩"，于是 1.19.2 的实例被塞进 26.3 的文件。
+        var query = new System.Text.StringBuilder($"{Base}mods/{pack.Id}/files?pageSize=50");
+        if (!string.IsNullOrWhiteSpace(gameVersion))
+            query.Append("&gameVersion=").Append(Uri.EscapeDataString(gameVersion));
+        if (modLoaderType is not null)
+            query.Append("&modLoaderType=").Append(modLoaderType.Value);
+
+        var url = query.ToString();
         using var response = await SendAsync(HttpMethod.Get, url, ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode) return null;
 
@@ -254,22 +263,25 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         if (files is null || files.Count == 0) return null;
 
         var extension = kind == CurseForgeKind.Mod ? ".jar" : ".zip";
-        var candidates = files
-            .Where(f => f.FileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+
+        // 关键：版本/加载器不匹配的文件一律不要。
+        // 以前这里只"算分不淘汰"，于是 1.19.2 的实例会被塞进 Iceberg-26.3、LibX-1.20.1，
+        // Forge 不加载它们，启动后照样报 "iceberg is not installed"。
+        var mapped = files
+            .Select(f => new CurseForgeFile(f.ModId, f.Id, f.FileName, f.DisplayName, f.DownloadUrl, f.GameVersions))
             .ToList();
 
-        if (candidates.Count == 0) candidates = files;
+        var loaderTag = modLoaderType is { } type ? LoaderTag(type) : null;
 
-        var scored = candidates
-            .Select(f => (File: f, Score: Score(f, gameVersion, modLoaderType)))
-            .OrderByDescending(x => x.Score)
-            .ThenByDescending(x => x.File.FileDate)
-            .ToList();
+        var best = CurseForgeFileSelection.SelectBest(
+            mapped,
+            gameVersion,
+            string.IsNullOrWhiteSpace(loaderTag) ? null : loaderTag,
+            extension,
+            requireCompatible: !string.IsNullOrWhiteSpace(gameVersion));
 
-        if (scored.Count == 0) return null;
-        var best = scored[0].File;
-        return new CurseForgeFile(best.ModId, best.Id, best.FileName, best.DisplayName, best.DownloadUrl,
-            best.GameVersions);
+        if (best is null) return null;
+        return best;
     }
 
     /// <summary>官方下载地址（文件元数据里没有时需要再问一次接口）。</summary>
@@ -385,12 +397,22 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         return name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? name : name + ".zip";
     }
 
+    /// <summary>
+    /// 元数据请求的超时。HttpClient 自身的 Timeout 是 10 分钟（给下载用的），
+    /// 元数据接口一旦卡住，界面上的按钮会一直处于"执行中"而变灰——所以这里单独限时。
+    /// </summary>
+    private static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(20);
+
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(method, url);
         request.Headers.TryAddWithoutValidation("x-api-key", _key);
         request.Headers.TryAddWithoutValidation("Accept", "application/json");
-        return await http.SendAsync(request, ct).ConfigureAwait(false);
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(MetadataTimeout);
+
+        return await http.SendAsync(request, timeout.Token).ConfigureAwait(false);
     }
 
     private static CurseForgePack ToPack(ModDto dto) => new(

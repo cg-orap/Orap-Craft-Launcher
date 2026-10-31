@@ -38,6 +38,9 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
         ["offroad"] = 676721,
     };
 
+    /// <summary>整体超时：再慢也不该让界面上的"补齐前置"卡到用户以为按钮坏了。</summary>
+    private static readonly TimeSpan RepairTimeout = TimeSpan.FromMinutes(3);
+
     public async Task<DependencyRepairResult> RepairAsync(
         string gameDirectory,
         IReadOnlyList<RequiredDependency> missing,
@@ -47,6 +50,10 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(RepairTimeout);
+        ct = timeout.Token;
+
         var modsDirectory = Path.Combine(gameDirectory, "mods");
         Directory.CreateDirectory(modsDirectory);
         Directory.CreateDirectory(cacheDirectory);
@@ -218,6 +225,26 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                     string.IsNullOrWhiteSpace(file.FileName) ? $"{modId}.jar" : file.FileName);
                 if (File.Exists(target)) File.Delete(target);
                 File.Move(temporary, target);
+
+                // 之前补错过版本的旧 jar（例如 Iceberg-26.3 塞进 1.19.2）会让 Forge 报重复 mod，
+                // 装好正确的这份之后把它们挪到隔离目录。
+                try
+                {
+                    var stale = StaleModFiles.SelectStale(
+                        Directory.GetFiles(modsDirectory, "*.jar"), dependency.ModId, target);
+
+                    foreach (var old in stale)
+                    {
+                        StaleModFiles.Quarantine(gameDirectory: Path.GetDirectoryName(modsDirectory) ?? modsDirectory,
+                            old, DateTimeOffset.Now);
+                        progress?.Report($"隔离了版本不对的旧文件：{Path.GetFileName(old)}");
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    progress?.Report("清理旧副本失败（不影响本次安装）：" + ex.Message);
+                }
+
                 return target;
             }
             finally
