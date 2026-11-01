@@ -71,7 +71,12 @@ public sealed class ConflictRow
     public string Code => Conflict.Code;
     public string Title => Conflict.Title;
     public string Detail => Conflict.Detail;
-    public string SeverityLabel => IsError ? "必须处理" : "建议检查";
+    public string SeverityLabel => Conflict.Severity switch
+    {
+        ConflictSeverity.Error => "必须处理",
+        ConflictSeverity.Warning => "建议检查",
+        _ => "仅供参考",
+    };
 
     /// <summary>涉及的文件名（一行显示）。</summary>
     public string Files => string.Join(" · ", Conflict.Files);
@@ -243,6 +248,10 @@ public sealed class ModsViewModel : ObservableObject
             if (Conflicts.Count == 0) return "";
             var parts = new List<string>();
             if (ConflictErrorCount > 0) parts.Add($"{ConflictErrorCount} 个必须处理");
+
+        // 桥接环境下的提示（例如 Sinytra Connector 的 Fabric 模组）单独说明，别混进"必须处理"
+        var infoCount = Conflicts.Count(c => c.Conflict.Severity == ConflictSeverity.Info);
+        if (infoCount > 0) parts.Add($"{infoCount} 条仅供参考");
             if (ConflictWarningCount > 0) parts.Add($"{ConflictWarningCount} 条建议检查");
             return string.Join("，", parts);
         }

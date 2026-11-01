@@ -6,8 +6,14 @@ namespace Orion.Core.Mods;
 /// <summary>冲突的严重程度：Error 一定要处理，Warning 只提示可能有问题。</summary>
 public enum ConflictSeverity
 {
+    /// <summary>必须处理，否则游戏会崩/模组不加载。</summary>
     Error,
+
+    /// <summary>建议检查，多数情况能跑。</summary>
     Warning,
+
+    /// <summary>纯提示：整合包的设计如此（例如 Sinytra Connector 桥接 Fabric 模组）。</summary>
+    Info,
 }
 
 /// <summary>一条冲突：涉及哪些文件、为什么、怎么处理。</summary>
@@ -145,10 +151,30 @@ public static class ModConflictScanner
 
         if (!forgeFamily && !fabricFamily) return;
 
+        // 有 Sinytra Connector 的整合包（例如 Better MC 4）是**故意**把 Fabric 模组装进 Forge 的：
+        // Connector 会自己加载这些 jar。再报"装错了"就是纯误报，会把用户吓得去删模组。
+        var hasConnector = jars.Any(j => j.AllMods.Any(m =>
+            m.Id.Equals("connector", StringComparison.OrdinalIgnoreCase)
+            || m.Id.Equals("sinytraconnector", StringComparison.OrdinalIgnoreCase)
+            || m.Id.Equals("connectorlib", StringComparison.OrdinalIgnoreCase)
+            || m.Id.Equals("connectorextras", StringComparison.OrdinalIgnoreCase)));
+
         foreach (var jar in jars)
         {
             if (forgeFamily && jar.HasFabricManifest && !jar.HasForgeManifest)
             {
+                if (hasConnector)
+                {
+                    // 桥接环境下只需要提示，不需要"必须处理"
+                    conflicts.Add(new ModConflict(
+                        "C3",
+                        ConflictSeverity.Info,
+                        $"Fabric 模组由 Sinytra Connector 桥接：{jar.FileName}",
+                        [jar.FileName],
+                        "这个整合包装了 Sinytra Connector，Fabric 模组由它负责加载，属于整合包的设计，不用删。"));
+                    continue;
+                }
+
                 conflicts.Add(new ModConflict(
                     "C3",
                     ConflictSeverity.Error,
