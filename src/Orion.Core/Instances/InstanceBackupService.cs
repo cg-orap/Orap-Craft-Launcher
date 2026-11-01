@@ -1,10 +1,10 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Orion.Core.Diagnostics;
 using Orion.Core.Util;
 
 namespace Orion.Core.Instances;
 
-/// <summary>一份实例快照的元数据（saves / config / mods 的副本）。</summary>
+/// <summary>一份实例快照的元数据（saves / resourcepacks / shaderpacks / mods 的副本）。</summary>
 public sealed class BackupSnapshot
 {
     [JsonPropertyName("id")] public string Id { get; set; } = "";
@@ -35,12 +35,17 @@ public sealed class BackupSnapshot
 }
 
 /// <summary>
-/// 实例快照：把 saves / config / mods 复制到 <c>backups/snapshots/&lt;时间戳&gt;/</c>，恢复时先给当前状态
+/// 实例快照：把 saves / resourcepacks / shaderpacks / mods 复制到 <c>backups/snapshots/&lt;时间戳&gt;/</c>，恢复时先给当前状态
 /// 拍一份"恢复前"快照，所以任何一次恢复都能回到上一步。
 /// </summary>
 public sealed class InstanceBackupService(string? backupRootOverride = null, bool useRecycleBin = true)
 {
-    private static readonly string[] Folders = ["saves", "config", "mods"];
+    /// <summary>
+    /// 快照覆盖的顶层目录。刻意**不含 config**：
+    /// 里面都是几十字节的小文件，几百个条目既占空间又难读，用户反馈"太零碎"。
+    /// 需要保配置时用「导出完整备份」（包整个 minecraft 目录）。
+    /// </summary>
+    private static readonly string[] Folders = ["saves", "resourcepacks", "shaderpacks", "mods"];
 
     public string BackupRoot(Instance instance) =>
         backupRootOverride ?? Path.Combine(instance.GameDirectory, "backups", "snapshots");
@@ -202,8 +207,10 @@ public sealed class InstanceBackupService(string? backupRootOverride = null, boo
     }
 
     /// <summary>
-    /// 列出快照里可单独恢复的顶层条目：<c>saves/*</c> 的每个世界、<c>config</c> 下的每个文件/目录、
-    /// <c>mods</c> 下的每个 jar。目录条目的大小是其内部文件之和。
+    /// 列出快照里可单独恢复的条目。
+    ///
+    /// 一条 = 一个**顶层分类**（saves / resourcepacks / shaderpacks / mods），
+    /// 只显示"多少文件 / 多大"。以前是每个 config 文件一行，几百行既难读也没人会用。
     /// </summary>
     public IReadOnlyList<SnapshotEntry> ListEntries(Instance instance, string snapshotId)
     {
@@ -211,23 +218,20 @@ public sealed class InstanceBackupService(string? backupRootOverride = null, boo
         if (!Directory.Exists(root)) return [];
 
         var entries = new List<SnapshotEntry>();
+
         foreach (var folder in Folders)
         {
             var folderPath = Path.Combine(root, folder);
             if (!Directory.Exists(folderPath)) continue;
 
-            foreach (var child in Directory.EnumerateFileSystemEntries(folderPath))
-            {
-                var isDirectory = Directory.Exists(child);
-                var size = isDirectory
-                    ? Directory.EnumerateFiles(child, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length)
-                    : new FileInfo(child).Length;
+            var files = Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories).ToList();
+            if (files.Count == 0) continue;
 
-                entries.Add(new SnapshotEntry($"{folder}/{Path.GetFileName(child)}", isDirectory, size));
-            }
+            var size = files.Sum(f => new FileInfo(f).Length);
+            entries.Add(new SnapshotEntry(folder, true, size) { FileCount = files.Count });
         }
 
-        return entries.OrderBy(e => e.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+        return entries;
     }
 
     /// <summary>
@@ -379,6 +383,22 @@ public sealed class InstanceBackupService(string? backupRootOverride = null, boo
 /// <summary>快照里的一个可单独恢复的条目（文件或目录，如某个世界、某个 config、某个 jar）。</summary>
 public sealed record SnapshotEntry(string RelativePath, bool IsDirectory, long SizeBytes)
 {
+    /// <summary>这个分类里有多少文件（顶层聚合条目用）。</summary>
+    public int FileCount { get; init; }
+
+    /// <summary>给人看的分类名：saves → 存档，mods → 模组…</summary>
+    public string Title => RelativePath switch
+    {
+        "saves" => "存档",
+        "resourcepacks" => "资源包",
+        "shaderpacks" => "光影包",
+        "mods" => "模组",
+        _ => RelativePath,
+    };
+
+    /// <summary>"12 个文件 · 3.4 MB"。</summary>
+    public string CountText => FileCount > 0 ? $"{FileCount} 个文件 · {SizeText}" : SizeText;
+
     public string SizeText => SizeBytes switch
     {
         >= 1024L * 1024 * 1024 => $"{SizeBytes / 1024.0 / 1024 / 1024:0.0} GB",

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows.Input;
 using Orion.App.Mvvm;
 using Orion.Core.Instances;
@@ -81,12 +81,12 @@ public sealed class InstancesViewModel : ObservableObject
 
     private readonly InstanceBackupService _backups = new();
 
-    /// <summary>该版本的快照列表（saves / config / mods 的副本）。</summary>
+    /// <summary>该版本的快照列表（saves / resourcepacks / shaderpacks / mods 的副本）。</summary>
     public ObservableList<BackupSnapshot> Snapshots { get; } = [];
 
     public bool HasSnapshots => Snapshots.Count > 0;
 
-    public string SnapshotsHint => Snapshots.Count == 0 ? "还没有快照。点「创建快照」把当前的存档、配置和模组打包存一份。" : "";
+    public string SnapshotsHint => Snapshots.Count == 0 ? "还没有快照。点「创建快照」把当前的存档、资源包、光影包和模组打包存一份。" : "";
 
     /// <summary>当前选中的快照（用于浏览内容、单条恢复）。</summary>
     public BackupSnapshot? SelectedSnapshot
@@ -642,7 +642,7 @@ public sealed class InstancesViewModel : ObservableObject
         if (SelectedInstance is not { } instance || parameter is not BackupSnapshot snapshot) return;
 
         var answer = Dialogs.Ask("恢复快照", $"要把「{instance.Name}」恢复到 {snapshot.TimeText} 的快照吗？{Environment.NewLine}{Environment.NewLine}" +
-            "当前的 saves / config / mods 会被替换。恢复前会自动把当前状态另存为一份「恢复前」快照，可再恢复回来。");
+            "当前的 saves / resourcepacks / shaderpacks / mods 会被替换。恢复前会自动把当前状态另存为一份「恢复前」快照，可再恢复回来。");
 
         if (answer != DialogOutcome.Yes) return;
 
@@ -688,7 +688,7 @@ public sealed class InstancesViewModel : ObservableObject
         OnPropertyChanged(nameof(SnapshotEntriesHint));
     }
 
-    /// <summary>只恢复快照里的一个世界/配置/jar；覆盖前的当前文件会另存到 backups/manual-restores。</summary>
+    /// <summary>只恢复快照里的一个分类（存档/资源包/光影/模组）；覆盖前的当前文件会另存到 backups/manual-restores。</summary>
     private async Task RestoreEntryAsync(object? parameter)
     {
         if (SelectedInstance is not { } instance ||

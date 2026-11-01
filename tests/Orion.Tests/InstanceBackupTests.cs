@@ -28,6 +28,10 @@ public sealed class InstanceBackupTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "config", "sodium.json"), "{}");
         Directory.CreateDirectory(Path.Combine(_root, "mods"));
         File.WriteAllText(Path.Combine(_root, "mods", "sodium.jar"), "jar-bytes");
+        Directory.CreateDirectory(Path.Combine(_root, "resourcepacks"));
+        File.WriteAllText(Path.Combine(_root, "resourcepacks", "pack.zip"), "zip-bytes");
+        Directory.CreateDirectory(Path.Combine(_root, "shaderpacks"));
+        File.WriteAllText(Path.Combine(_root, "shaderpacks", "shader.zip"), "zip-bytes");
     }
 
     public void Dispose()
@@ -117,14 +121,19 @@ public sealed class InstanceBackupTests : IDisposable
     }
 
     [Fact]
-    public async Task ListEntriesReturnsWorldsConfigsAndJars()
+    public async Task ListEntriesReturnsOneRowPerCategory()
     {
         var snapshot = await _service.CreateAsync(_instance, "manual");
         var entries = _service.ListEntries(_instance, snapshot.Id);
 
-        Assert.Contains(entries, e => e.RelativePath == "saves/world" && e.IsDirectory);
-        Assert.Contains(entries, e => e.RelativePath == "config/sodium.json" && !e.IsDirectory);
-        Assert.Contains(entries, e => e.RelativePath == "mods/sodium.jar");
+        // 一条 = 一个分类（不再逐文件列出）
+        Assert.Contains(entries, e => e.RelativePath == "saves" && e.IsDirectory);
+        Assert.Contains(entries, e => e.RelativePath == "resourcepacks");
+        Assert.Contains(entries, e => e.RelativePath == "shaderpacks");
+        Assert.Contains(entries, e => e.RelativePath == "mods");
+
+        // config 不再进快照
+        Assert.DoesNotContain(entries, e => e.RelativePath.StartsWith("config", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -146,23 +155,23 @@ public sealed class InstanceBackupTests : IDisposable
     }
 
     [Fact]
-    public async Task RestoreEntryWorksForASingleConfigFile()
+    public async Task RestoreEntryWorksForOneCategory()
     {
         var snapshot = await _service.CreateAsync(_instance, "manual");
-        File.WriteAllText(Path.Combine(_root, "config", "sodium.json"), "{broken}");
+        File.WriteAllText(Path.Combine(_root, "saves", "world", "level.dat"), "broken");
 
-        _service.RestoreEntry(_instance, snapshot.Id, "config/sodium.json");
+        _service.RestoreEntry(_instance, snapshot.Id, "saves");
 
-        Assert.Equal("{}", File.ReadAllText(Path.Combine(_root, "config", "sodium.json")));
+        Assert.Equal("original-level", File.ReadAllText(Path.Combine(_root, "saves", "world", "level.dat")));
     }
 
     [Fact]
     public async Task RestoreBackupsCanBeListedAndDeleted()
     {
         var snapshot = await _service.CreateAsync(_instance, "manual");
-        File.WriteAllText(Path.Combine(_root, "config", "sodium.json"), "{changed}");
+        File.WriteAllText(Path.Combine(_root, "mods", "sodium.jar"), "{changed}");
 
-        _service.RestoreEntry(_instance, snapshot.Id, "config/sodium.json");
+        _service.RestoreEntry(_instance, snapshot.Id, "mods");
 
         var backups = _service.ListRestoreBackups(_instance);
         var backup = Assert.Single(backups);
@@ -188,5 +197,52 @@ public sealed class InstanceBackupTests : IDisposable
         Assert.True(_service.Delete(_instance, snapshot.Id));
         Assert.Empty(_service.List(_instance));
         Assert.False(_service.Delete(_instance, snapshot.Id));
+    }
+
+    [Fact]
+    public async Task SnapshotCoversTheFourUsefulFoldersAndSkipsConfig()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+        var directory = Path.Combine(_service.BackupRoot(_instance), snapshot.Id);
+
+        Assert.True(Directory.Exists(Path.Combine(directory, "saves")));
+        Assert.True(Directory.Exists(Path.Combine(directory, "resourcepacks")));
+        Assert.True(Directory.Exists(Path.Combine(directory, "shaderpacks")));
+        Assert.True(Directory.Exists(Path.Combine(directory, "mods")));
+
+        // config 里都是几十字节的小文件：不备份，否则条目又多又占空间
+        Assert.False(Directory.Exists(Path.Combine(directory, "config")));
+    }
+
+    [Fact]
+    public async Task EntryListIsOneRowPerCategory()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+        var entries = _service.ListEntries(_instance, snapshot.Id);
+
+        Assert.Equal(4, entries.Count);
+        Assert.Equal(
+            ["mods", "resourcepacks", "saves", "shaderpacks"],
+            entries.Select(e => e.RelativePath).OrderBy(p => p, StringComparer.Ordinal).ToArray());
+
+        var saves = entries.Single(e => e.RelativePath == "saves");
+        Assert.Equal("存档", saves.Title);
+        Assert.Equal(1, saves.FileCount);
+        Assert.Contains("个文件", saves.CountText);
+    }
+
+    [Fact]
+    public async Task RestoreLeavesConfigUntouched()
+    {
+        var snapshot = await _service.CreateAsync(_instance, "manual");
+
+        File.WriteAllText(Path.Combine(_root, "saves", "world", "level.dat"), "changed");
+        File.WriteAllText(Path.Combine(_root, "config", "sodium.json"), "{\"user\":true}");
+
+        await _service.RestoreAsync(_instance, snapshot.Id);
+
+        Assert.Equal("original-level", File.ReadAllText(Path.Combine(_root, "saves", "world", "level.dat")));
+        // config 不在备份范围内，恢复也不动它
+        Assert.Contains("user", File.ReadAllText(Path.Combine(_root, "config", "sodium.json")));
     }
 }
