@@ -1410,7 +1410,10 @@ public sealed class CatalogViewModel : ObservableObject
         {
             if (kind == Orion.Core.Mods.CurseForgeKind.Modpack)
             {
-                var cache = Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+                // 用户在「下载位置」里选了「只下载到…」：把整合包 zip 存到那个目录就结束，不装。
+                var downloadOnlyDir = _main.PendingDownloadOnlyDirectory;
+                var cache = downloadOnlyDir ?? Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+
                 Status = $"正在下载 {file.FileName}…";
                 var downloadProgress = new Progress<long>(percent =>
                 {
@@ -1424,6 +1427,15 @@ public sealed class CatalogViewModel : ObservableObject
                 var zip = await _main.Context.CurseForge
                     .DownloadPackAsync(row.Pack, file, cache, downloadProgress)
                     .ConfigureAwait(true);
+
+                if (downloadOnlyDir is not null)
+                {
+                    Status = $"已下载到 {zip}（按你的选择，没有安装整合包）";
+                    _main.ClearDownloadOnlyChoice();
+                    _main.Activities.Finish(activity, ActivityState.Completed, null);
+                    _main.LogsPage.AppendSystem(Status);
+                    return;
+                }
 
                 var info = Orion.Core.Mods.PackArchiveInstaller.Inspect(zip);
                 var installerJava = await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true);
@@ -1577,7 +1589,9 @@ public sealed class CatalogViewModel : ObservableObject
 
             if (kind == Orion.Core.Mods.CurseForgeKind.Modpack)
             {
-                var cache = Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+                // 用户在「下载位置」里选了「只下载到…」：zip 存到那个目录就结束，不安装
+                var downloadOnlyDir = _main.PendingDownloadOnlyDirectory;
+                var cache = downloadOnlyDir ?? Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
                 Status = $"正在下载 {file.FileName}…";
 
                 // 进度同时写进活动条目：任务面板上能看到百分比，而不是一直"进行中"
@@ -1596,6 +1610,15 @@ public sealed class CatalogViewModel : ObservableObject
 
                 // Forge/NeoForge 的安装器需要对应版本的 Java：之前这里少了一步，才会报
                 // "需要 Java 运行时来运行安装器（MC x.y）"
+                if (downloadOnlyDir is not null)
+                {
+                    Status = $"已下载到 {zip}（按你的选择，没有安装整合包）";
+                    _main.ClearDownloadOnlyChoice();
+                    _main.Activities.Finish(activity, ActivityState.Completed, null);
+                    _main.LogsPage.AppendSystem(Status);
+                    return;
+                }
+
                 var info = Orion.Core.Mods.PackArchiveInstaller.Inspect(zip);
                 var installerJava = await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true);
                 if (installerJava is null && info.Loader != Orion.Core.Instances.LoaderKind.Vanilla)

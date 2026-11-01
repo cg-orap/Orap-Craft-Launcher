@@ -443,6 +443,9 @@ public sealed class MainViewModel : ObservableObject
         return true;
     }
 
+    /// <summary>用完「只下载到…」的选择后清掉，避免影响下一次安装。</summary>
+    public void ClearDownloadOnlyChoice() => PendingDownloadOnlyDirectory = null;
+
     public Account? CurrentAccount
     {
         get => _currentAccount;
