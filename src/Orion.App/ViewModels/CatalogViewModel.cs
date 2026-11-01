@@ -1418,6 +1418,8 @@ public sealed class CatalogViewModel : ObservableObject
         }
 
         Busy = true;
+        _installCts?.Dispose();
+        _installCts = new CancellationTokenSource();
         var activity = _main.Activities.Begin($"安装 {row.Title}", file.FileName);
 
         try
@@ -1427,6 +1429,27 @@ public sealed class CatalogViewModel : ObservableObject
                 // 用户在「下载位置」里选了「只下载到…」：把整合包 zip 存到那个目录就结束，不装。
                 var downloadOnlyDir = _main.PendingDownloadOnlyDirectory;
                 var cache = downloadOnlyDir ?? Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+
+                // 实例名要在**下载之前**问：用户选完下载位置就立刻看到，而不是等几十 MB 下完。
+                var plannedName = row.Title;
+
+                if (downloadOnlyDir is null)
+                {
+                    var request = Dialogs.AskPackInstall(
+                        row.Title,
+                        [(file.FileId.ToString(), file.FileName)],
+                        row.Title,
+                        row.Title);
+
+                    if (request is null)
+                    {
+                        Status = "已取消安装。";
+                        _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
+                        return;
+                    }
+
+                    plannedName = request.InstanceName;
+                }
 
                 Status = $"正在下载 {file.FileName}…";
                 var downloadProgress = new Progress<long>(percent =>
@@ -1439,7 +1462,7 @@ public sealed class CatalogViewModel : ObservableObject
                 });
 
                 var zip = await _main.Context.CurseForge
-                    .DownloadPackAsync(row.Pack, file, cache, downloadProgress)
+                    .DownloadPackAsync(row.Pack, file, cache, downloadProgress, _installCts.Token)
                     .ConfigureAwait(true);
 
                 if (downloadOnlyDir is not null)
@@ -1467,25 +1490,11 @@ public sealed class CatalogViewModel : ObservableObject
                     if (fraction >= 0) _main.Activities.Report(activity, 0.25 + (fraction * 0.75), line, "");
                 });
 
-                // 装之前先问实例名（默认就是整合包名称）
-                var request = Dialogs.AskPackInstall(
-                    row.Title,
-                    [(file.FileId.ToString(), file.FileName)],
-                    row.Title,
-                    row.Title);
-
-                if (request is null)
-                {
-                    Status = "已取消安装。";
-                    _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
-                    return;
-                }
-
                 var result = await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(zip, request.InstanceName, installerJava, installProgress)
+                    .InstallCurseForgeAsync(zip, plannedName, installerJava, installProgress, _installCts.Token)
                     .ConfigureAwait(true);
 
-                Status = result.Success ? $"已安装整合包 {request.InstanceName}" : "安装失败: " + (result.Error ?? "未知错误");
+                Status = result.Success ? $"已安装整合包 {plannedName}" : "安装失败: " + (result.Error ?? "未知错误");
                 _main.Activities.Finish(activity,
                     result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
                 if (result.Success) await _main.ReloadInstancesAsync().ConfigureAwait(true);
@@ -1504,13 +1513,20 @@ public sealed class CatalogViewModel : ObservableObject
 
             Status = $"正在下载 {file.FileName}…";
             var saved = await _main.Context.CurseForge
-                .DownloadFileAsync(file, target, new Progress<long>(p => Status = $"正在下载 {file.FileName}… {p}%"))
+                .DownloadFileAsync(file, target, new Progress<long>(p => Status = $"正在下载 {file.FileName}… {p}%"),
+                    _installCts.Token)
                 .ConfigureAwait(true);
 
             Status = downloadOnly is null
                 ? $"已安装 {row.Title} → {folder}/{Path.GetFileName(saved)}"
                 : $"已下载到 {saved}（按你的选择，没有装进版本）";
             _main.Activities.Finish(activity, ActivityState.Completed);
+            _main.LogsPage.AppendSystem(Status);
+        }
+        catch (OperationCanceledException)
+        {
+            Status = "已取消安装。";
+            _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
             _main.LogsPage.AppendSystem(Status);
         }
         catch (Exception ex)
@@ -1620,6 +1636,28 @@ public sealed class CatalogViewModel : ObservableObject
                 // 用户在「下载位置」里选了「只下载到…」：zip 存到那个目录就结束，不安装
                 var downloadOnlyDir = _main.PendingDownloadOnlyDirectory;
                 var cache = downloadOnlyDir ?? Path.Combine(_main.Context.Paths.Root, "cache", "curseforge");
+
+                // 实例名在下载前就问（选完下载位置立刻看到输入框）
+                var plannedName = row.Title;
+
+                if (downloadOnlyDir is null)
+                {
+                    var nameRequest = Dialogs.AskPackInstall(
+                        row.Title,
+                        [(file.FileId.ToString(), file.FileName)],
+                        row.Title,
+                        row.Title);
+
+                    if (nameRequest is null)
+                    {
+                        Status = "已取消安装。";
+                        _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
+                        return;
+                    }
+
+                    plannedName = nameRequest.InstanceName;
+                }
+
                 Status = $"正在下载 {file.FileName}…";
 
                 // 进度同时写进活动条目：任务面板上能看到百分比，而不是一直"进行中"
@@ -1663,27 +1701,13 @@ public sealed class CatalogViewModel : ObservableObject
                     if (fraction >= 0) _main.Activities.Report(activity, 0.25 + (fraction * 0.75), line, "");
                 });
 
-                // 合并成一个对话框：下载位置 + 实例名（版本沿用当前选中的整合包文件）
-                var request = Dialogs.AskPackInstall(
-                    row.Title,
-                    [(file.FileId.ToString(), file.FileName)],
-                    row.Title,
-                    row.Title);
-
-                if (request is null)
-                {
-                    Status = "已取消安装。";
-                    _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
-                    return;
-                }
-
                 var result = await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(zip, request.InstanceName, installerJava, installProgress, _installCts.Token)
+                    .InstallCurseForgeAsync(zip, plannedName, installerJava, installProgress, _installCts.Token)
                     .ConfigureAwait(true);
 
                 if (result.Success)
                 {
-                    Status = $"已安装整合包 {row.Title}";
+                    Status = $"已安装整合包 {plannedName}";
                     _main.Activities.Finish(activity, ActivityState.Completed);
                     _main.LogsPage.AppendSystem(Status);
                     await _main.ReloadInstancesAsync().ConfigureAwait(true);

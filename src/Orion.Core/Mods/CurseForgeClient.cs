@@ -386,6 +386,7 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         int read;
         while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
         {
+            ct.ThrowIfCancellationRequested();
             await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             written += read;
             // 界面上的"实时下载速度"来自这里（下载中心 → 装整合包/装模组都走这条路）
@@ -417,11 +418,24 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         var buffer = new byte[81920];
         long written = 0;
         int read;
-        while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+
+        try
         {
-            await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
-            written += read;
-            if (total > 0) progress?.Report((long)(written * 100.0 / total));
+            while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+                written += read;
+                Net.TransferMeter.Report(read);
+                if (total > 0) progress?.Report((long)(written * 100.0 / total));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消：删掉半截文件，别让不完整的 zip 留在缓存里
+            destination.Dispose();
+            try { File.Delete(target); } catch (IOException) { }
+            throw;
         }
 
         return target;

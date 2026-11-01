@@ -437,8 +437,8 @@ public sealed class MainViewModel : ObservableObject
         var (directory, downloadOnly) = choice.Value;
         if (!downloadOnly) return true;
 
-        // 用户明确要求"只下载到别处"：记住目录，安装逻辑不再往版本里写文件。
-        SetDownloadDirectory(directory);
+        // 用户明确要求"只下载到别处"：只记住这一次的目标目录，
+        // **不改**设置里的默认下载目录（默认目录只应该在设置页里改）。
         PendingDownloadOnlyDirectory = directory;
         return true;
     }
