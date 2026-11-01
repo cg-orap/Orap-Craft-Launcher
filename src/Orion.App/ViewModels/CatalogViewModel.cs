@@ -1792,8 +1792,18 @@ public sealed class CatalogViewModel : ObservableObject
                 _main.Activities.Report(activity, step, line, "");
             });
 
+            // Forge/NeoForge 的安装器要靠 Java 才能跑。
+            // 这里以前硬传 null，于是整合包装到"加载器安装"这一步必然失败：
+            //   加载器安装失败: 需要 Java 运行时来运行安装器（MC 1.20.1）
+            var installerJava = await PickInstallerJavaAsync(info.MinecraftVersion).ConfigureAwait(true);
+            if (installerJava is null && info.Loader != Orion.Core.Instances.LoaderKind.Vanilla)
+            {
+                _main.Activities.Finish(activity, ActivityState.Failed, Status);
+                return;
+            }
+
             var result = await _main.Context.PackArchives
-                .InstallCurseForgeAsync(path, instanceName, null, progress, _installCts.Token)
+                .InstallCurseForgeAsync(path, instanceName, installerJava, progress, _installCts.Token)
                 .ConfigureAwait(true);
 
             _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);

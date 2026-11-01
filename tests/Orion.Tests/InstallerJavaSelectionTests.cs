@@ -51,4 +51,36 @@ public sealed class InstallerJavaSelectionTests
             previous = fraction;
         }
     }
+
+    [Fact]
+    public void SelectorPrefersTheMatchingMajorThenNewer()
+    {
+        var java17 = new JavaRuntime
+        {
+            ExecutablePath = @"C:\jdk-17\bin\java.exe",
+            Home = @"C:\jdk-17",
+            MajorVersion = 17,
+            Version = "17.0.11",
+            Is64Bit = true,
+        };
+
+        var java21 = new JavaRuntime
+        {
+            ExecutablePath = @"C:\jdk-21\bin\java.exe",
+            Home = @"C:\jdk-21",
+            MajorVersion = 21,
+            Version = "21.0.4",
+            Is64Bit = true,
+        };
+
+        // 1.20.1 需要 17：必须选中 17，而不是 21
+        Assert.Same(java17, JavaDetector.SelectFor(17, [java21, java17]));
+
+        // 只有 21 时退而求其次（比没有强，但优先 17）
+        Assert.Same(java21, JavaDetector.SelectFor(17, [java21]));
+
+        // 一个都没有 → null，调用方必须报错，不能把 null 传给安装器
+        // （这正是「加载器安装失败: 需要 Java 运行时来运行安装器」的根因）
+        Assert.Null(JavaDetector.SelectFor(17, []));
+    }
 }
