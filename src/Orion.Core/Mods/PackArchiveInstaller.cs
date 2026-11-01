@@ -253,8 +253,11 @@ public sealed class PackArchiveInstaller
 
             await WriteInstallReportAsync(instance.GameDirectory, name,
                     downloadResult.Downloaded + downloadResult.Failed.Count + downloadResult.UnavailableCount,
-                    downloaded, unresolved)
-                .ConfigureAwait(false);
+                    downloaded, unresolved).ConfigureAwait(false);
+
+            // 记下"这个整合包原本该有哪些文件"：Axolotl 类启动器只装清单里的东西，
+            // 我们靠这份快照来判断哪些是后来补进来的（可以一键还原）。
+            await SavePackManifestAsync(instance.GameDirectory, downloadResult.FileNames).ConfigureAwait(false);
 
             var result = new MrPackResult
             {
@@ -481,6 +484,119 @@ public sealed class PackArchiveInstaller
             warnings.Add($"有 {result.Failed.Count} 个前置没补上（可在模组页手动搜索安装）：");
             warnings.AddRange(result.Failed.Take(20));
         }
+    }
+
+    /// <summary>整合包安装时记下的文件名快照（用来判断哪些文件是包外的）。</summary>
+    private const string PackManifestFileName = ".orap-pack-manifest.json";
+
+    /// <summary>保存"整合包原始文件清单"。</summary>
+    private static async Task SavePackManifestAsync(string gameDirectory, IReadOnlyList<string> fileNames)
+    {
+        if (fileNames.Count == 0) return;
+
+        try
+        {
+            await Orion.Core.Util.JsonUtil.WriteFileAsync(
+                Path.Combine(gameDirectory, PackManifestFileName), new
+                {
+                    generatedAt = DateTimeOffset.Now,
+                    files = fileNames,
+                }).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Warn("packs", "manifest-snapshot-failed", ("error", ex.Message));
+        }
+    }
+
+    /// <summary>读出整合包原始文件清单；没有快照就返回 null。</summary>
+    public static IReadOnlySet<string>? ReadPackManifest(string gameDirectory)
+    {
+        var path = Path.Combine(gameDirectory, PackManifestFileName);
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (!document.RootElement.TryGetProperty("files", out var files) ||
+                files.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in files.EnumerateArray())
+            {
+                var name = entry.GetString();
+                if (!string.IsNullOrWhiteSpace(name)) set.Add(name);
+            }
+
+            return set;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 把实例还原成"整合包刚装完的样子"：mods 里不在清单快照中的 jar 移到隔离目录。
+    ///
+    /// 为什么要这个：Axolotl 这类启动器只装清单里的文件，从不额外补模组；
+    /// 我们的"补齐前置"会把包外模组装进去，一旦版本不匹配就会崩（例如 colorwheel ↔ irisfly）。
+    /// 一键还原 = 回到和 Axolotl 一模一样的文件集合。
+    /// </summary>
+    public Task<int> RestoreToPackAsync(
+        string gameDirectory,
+        IProgress<string>? output = null,
+        CancellationToken ct = default)
+    {
+        var manifest = ReadPackManifest(gameDirectory);
+        if (manifest is null)
+        {
+            output?.Report("这个实例没有整合包清单快照（不是从整合包安装的），无法还原。");
+            return Task.FromResult(0);
+        }
+
+        var modsDirectory = Path.Combine(gameDirectory, "mods");
+        if (!Directory.Exists(modsDirectory)) return Task.FromResult(0);
+
+        var extra = new List<string>();
+        foreach (var path in Directory.EnumerateFiles(modsDirectory, "*.jar"))
+        {
+            if (manifest.Contains(Path.GetFileName(path))) continue;
+            extra.Add(path);
+        }
+
+        if (extra.Count == 0)
+        {
+            output?.Report("当前 mods 与整合包清单一致，无需还原。");
+            return Task.FromResult(0);
+        }
+
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        var quarantine = Path.Combine(gameDirectory, ".orap-quarantine", stamp);
+        Directory.CreateDirectory(quarantine);
+
+        var moved = 0;
+        foreach (var path in extra)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                File.Move(path, Path.Combine(quarantine, Path.GetFileName(path)));
+                moved++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                AppLog.Warn("packs", "restore-move-failed", ("file", Path.GetFileName(path)), ("error", ex.Message));
+            }
+        }
+
+        AppLog.Info("packs", "restored-to-pack", ("moved", moved), ("quarantine", quarantine));
+        output?.Report($"已把 {moved} 个整合包之外的模组移到隔离目录 .orap-quarantine/{stamp}（可随时拿回来）。");
+        return Task.FromResult(moved);
     }
 
     /// <summary>
@@ -823,7 +939,11 @@ public sealed class PackArchiveInstaller
     }
 
     /// <summary>整合包模组下载结果。</summary>
-    public sealed record ModDownloadResult(int Downloaded, int UnavailableCount, IReadOnlyList<string> Failed);
+    public sealed record ModDownloadResult(
+        int Downloaded,
+        int UnavailableCount,
+        IReadOnlyList<string> Failed,
+        IReadOnlyList<string> FileNames);
 
     /// <summary>
     /// 下载一个 CurseForge 整合包里清单列出的全部模组文件。
@@ -847,7 +967,7 @@ public sealed class PackArchiveInstaller
         var manifest = ReadManifest(archivePath);
         var files = manifest?.Files ?? [];
 
-        if (files.Count == 0) return new ModDownloadResult(0, 0, Array.Empty<string>());
+        if (files.Count == 0) return new ModDownloadResult(0, 0, Array.Empty<string>(), Array.Empty<string>());
 
         output?.Report($"解析清单：{files.Count} 个文件…");
 
@@ -916,7 +1036,14 @@ public sealed class PackArchiveInstaller
 
         await Task.WhenAll(downloadJobs).ConfigureAwait(false);
 
-        return new ModDownloadResult(done, unavailable.Count, failed.ToArray());
+        var names = new List<string>(targets.Count);
+        foreach (var target in targets)
+        {
+            var path = Path.Combine(modsDirectory, target.FileName);
+            if (File.Exists(path)) names.Add(target.FileName);
+        }
+
+        return new ModDownloadResult(done, unavailable.Count, failed.ToArray(), names);
     }
 
     /// <summary>整合包并发下载数：8 个连接足够吃满家用带宽，又不会把 CDN 打出 429。</summary>

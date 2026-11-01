@@ -783,6 +783,34 @@ public sealed class ModsViewModel : ObservableObject
             _main.Activities.Finish(activity,
                 result.Remaining.Count == 0 ? ActivityState.Completed : ActivityState.Failed, Status);
             _main.LogsPage.AppendSystem(Status);
+
+            // 整合包实例：补进来的模组属于"包外新增"，版本不匹配就会崩（colorwheel ↔ irisfly 就是这么来的）。
+            // 问一句要不要还原成整合包原始文件集合——Axolotl 这类启动器根本不会往包里加东西。
+            if (result.Installed.Count > 0
+                && PackArchiveInstaller.ReadPackManifest(instance.GameDirectory) is not null)
+            {
+                var answer = System.Windows.MessageBox.Show(
+                    $"这次往整合包里补了 {result.Installed.Count} 个模组。\n\n"
+                    + "整合包是按它自己的版本配好的，额外加模组有概率导致启动崩溃。\n"
+                    + "要现在还原成整合包原始内容吗？（多出来的模组会移到 .orap-quarantine，随时能拿回来）",
+                    "补齐前置：是否还原整合包",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Question);
+
+                if (answer == System.Windows.MessageBoxResult.Yes)
+                {
+                    var restored = await _main.Context.PackArchives
+                        .RestoreToPackAsync(instance.GameDirectory,
+                            new Progress<string>(line => Status = line)).ConfigureAwait(true);
+
+                    Status = restored == 0
+                        ? "整合包已经和原始清单一致，无需还原。"
+                        : $"已还原：移走 {restored} 个包外模组，现在与整合包原始内容一致。";
+
+                    _main.LogsPage.AppendSystem(Status);
+                    await LoadModsAsync().ConfigureAwait(true);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -833,11 +861,12 @@ public sealed class ModsViewModel : ObservableObject
             if (recovered == 0 && renamed == 0)
             {
                 Status = "没有需要修复的文件（缺失清单为空、文件名都正常）。";
+                _main.LogsPage.AppendSystem(Status);
+                return;
             }
-            else
-            {
-                Status = $"已补下 {recovered} 个文件、改名 {renamed} 个，请点「重新扫描」后启动。";
-            }
+
+            Status = $"已补下 {recovered} 个文件、改名 {renamed} 个。";
+            _main.LogsPage.AppendSystem(Status);
 
             _main.Activities.Finish(activity, recovered == 0 ? ActivityState.Failed : ActivityState.Completed, Status);
             _main.LogsPage.AppendSystem(Status);
