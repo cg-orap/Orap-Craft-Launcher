@@ -720,6 +720,28 @@ public sealed class HomeViewModel : ObservableObject
         _session.Kill();
     }
 
+    private DateTime? _sessionStartedAt;
+
+    /// <summary>把本次会话的时长写进游玩记录。</summary>
+    private void RecordSession(Core.Instances.Instance instance, int exitCode, bool killed)
+    {
+        var started = _sessionStartedAt;
+        _sessionStartedAt = null;
+
+        try
+        {
+            var duration = started is null ? TimeSpan.Zero : DateTime.UtcNow - started.Value;
+            if (duration < TimeSpan.Zero) duration = TimeSpan.Zero;
+
+            _main.Context.PlayStats.RecordSession(instance.Id, instance.Name, duration, killed ? 0 : exitCode);
+            _ = _main.ToolboxPage.RefreshRecordsAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Warn("stats", "record-session-failed", ("error", ex.Message));
+        }
+    }
+
     private async Task RefreshTokenAsync()
     {
         var account = _main.CurrentAccount;

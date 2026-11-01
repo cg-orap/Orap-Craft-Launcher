@@ -1,7 +1,9 @@
 using System.IO;
 using System.Windows.Input;
+using Orion.Core.Instances;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Orion.App.Controls;
 using Orion.App.Mvvm;
 using Orion.Core.Game;
 using Orion.Core.World;
@@ -31,7 +33,20 @@ public sealed class ToolboxViewModel : ObservableObject
         _main = main;
 
         GenerateMapCommand = new RelayCommand(GenerateMap);
+        RefreshRecordsCommand = new RelayCommand(() => _ = RefreshRecordsAsync());
+        ClearRecordsCommand = new RelayCommand(ClearRecords);
         LocateCommand = new RelayCommand(LocateTo);
+        ScanStructuresCommand = new RelayCommand(ScanNearbyStructures);
+        LocateStructureCommand = new RelayCommand(param =>
+        {
+            if (param is not NearbyStructure row) return;
+            LocateX = row.X.ToString();
+            LocateZ = row.Z.ToString();
+            OnPropertyChanged(nameof(LocateX));
+            OnPropertyChanged(nameof(LocateZ));
+            LocateRequested?.Invoke(row.X, row.Z);
+            MapStatus = $"已定位到 {row.Name} · {row.X}, {row.Z}（{row.DistanceText}）";
+        });
         ToggleAllStructuresCommand = new RelayCommand(() =>
         {
             var enable = !StructureFilterOptions.All(o => o.IsEnabled);
@@ -55,7 +70,7 @@ public sealed class ToolboxViewModel : ObservableObject
     }
 
     // ── 页签 ────────────────────────────────────────────────
-    public IReadOnlyList<string> Tabs { get; } = ["种子地图", "查看截图", "游戏默认设置"];
+    public IReadOnlyList<string> Tabs { get; } = ["种子地图", "查看截图", "游戏默认设置", "记录"];
 
     public int TabIndex
     {
@@ -66,20 +81,87 @@ public sealed class ToolboxViewModel : ObservableObject
             OnPropertyChanged(nameof(IsSeedTab));
             OnPropertyChanged(nameof(IsScreenshotsTab));
             OnPropertyChanged(nameof(IsDefaultsTab));
+            OnPropertyChanged(nameof(IsRecordsTab));
 
             if (IsScreenshotsTab) RefreshScreenshots();
+            if (IsRecordsTab) _ = RefreshRecordsAsync();
         }
     }
 
     public bool IsSeedTab => _tabIndex == 0;
     public bool IsScreenshotsTab => _tabIndex == 1;
     public bool IsDefaultsTab => _tabIndex == 2;
+    public bool IsRecordsTab => _tabIndex == 3;
 
     public string InstanceLabel => _main.CurrentInstance is { } instance
         ? $"{instance.Name} · MC {instance.GameVersion}"
         : "未选择版本";
 
-    // ── 种子地图 ────────────────────────────────────────────
+    // ── 记录（各版本启动次数 / 游玩时长）──────────────────────
+    public ObservableList<PlayRecordRow> Records { get; } = [];
+
+    private string _recordsSummary = "";
+    private bool _recordsLoaded;
+
+    public string RecordsSummary
+    {
+        get => _recordsSummary;
+        private set => SetProperty(ref _recordsSummary, value);
+    }
+
+    public bool HasRecords => Records.Count > 0;
+
+    public string RecordsEmptyHint =>
+        Records.Count > 0 ? "" : "还没有记录。启动任意版本后，这里会显示启动次数与游玩时长。";
+
+
+    /// <summary>重新读一遍统计文件并刷新列表（启动/退出后也会被调用）。</summary>
+    public Task RefreshRecordsAsync()
+    {
+        try
+        {
+            var stats = _main.Context.PlayStats.All();
+            var byId = stats.ToDictionary(s => s.InstanceId, s => s, StringComparer.OrdinalIgnoreCase);
+
+            var rows = new List<PlayRecordRow>();
+
+            // 先按实例列表排（能显示没玩过的版本），再补上已删除实例的历史
+            foreach (var instance in _main.Instances)
+            {
+                byId.TryGetValue(instance.Id, out var stat);
+                rows.Add(PlayRecordRow.From(instance, stat));
+            }
+
+            foreach (var stat in stats)
+            {
+                if (_main.Instances.Any(i => string.Equals(i.Id, stat.InstanceId, StringComparison.OrdinalIgnoreCase))) continue;
+                rows.Add(PlayRecordRow.From(null, stat));
+            }
+
+            rows = [.. rows.OrderByDescending(r => r.LastPlayed ?? DateTime.MinValue)
+                .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)];
+
+            Records.Replace(rows);
+            _recordsLoaded = true;
+
+            var total = TimeSpan.FromSeconds(stats.Sum(s => s.TotalSeconds));
+            var launches = stats.Sum(s => s.Launches);
+            RecordsSummary = stats.Count == 0
+                ? "暂无记录"
+                : $"共 {launches} 次启动 · 累计 {InstancePlayStats.FormatDuration(total)} · {stats.Count} 个版本有记录";
+
+            OnPropertyChanged(nameof(HasRecords));
+            OnPropertyChanged(nameof(RecordsEmptyHint));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RecordsSummary = "读取记录失败：" + ex.Message;
+        }
+
+        return Task.CompletedTask;
+    }
+
+        // ── 种子地图 ────────────────────────────────────────────
     public string Seed
     {
         get => _seed;
@@ -240,6 +322,26 @@ public sealed class ToolboxViewModel : ObservableObject
     public ICommand OpenChunkbaseCommand { get; }
     public ICommand OpenMislandCommand { get; }
     public ICommand CopySeedCommand { get; }
+
+    public ICommand RefreshRecordsCommand { get; }
+    public ICommand ClearRecordsCommand { get; }
+
+    private void ClearRecords()
+    {
+        var answer = Dialogs.Ask(
+            "清空游玩记录",
+            "会删除所有版本的启动次数与游玩时长统计（playstats.json）。",
+            yesText: "清空",
+            noText: "取消",
+            detail: "这个操作不可撤销；版本本身和存档不受影响。",
+            danger: true);
+
+        if (answer != DialogOutcome.Yes) return;
+
+        _main.Context.PlayStats.Clear();
+        _ = RefreshRecordsAsync();
+        MapStatus = "已清空游玩记录。";
+    }
 
     // ── 截图 ────────────────────────────────────────────────
     public ObservableList<ScreenshotRow> Screenshots { get; } = [];
@@ -472,6 +574,89 @@ public sealed class ToolboxViewModel : ObservableObject
         OnPropertyChanged(nameof(SeedValue));
         MapStatus = $"种子 = {value} · 拖动平移，滚轮缩放，悬停看群系";
         _main.LogsPage.AppendSystem($"工具箱：已生成离线种子地图 {value}");
+    }
+
+    // ── 附近结构（像 cubiomes-viewer 的结构列表）────────────────
+    public ObservableList<NearbyStructure> NearbyStructures { get; } = [];
+
+    private string _structureScanStatus = "点「扫描附近结构」列出以当前视图为中心、2000 格内的结构。";
+
+    public string StructureScanStatus
+    {
+        get => _structureScanStatus;
+        private set => SetProperty(ref _structureScanStatus, value);
+    }
+
+    public bool HasNearbyStructures => NearbyStructures.Count > 0;
+
+    public ICommand ScanStructuresCommand { get; }
+    public ICommand LocateStructureCommand { get; }
+
+    /// <summary>由视图注入：拿当前地图中心（没有就退回坐标输入框/原点）。</summary>
+    public Func<(int X, int Z)>? MapCenterProvider { get; set; }
+
+    private void ScanNearbyStructures()
+    {
+        if (!CubiomesNative.Available)
+        {
+            StructureScanStatus = "原生引擎未加载，算不出结构位置。";
+            return;
+        }
+
+        if (!SeedMap.TryParseSeed(Seed, out var seed))
+        {
+            StructureScanStatus = "先填一个种子再扫描。";
+            return;
+        }
+
+        var (centerX, centerZ) = MapCenterProvider?.Invoke()
+                                  ?? (int.TryParse(LocateX, out var lx) && int.TryParse(LocateZ, out var lz) ? (lx, lz) : (0, 0));
+
+        const int radius = 2000;
+        var version = CubiomesNative.VersionIndexFor(SeedVersion);
+        var dimension = _dimensionIndex;
+
+        StructureScanStatus = "正在扫描…";
+
+        try
+        {
+            var found = new List<NearbyStructure>();
+
+            foreach (var (key, x, z) in CubiomesNative.FindStructures(seed, version, dimension,
+                         (centerX - radius) >> 4, (centerZ - radius) >> 4,
+                         (centerX + radius) >> 4, (centerZ + radius) >> 4))
+            {
+                found.Add(NearbyStructure.Create(key, StructureLabels.Resolve(key), x, z, centerX, centerZ));
+            }
+
+            if (dimension == CubiomesNative.DimOverworld)
+            {
+                foreach (var (x, z) in CubiomesNative.FindStrongholds(seed, version))
+                {
+                    found.Add(NearbyStructure.Create("stronghold", StructureLabels.Resolve("stronghold"), x, z, centerX, centerZ));
+                }
+            }
+
+            var rows = found
+                .Where(r => r.Distance <= radius)
+                .DistinctBy(r => (r.Key, r.X, r.Z))
+                .OrderBy(r => r.Distance)
+                .Take(120)
+                .ToList();
+
+            NearbyStructures.Replace(rows);
+            OnPropertyChanged(nameof(HasNearbyStructures));
+
+            StructureScanStatus = rows.Count == 0
+                ? $"{radius} 格内没有找到结构（换个位置或换维度再试）。"
+                : $"以 {centerX}, {centerZ} 为中心 {radius} 格内找到 {rows.Count} 个结构，按距离排序。";
+
+            MapStatus = StructureScanStatus;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or InvalidOperationException)
+        {
+            StructureScanStatus = "扫描失败：" + ex.Message;
+        }
     }
 
     /// <summary>把地图跳到输入的方块坐标。</summary>
@@ -718,4 +903,66 @@ public sealed class StructureFilterOption : ObservableObject
 public sealed record GameLanguage(string Code, string Name)
 {
     public override string ToString() => Name;
+
+}
+
+/// <summary>「记录」页签的一行：某个版本的启动次数 / 总时长 / 最近游玩。</summary>
+public sealed class PlayRecordRow
+{
+    public string InstanceId { get; private init; } = "";
+    public string Name { get; private init; } = "";
+    public string Subtitle { get; private init; } = "";
+    public int Launches { get; private init; }
+    public string TotalPlayText { get; private init; } = "0 分钟";
+    public string AverageText { get; private init; } = "—";
+    public string LastPlayedText { get; private init; } = "从未";
+    public DateTime? LastPlayed { get; private init; }
+    public int AbnormalExits { get; private init; }
+    public bool IsRemoved => string.IsNullOrEmpty(Subtitle);
+    public string LaunchesText => Launches == 0 ? "未启动" : $"{Launches} 次";
+    public string AbnormalText => AbnormalExits == 0 ? "" : $"异常退出 {AbnormalExits} 次";
+
+    public static PlayRecordRow From(Orion.Core.Instances.Instance? instance, InstancePlayStats? stat)
+    {
+        var total = stat?.TotalSeconds ?? 0;
+        var launches = stat?.Launches ?? 0;
+
+        return new PlayRecordRow
+        {
+            InstanceId = instance?.Id ?? stat?.InstanceId ?? "",
+            Name = instance?.Name ?? stat?.Name ?? "(已删除的版本)",
+            Subtitle = instance is null ? "" : $"{instance.GameVersion} · {instance.Loader}",
+            Launches = launches,
+            TotalPlayText = InstancePlayStats.FormatDuration(TimeSpan.FromSeconds(total)),
+            AverageText = launches > 0 ? InstancePlayStats.FormatDuration(TimeSpan.FromSeconds(total / (double)launches)) : "—",
+            LastPlayedText = stat?.LastPlayedUtc is { } t ? t.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "从未",
+            LastPlayed = stat?.LastPlayedUtc,
+            AbnormalExits = stat?.AbnormalExits ?? 0,
+        };
+    }
+}
+
+/// <summary>「附近结构」的一行。</summary>
+public sealed class NearbyStructure
+{
+    public string Key { get; private init; } = "";
+    public string Name { get; private init; } = "";
+    public int X { get; private init; }
+    public int Z { get; private init; }
+    public double Distance { get; private init; }
+
+    public string DistanceText => Distance >= 1000
+        ? $"{Distance / 1000:0.0} km"
+        : $"{Distance:0} 格";
+
+    public string CoordinatesText => $"{X}, {Z}";
+
+    public static NearbyStructure Create(string key, string name, int x, int z, int centerX, int centerZ) => new()
+    {
+        Key = key,
+        Name = name,
+        X = x,
+        Z = z,
+        Distance = Math.Sqrt(((double)x - centerX) * (x - centerX) + ((double)z - centerZ) * (z - centerZ)),
+    };
 }

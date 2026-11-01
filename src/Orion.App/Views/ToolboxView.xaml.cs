@@ -37,6 +37,7 @@ public partial class ToolboxView : UserControl
         if (_attached is not null)
         {
             _attached.PropertyChanged += OnViewModelPropertyChanged;
+            _attached.MapCenterProvider = MapCenter;
             BiomeCanvas.Seed = _attached.SeedValue;
             BiomeCanvas.ShowSlime = _attached.ShowSlimeOverlay;
             BiomeCanvas.ShowGrid = _attached.ShowGridOverlay;
@@ -77,6 +78,9 @@ public partial class ToolboxView : UserControl
     }
 
     private void OnLocateRequested(int blockX, int blockZ) => BiomeCanvas.LocateTo(blockX, blockZ);
+
+    /// <summary>「扫描附近结构」用的中心点：直接取画布当前视图中心。</summary>
+    private (int X, int Z) MapCenter() => BiomeCanvas.CenterBlock;
 
     private void OnSpawnRequested()
     {

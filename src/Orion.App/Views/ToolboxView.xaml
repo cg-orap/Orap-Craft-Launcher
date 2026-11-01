@@ -56,8 +56,8 @@
                                    Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
 
                         <TextBlock Text="种子（数字或任意文本）" Style="{StaticResource CaptionText}" Margin="0,14,0,0" />
-                        <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
-                                 AutomationProperties.AutomationId="SeedBox" />
+                        <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.AutomationId="SeedBox" Margin="0,6,0,0" />
 
                         <Button Content="生成地图" Style="{StaticResource PrimaryButton}" Padding="16,8"
                                 Margin="0,10,0,0" Command="{Binding GenerateMapCommand}"
@@ -65,6 +65,60 @@
 
                         <TextBlock Text="{Binding SeedError}" Style="{StaticResource CaptionText}"
                                    Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="附近结构" Style="{StaticResource SectionTitle}" />
+                                    </StackPanel>
+                                    <Button Content="扫描附近结构" Style="{StaticResource SecondaryButton}"
+                                            HorizontalAlignment="Right" FontSize="11" Padding="10,5"
+                                            Command="{Binding ScanStructuresCommand}"
+                                            AutomationProperties.AutomationId="ScanStructuresButton" />
+                                </Grid>
+
+                                <TextBlock Text="{Binding StructureScanStatus}" Style="{StaticResource CaptionText}"
+                                           TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                                    <ItemsControl ItemsSource="{Binding NearbyStructures}"
+                                                  AutomationProperties.AutomationId="NearbyStructuresList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding DataContext.LocateStructureCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding}" Cursor="Hand"
+                                                        HorizontalContentAlignment="Stretch" Padding="0"
+                                                        BorderThickness="0" Background="Transparent"
+                                                        ToolTip="在地图上定位到这个结构">
+                                                    <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="6"
+                                                            Padding="10,6" Margin="0,0,0,4">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" MinWidth="0" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11.5"
+                                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding CoordinatesText}"
+                                                                       FontFamily="Consolas" FontSize="10.5"
+                                                                       Margin="10,0" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource MutedTextBrush}" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding DistanceText}"
+                                                                       FontFamily="Consolas" FontSize="10.5"
+                                                                       MinWidth="64" TextAlignment="Right"
+                                                                       VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource AccentBrush}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
 
                         <TextBlock Text="{Binding MapStatus}" Style="{StaticResource CaptionText}"
                                    TextWrapping="Wrap" Margin="0,10,0,0" />
@@ -335,5 +389,85 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
+        <!-- ===== 记录（各版本启动次数 / 游玩时长）===== -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                      Visibility="{Binding IsRecordsTab, Converter={StaticResource BoolToVisibility}}"
+                      anim:ContentTransition.Watch="{Binding IsRecordsTab}" anim:ContentTransition.Offset="6">
+            <StackPanel>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="游玩记录" Style="{StaticResource SectionTitle}" />
+                                <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4"
+                                        Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding RecordsSummary}" FontSize="10.5"
+                                               Foreground="{DynamicResource MutedTextBrush}" />
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="刷新" Style="{StaticResource GhostButton}" FontSize="11"
+                                        Padding="10,4" Command="{Binding RefreshRecordsCommand}" />
+                                <Button Content="清空记录" Style="{StaticResource GhostButton}" FontSize="11"
+                                        Padding="10,4" Margin="8,0,0,0" Command="{Binding ClearRecordsCommand}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="统计每次启动到退出的墙钟时间；被启动器强制结束的会话也算。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                        <TextBlock Text="{Binding RecordsEmptyHint}" Style="{StaticResource CaptionText}"
+                                   TextWrapping="Wrap" Margin="0,10,0,0"
+                                   Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+
+                        <ItemsControl ItemsSource="{Binding Records}" Margin="0,12,0,0"
+                                      AutomationProperties.AutomationId="RecordsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="8"
+                                            Padding="12,10" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MinWidth="0" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="12.5"
+                                                           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="10.5"
+                                                           FontFamily="Consolas"
+                                                           Foreground="{DynamicResource MutedTextBrush}" />
+                                            </StackPanel>
+
+                                            <TextBlock Grid.Column="1" Text="{Binding LaunchesText}" FontSize="11.5"
+                                                       FontFamily="Consolas" VerticalAlignment="Center"
+                                                       Margin="12,0" Foreground="{DynamicResource AccentBrush}" />
+
+                                            <TextBlock Grid.Column="2" Text="{Binding TotalPlayText}" FontSize="11.5"
+                                                       VerticalAlignment="Center" Margin="0,0,12,0"
+                                                       MinWidth="90" TextAlignment="Right" />
+
+                                            <StackPanel Grid.Column="3" VerticalAlignment="Center" MinWidth="140">
+                                                <TextBlock Text="{Binding LastPlayedText}" FontSize="10.5"
+                                                           FontFamily="Consolas" TextAlignment="Right"
+                                                           Foreground="{DynamicResource MutedTextBrush}" />
+                                                <TextBlock Text="{Binding AbnormalText}" FontSize="10"
+                                                           TextAlignment="Right"
+                                                           Foreground="{DynamicResource DangerBrush}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
     </Grid>
 </UserControl>

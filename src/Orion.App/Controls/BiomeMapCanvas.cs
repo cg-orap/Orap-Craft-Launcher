@@ -264,6 +264,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
    // 视觉倍率保持动画终值，等新图到达后在回调里归位
     }
 
+    /// <summary>当前视图中心（方块坐标）——「扫描附近结构」用它当圆心。</summary>
+    public (int X, int Z) CenterBlock => (_centerBlockX, _centerBlockZ);
+
     public void CenterOn(int blockX, int blockZ)
     {
         _centerBlockX = blockX;

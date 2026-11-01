@@ -107,6 +107,9 @@ public sealed class LauncherContext : IAsyncDisposable
     /// <summary>缺前置检测与自动补齐（安装整合包后自动跑一次，模组页也能手动触发）。</summary>
     public Mods.ModDependencyRepair DependencyRepair { get; }
 
+    /// <summary>各版本的游玩统计（启动次数 / 总时长 / 最近游玩）。</summary>
+    public Instances.PlayStatsStore PlayStats { get; set; } = null!;
+
     /// <summary>Set once <see cref="InitializeAsync"/> has run.</summary>
     public bool IsInitialized { get; private set; }
 
@@ -138,7 +141,10 @@ public sealed class LauncherContext : IAsyncDisposable
         var mirrors = new MirrorResolver(network);
         var http = HttpClients.Create(network);
 
-        return new LauncherContext(paths, settingsStore, settings, http, network, mirrors);
+        return new LauncherContext(paths, settingsStore, settings, http, network, mirrors)
+        {
+            PlayStats = new Instances.PlayStatsStore(Path.Combine(paths.Root, "playstats.json")),
+        };
     }
 
     /// <summary>Portable mode (a <c>portable.txt</c> beside the executable) stores data next to the EXE.</summary>
