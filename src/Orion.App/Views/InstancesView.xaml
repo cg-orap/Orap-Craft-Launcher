@@ -55,7 +55,8 @@
             <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,16" />
 
             <!-- ===== 头部：实例身份 + 操作 + 页签 ===== -->
-            <Border Style="{StaticResource Card}" Padding="20,16">
+            <Border Style="{StaticResource Card}" Padding="20,16"
+                    anim:InstanceSwitch.Watch="{Binding SelectedInstance}">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>

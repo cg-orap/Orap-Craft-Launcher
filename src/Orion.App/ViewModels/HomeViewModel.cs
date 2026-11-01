@@ -217,6 +217,9 @@ public sealed class HomeViewModel : ObservableObject
 
     public Instance? SelectedInstance => _main.CurrentInstance;
 
+    /// <summary>给切换动画用：值变了 → 播一次过渡（见 Animations.InstanceSwitch）。</summary>
+    public Instance? CurrentInstance => _main.CurrentInstance;
+
     /// <summary>Versions offered by the home page picker.</summary>
     public ObservableList<Instance> Instances => _main.Instances;
 
@@ -240,6 +243,7 @@ public sealed class HomeViewModel : ObservableObject
             RefreshInstanceIcon();
             OnPropertyChanged(nameof(InstanceSubtitle));
             OnPropertyChanged(nameof(LaunchVersionLine));
+            OnPropertyChanged(nameof(CurrentInstance));
             _ = RefreshAsync();
         }
     }

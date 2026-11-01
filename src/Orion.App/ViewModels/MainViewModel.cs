@@ -634,10 +634,13 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(InstanceDetail));
             Home.RaisePropertyChanged(nameof(HomeViewModel.SelectedInstance));
             Home.RaisePropertyChanged(nameof(HomeViewModel.SelectedLaunchInstance));
-            Home.RaisePropertyChanged(nameof(HomeViewModel.SelectedLaunchInstance));
             Home.RaisePropertyChanged(nameof(HomeViewModel.InstanceTitle));
             Home.RaisePropertyChanged(nameof(HomeViewModel.InstanceSubtitle));
             Home.RaisePropertyChanged(nameof(HomeViewModel.LaunchVersionLine));
+            Home.RaisePropertyChanged(nameof(HomeViewModel.CurrentInstance));
+
+            // 顶栏 / 首页卡片都在监听这个属性：换版本时播一次过渡动画
+            OnPropertyChanged(nameof(CurrentInstance));
             ModsPage?.SyncInstance();
             InstancesPage?.SyncSelection();
             CatalogPage?.SyncInstance();

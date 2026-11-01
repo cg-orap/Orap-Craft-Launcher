@@ -130,7 +130,8 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
 
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                    anim:InstanceSwitch.Watch="{Binding SelectedInstance}" anim:InstanceSwitch.Offset="4">
                             <TextBlock Text="模组管理" FontSize="18" FontWeight="SemiBold"
                                        TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">

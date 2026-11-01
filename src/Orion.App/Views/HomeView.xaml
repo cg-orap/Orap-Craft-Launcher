@@ -84,7 +84,8 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="28,24,28,28">
 
-                <Border Style="{StaticResource HomeCard}" Padding="24,20">
+                <Border Style="{StaticResource HomeCard}" Padding="24,20"
+                        anim:InstanceSwitch.Watch="{Binding CurrentInstance}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <!-- 实例头像：有整合包图标就显示图标，否则用"名字哈希渐变 + 首字母" -->
