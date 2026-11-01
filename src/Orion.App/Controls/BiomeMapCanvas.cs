@@ -47,7 +47,17 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
     // 与 cubiomes 的 scale 取值对齐：每格 1/4/16/64 方块
     // 细档位：每档 2 倍。cubiomes 只支持 1/4/16/64 的采样 scale，中间档用"渲染更大再缩小"实现。
+    /// <summary>缩放档位（方块/像素）。数组首尾就是上下限：最小 1（看清楚 1 格），最大 64（看大范围）。</summary>
     private static readonly int[] ZoomSteps = [1, 2, 4, 8, 16, 32, 64];
+
+    /// <summary>是否已到最大放大倍数（每像素 1 格）。</summary>
+    public bool AtMaxZoom => _zoomIndex <= 0;
+
+    /// <summary>是否已到最大缩小倍数（每像素 64 格）。</summary>
+    public bool AtMinZoom => _zoomIndex >= ZoomSteps.Length - 1;
+
+    /// <summary>当前缩放档位的说明文字。</summary>
+    public string ZoomText => $"{BlocksPerPixel} 格 / 像素" + (AtMaxZoom ? "（已到上限）" : AtMinZoom ? "（已到下限）" : "");
 
     // 一次点击只走一档，视觉上先缩放旧图（220ms 缓出），新图到达后再归位，避免生硬跳变。
     private const int ZoomAnimationMs = 220;
@@ -91,6 +101,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private int _bitmapCenterX;
     private int _bitmapCenterZ;
     private int _bitmapStep = 16;
+
+    // 位图覆盖的世界方块范围（渲染时记下来）。
+    // 只记像素数 + step 不够：换过缩放档位后，用"拉伸到整屏"的方式画旧图
+    // 会把它挪错位置，画面上就会出现"一块清晰图压在粗图上"的接缝。
+    private double _bitmapWorldLeft, _bitmapWorldTop, _bitmapWorldWidth, _bitmapWorldHeight;
+    private double _previewWorldLeft, _previewWorldTop, _previewWorldWidth, _previewWorldHeight;
 
     // 预览层：整屏 1/4 分辨率的粗图，用来在拖动/缩放期间垫底，避免出现空白。
     private BitmapSource? _previewBitmap;
@@ -273,6 +289,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
         };
         BeginAnimation(VisualScaleProperty, animation);
 
+        // 关键：把档位真正切换过去。
+        // 以前只设了 _pendingZoomIndex，_zoomIndex 永远不变 ——
+        // 于是动画结束后重渲的还是旧比例，观感就是"放大一下又弹回原样"。
+        _zoomIndex = target;
+        ScheduleRenderAfterGesture();
+
         _zoomTimer ??= new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(ZoomAnimationMs),
@@ -291,9 +313,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
     {
         _zoomTimer?.Stop();
 
-        // 兜底：900ms 内新图还没来（渲染失败/超时）就把视觉缩放归位，
-        // 否则地图会一直停在"缩小的一小块"。
+        // 档位已经在 ZoomStep 里提交；这里只负责"新图迟迟不来就归位"的兜底
         _zoomWatchdog ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+
         _zoomWatchdog.Stop();
         _zoomWatchdog.Tick -= OnZoomWatchdogTick;
         _zoomWatchdog.Tick += OnZoomWatchdogTick;
@@ -452,6 +474,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _previewCenterX = centerX;
                     _previewCenterZ = centerZ;
                     _previewStep = step;
+
+                    _previewWorldWidth = width * (double)step;
+                    _previewWorldHeight = height * (double)step;
+                    _previewWorldLeft = centerX - _previewWorldWidth / 2;
+                    _previewWorldTop = centerZ - _previewWorldHeight / 2;
                     InvalidateVisual();
                 }));
             }
@@ -575,6 +602,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _structures.AddRange(markers);
                     _spawn = spawn;
                     _bitmapStep = step;
+
+                    // 注意：这里的 width/height 是位图像素数，乘 step 得到覆盖的方块范围
+                    _bitmapWorldWidth = width * (double)step;
+                    _bitmapWorldHeight = height * (double)step;
+                    _bitmapWorldLeft = centerX - _bitmapWorldWidth / 2;
+                    _bitmapWorldTop = centerZ - _bitmapWorldHeight / 2;
                     _loading = false;
                     _pendingZoomIndex = null;
                     BeginAnimation(VisualScaleProperty, null);
@@ -655,26 +688,36 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var step = BlocksPerPixel;
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
+        // 当前视口左上角对应的世界方块
+        var viewLeft = _centerBlockX - width / 2.0 * step;
+        var viewTop = _centerBlockZ - height / 2.0 * step;
+
         // 预览层先垫底：拖出去的那部分不会是空白，而是"稍旧的粗图"
-        if (_previewBitmap is not null)
+        if (_previewBitmap is not null && _previewWorldWidth > 0)
         {
-            var pdx = _previewStep > 0 ? (_previewCenterX - _centerBlockX) / (double)_previewStep : 0;
-            var pdz = _previewStep > 0 ? (_previewCenterZ - _centerBlockZ) / (double)_previewStep : 0;
+            var rect = new Rect(
+                (_previewWorldLeft - viewLeft) / step,
+                (_previewWorldTop - viewTop) / step,
+                _previewWorldWidth / step,
+                _previewWorldHeight / step);
 
             dc.PushOpacity(0.9);
-            dc.DrawImage(_previewBitmap, new Rect(pdx, pdz, width, height));
+            dc.DrawImage(_previewBitmap, rect);
             dc.Pop();
         }
 
-        if (_bitmap is not null)
+        if (_bitmap is not null && _bitmapWorldWidth > 0)
         {
-            // 旧图按"位图中心 vs 当前中心"的差平移：拖动时画面跟着走，
-            // 新瓦片到达前不会出现空白，也不会在替换瞬间跳位。
-            var dx = _bitmapStep > 0 ? (_bitmapCenterX - _centerBlockX) / (double)_bitmapStep : 0;
-            var dz = _bitmapStep > 0 ? (_bitmapCenterZ - _centerBlockZ) / (double)_bitmapStep : 0;
+            // 按"这张图覆盖的方块范围"落到屏幕：换过缩放档位也能正确叠放，
+            // 不会出现"清晰图只盖住一块、周围露粗图"的接缝。
+            var rect = new Rect(
+                (_bitmapWorldLeft - viewLeft) / step,
+                (_bitmapWorldTop - viewTop) / step,
+                _bitmapWorldWidth / step,
+                _bitmapWorldHeight / step);
 
             dc.PushOpacity(BitmapOpacity);
-            dc.DrawImage(_bitmap, new Rect(dx, dz, width, height));
+            dc.DrawImage(_bitmap, rect);
             dc.Pop();
         }
 

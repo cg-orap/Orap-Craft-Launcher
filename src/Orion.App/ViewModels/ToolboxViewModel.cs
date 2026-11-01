@@ -202,6 +202,18 @@ public sealed class ToolboxViewModel : ObservableObject
         set => SetProperty(ref _mapStatus, value);
     }
 
+    private string _zoomHint = "";
+
+    /// <summary>当前缩放档位（由视图调用 SetZoomHint 更新）。</summary>
+    public string ZoomHint
+    {
+        get => _zoomHint;
+        private set => SetProperty(ref _zoomHint, value);
+    }
+
+    /// <summary>视图在缩放后回填档位文字（含"已到上限/下限"）。</summary>
+    public void SetZoomHint(string text) => ZoomHint = text;
+
     public string Legend => "彩色：生物群系（简化模型）· 绿色方格：史莱姆区块（精确）";
 
     private bool _showSlimeOverlay = true;

@@ -286,6 +286,12 @@
                                 Margin="6,0,0,0" Click="OnZoomOut" ToolTip="缩小一档：看到更大的范围" />
                         <Button Content="回到原点" Style="{StaticResource GhostButton}" Margin="6,0,0,0"
                                 Click="OnCenterOrigin" />
+                        <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="8,3"
+                                Margin="6,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ZoomHint}" FontFamily="Consolas" FontSize="10"
+                                       Foreground="{DynamicResource MutedTextBrush}"
+                                       AutomationProperties.AutomationId="ZoomHintText" />
+                        </Border>
                     </StackPanel>
 
                     <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10"

@@ -44,6 +44,7 @@ public partial class ToolboxView : UserControl
             BiomeCanvas.ShowGrid = _attached.ShowGridOverlay;
             BiomeCanvas.Styled = _attached.ShowTextures;
             _attached.TextureChanged += OnTextureChanged;
+            PushZoomHint();
             BiomeCanvas.EngineVersionIndex = CubiomesNative.VersionIndexFor(_attached.SeedVersion);
             _attached.LocateRequested += OnLocateRequested;
             _attached.DimensionChanged += OnDimensionChanged;
@@ -170,16 +171,23 @@ public partial class ToolboxView : UserControl
 
     private ScrollViewer? SeedPanelScroll => FindName("SeedPanelScroll") as ScrollViewer;
 
+    private void PushZoomHint()
+    {
+        _attached?.SetZoomHint(BiomeCanvas.ZoomText);
+    }
+
     private void OnZoomIn(object sender, RoutedEventArgs e)
     {
         BiomeCanvas.ClearZoomAnchor();   // 按钮缩放以面板中心为准
         BiomeCanvas.ZoomIn();
+        PushZoomHint();
     }
 
     private void OnZoomOut(object sender, RoutedEventArgs e)
     {
         BiomeCanvas.ClearZoomAnchor();
         BiomeCanvas.ZoomOut();
+        PushZoomHint();
     }
 
     private void OnCenterOrigin(object sender, RoutedEventArgs e) => BiomeCanvas.CenterOn(0, 0);
