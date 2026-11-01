@@ -109,6 +109,43 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private double _previewWorldLeft, _previewWorldTop, _previewWorldWidth, _previewWorldHeight;
 
     // 预览层：整屏 1/4 分辨率的粗图，用来在拖动/缩放期间垫底，避免出现空白。
+    private readonly BiomeTileLayer _tileLayer = new();
+
+    /// <summary>用瓦片渲染（默认开）：平移只补缺的块，不再整屏重算。</summary>
+    private bool _useTiles = true;
+
+    private void InitTileLayer()
+    {
+        _tileLayer.Renderer = request => Task.Run<byte[]?>(() =>
+        {
+            var rgba = CubiomesNative.RenderRgba(request.Seed, request.VersionIndex, request.Dimension,
+                request.CenterX, request.CenterZ, request.RenderStep, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels)
+                ?? SimplifiedBiomeMap.RenderRgba(request.Seed, request.CenterX, request.CenterZ,
+                    request.RenderStep, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels);
+
+            if (rgba is null) return null;
+
+            if (_styled)
+            {
+                var span = BiomeTileLayer.TilePixels * request.RenderStep;
+                BiomeMapStyler.Stylize(rgba, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels,
+                    request.CenterX - span / 2, request.CenterZ - span / 2,
+                    Math.Max(1, request.RenderStep), textures: true, borders: true, hillshade: true);
+            }
+
+            return ToBgra(rgba);
+        });
+
+        _tileLayer.RequestFactory = (renderStep, centerX, centerZ) => new BiomeTileLayer.TileRequest(
+            _seed, EngineVersionIndex, _dimension, renderStep, 1, centerX, centerZ, BiomeTileLayer.TilePixels);
+
+        _tileLayer.Updated = () => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _loading = false;
+            InvalidateVisual();
+        }));
+    }
+
     private BitmapSource? _previewBitmap;
     private int _previewCenterX;
     private int _previewCenterZ;
@@ -162,6 +199,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
     public BiomeMapCanvas()
     {
+        InitTileLayer();
         ClipToBounds = true;
         SnapsToDevicePixels = true;
         Focusable = true;
@@ -502,6 +540,19 @@ public sealed class BiomeMapCanvas : FrameworkElement
         });
     }
 
+    /// <summary>算出当前视口需要的瓦片并排队（缺哪块补哪块）。</summary>
+    private void PlanTiles()
+    {
+        if (!_useTiles) return;
+        if (ActualWidth < 8 || ActualHeight < 8) return;
+
+        var step = BlocksPerPixel;
+        var viewLeft = _centerBlockX - ActualWidth / 2.0 * step;
+        var viewTop = _centerBlockZ - ActualHeight / 2.0 * step;
+
+        _tileLayer.Plan(step, viewLeft, viewTop, ActualWidth * step, ActualHeight * step);
+    }
+
     private void RequestRender()
     {
         if (_renderQueued) return;
@@ -515,6 +566,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
             _loading = true;
             _lastRenderStarted = Environment.TickCount64;
             QueuePreviewRender();
+            PlanTiles();
             InvalidateVisual();
 
             // 位图尺寸必须与元素一致，否则右侧/底部会留下未绘制的深色条。
@@ -551,13 +603,18 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 // 注意：cubiomes 在 scale>1 时的采样相位与"被渲染区间的起点/宽度"有关，
                 // 把一屏切成条带或瓦片都会在接缝处出现色块错位（实测过）。所以整屏必须一次调用，
                 // 平滑靠"手势期间只做位移 + 停下后再渲染"来保证。
-                var pixels = CubiomesNative.RenderRgba(seed, versionIndex, dimension,
+                byte[] pixels = [];
+
+                if (!_useTiles)
+                {
+                pixels = CubiomesNative.RenderRgba(seed, versionIndex, dimension,
                                                        centerX, centerZ, renderScale, pixelWidth, pixelHeight)
                              ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, renderScale, pixelWidth, pixelHeight)
                              ?? new byte[pixelWidth * pixelHeight * 4];
+                }
 
                 // 质感：给纯色群系图加程序化贴图 + 群系描边（纯计算，不依赖额外原生接口）
-                if (_styled)
+                if (!_useTiles && _styled)
                 {
                     var worldLeft = centerX - (int)(width * supersample / 2.0 * step);
                     var worldTop = centerZ - (int)(height * supersample / 2.0 * step);
@@ -609,6 +666,21 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (version != _bitmapVersion) return;    // 已被更新的请求取代
+                    if (_useTiles)
+                    {
+                        // 瓦片模式：整屏只负责结构与出生点，像素交给瓦片层
+                        _structures.Clear();
+                        _structures.AddRange(markers);
+                        _spawn = spawn;
+                        _loading = false;
+                        _pendingZoomIndex = null;
+                        BeginAnimation(VisualScaleProperty, null);
+                        VisualScale = 1.0;
+                        InvalidateVisual();
+                        PlanTiles();
+                        return;
+                    }
+
                     var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null,
                         ToBgra(pixels), width * 4);
                     bitmap.Freeze();
@@ -725,7 +797,27 @@ public sealed class BiomeMapCanvas : FrameworkElement
             dc.Pop();
         }
 
-        if (_bitmap is not null && _bitmapWorldWidth > 0)
+        if (_useTiles)
+        {
+            var tiles = _tileLayer.Visible(step, viewLeft, viewTop, width * step, height * step);
+
+            foreach (var (bitmap, worldLeft, worldTop, spanBlocks) in tiles)
+            {
+                var rect = new Rect(
+                    (worldLeft - viewLeft) / step,
+                    (worldTop - viewTop) / step,
+                    spanBlocks / step,
+                    spanBlocks / step);
+
+                // 像素级对齐，避免瓦片之间出现 1px 的缝
+                rect = new Rect(Math.Round(rect.X), Math.Round(rect.Y),
+                    Math.Round(rect.Width + rect.X) - Math.Round(rect.X),
+                    Math.Round(rect.Height + rect.Y) - Math.Round(rect.Y));
+
+                dc.DrawImage(bitmap, rect);
+            }
+        }
+        else if (_bitmap is not null && _bitmapWorldWidth > 0)
         {
             // 按"这张图覆盖的方块范围"落到屏幕：换过缩放档位也能正确叠放，
             // 不会出现"清晰图只盖住一块、周围露粗图"的接缝。
