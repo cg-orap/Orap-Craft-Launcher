@@ -198,6 +198,20 @@ public sealed class BiomeMapCanvas : FrameworkElement
         || _allowedStructures.Contains(key);
 
     public bool ShowSlime { get; set; } = true;
+
+    private bool _styled = true;
+
+    /// <summary>是否给群系图加贴图质感与描边（关掉就退回纯色块）。</summary>
+    public bool Styled
+    {
+        get => _styled;
+        set
+        {
+            if (_styled == value) return;
+            _styled = value;
+            RequestRender();
+        }
+    }
     public bool ShowGrid { get; set; } = true;
 
     public int BlocksPerPixel => ZoomSteps[_zoomIndex];
@@ -416,6 +430,17 @@ public sealed class BiomeMapCanvas : FrameworkElement
                                                        centerX, centerZ, renderScale, pixelWidth, pixelHeight)
                              ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, renderScale, pixelWidth, pixelHeight)
                              ?? new byte[pixelWidth * pixelHeight * 4];
+
+                // 质感：给纯色群系图加程序化贴图 + 群系描边（纯计算，不依赖额外原生接口）
+                if (_styled)
+                {
+                    var worldLeft = centerX - (int)(width * supersample / 2.0 * step);
+                    var worldTop = centerZ - (int)(height * supersample / 2.0 * step);
+
+                    BiomeMapStyler.Stylize(pixels, pixelWidth, pixelHeight,
+                        worldLeft, worldTop, Math.Max(1, step / Math.Max(1, supersample)),
+                        textures: true, borders: true);
+                }
 
                 // 结构与出生点跟着同一次渲染取，避免额外的时序问题
                 List<StructureMarker> markers = [];
@@ -641,8 +666,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 var my = (marker.BlockZ - top) / (double)step;
                 if (mx < -12 || mx > width + 12 || my < -12 || my > height + 12) continue;
 
+                // 图标随缩放变大变小：缩得很远时不至于糊成一片
+                var iconSize = step >= 32 ? 7.0 : step >= 8 ? 9.0 : 11.0;
+                if (marker.IsStronghold) iconSize += 2;
+
                 StructureIconRenderer.Draw(dc, marker.Key, StructureLabels.BrushFor(marker.Key),
-                    new Point(mx, my), marker.IsStronghold ? 13 : 11);
+                    new Point(mx, my), iconSize);
             }
 
             if (_spawn is { } sp)

@@ -245,6 +245,9 @@
                                   Margin="0,6,0,0" />
                         <CheckBox Content="显示网格与坐标" IsChecked="{Binding ShowGridOverlay}"
                                   Margin="0,6,0,0" />
+                        <CheckBox Content="群系质感（贴图 + 描边）"
+                                  IsChecked="{Binding ShowTextures, Mode=TwoWay}" Margin="0,6,0,0"
+                                  AutomationProperties.AutomationId="TextureToggle" />
                         <TextBlock Text="{Binding MapEngineLabel}" Style="{StaticResource CaptionText}"
                                    TextWrapping="Wrap" Margin="0,10,0,0"
                                    Foreground="{DynamicResource AccentBrush}" />

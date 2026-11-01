@@ -219,6 +219,21 @@ public sealed class ToolboxViewModel : ObservableObject
         set => SetProperty(ref _showGridOverlay, value);
     }
 
+    private bool _showTextures = true;
+
+    /// <summary>是否给群系图加贴图质感（关掉是纯色块，渲染更快）。</summary>
+    public bool ShowTextures
+    {
+        get => _showTextures;
+        set
+        {
+            if (!SetProperty(ref _showTextures, value)) return;
+            TextureChanged?.Invoke(value);
+        }
+    }
+
+    public event Action<bool>? TextureChanged;
+
     /// <summary>当前用的是哪个引擎（cubiomes 原生 / 简化模型）。</summary>
     public string MapEngineLabel => CubiomesNative.Available
         ? $"群系引擎：cubiomes（支持 {CubiomesNative.Versions[0]} 及更早）"

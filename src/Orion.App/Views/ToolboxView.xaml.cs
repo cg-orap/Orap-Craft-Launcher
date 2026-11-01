@@ -31,6 +31,7 @@ public partial class ToolboxView : UserControl
             _attached.DimensionChanged -= OnDimensionChanged;
             _attached.SpawnRequested -= OnSpawnRequested;
             _attached.StructureFilterChanged -= OnStructureFilterChanged;
+            _attached.TextureChanged -= OnTextureChanged;
         }
 
         _attached = DataContext as ToolboxViewModel;
@@ -41,6 +42,8 @@ public partial class ToolboxView : UserControl
             BiomeCanvas.Seed = _attached.SeedValue;
             BiomeCanvas.ShowSlime = _attached.ShowSlimeOverlay;
             BiomeCanvas.ShowGrid = _attached.ShowGridOverlay;
+            BiomeCanvas.Styled = _attached.ShowTextures;
+            _attached.TextureChanged += OnTextureChanged;
             BiomeCanvas.EngineVersionIndex = CubiomesNative.VersionIndexFor(_attached.SeedVersion);
             _attached.LocateRequested += OnLocateRequested;
             _attached.DimensionChanged += OnDimensionChanged;
@@ -90,6 +93,8 @@ public partial class ToolboxView : UserControl
     }
 
     private void OnDimensionChanged(int index) => BiomeCanvas.Dimension = DimensionOf(index);
+
+    private void OnTextureChanged(bool enabled) => BiomeCanvas.Styled = enabled;
 
     private void OnStructureFilterChanged(IEnumerable<string>? keys) => BiomeCanvas.SetStructureFilter(keys);
 
