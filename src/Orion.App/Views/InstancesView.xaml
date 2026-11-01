@@ -54,7 +54,7 @@
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
@@ -117,7 +117,7 @@
             <Grid Margin="0,14,0,0"
                   Visibility="{Binding IsOverviewTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsOverviewTab}" anim:ContentTransition.Offset="6">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" MinWidth="0" />
                     <ColumnDefinition Width="300" />
                 </Grid.ColumnDefinitions>
 
@@ -241,7 +241,7 @@
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
@@ -338,7 +338,7 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" MinWidth="0" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
@@ -403,7 +403,7 @@
                                     <DataTemplate>
                                         <Grid Margin="0,0,0,4">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" MinWidth="0" />
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="Auto" />
@@ -440,9 +440,9 @@
 
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
                             <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0">
@@ -460,7 +460,7 @@
                             <TextBlock Text="Java 路径（留空自动选择）" Style="{StaticResource CaptionText}" />
                             <Grid Margin="0,6,0,12">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" MinWidth="0" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBox Text="{Binding JavaPath, UpdateSourceTrigger=PropertyChanged}" />

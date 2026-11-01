@@ -50,7 +50,7 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="172" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" MinWidth="0" />
         </Grid.ColumnDefinitions>
 
         <!-- 左侧：竖排滑块页签 -->

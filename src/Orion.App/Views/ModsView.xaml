@@ -146,13 +146,12 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <UniformGrid Grid.Row="1" Grid.ColumnSpan="3" Rows="0" Columns="3"
-                                     HorizontalAlignment="Stretch" Margin="0,14,0,0">
-                            <!-- 在本页直接切换版本 -->
+                        <!-- 切换版本：放标题右侧空白处，不和下面的统计小字重叠 -->
+                        <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal"
+                                    VerticalAlignment="Center" Margin="16,0,0,0">
                             <ComboBox ItemsSource="{Binding Instances}"
                                       SelectedItem="{Binding SelectedInstance, Mode=TwoWay}"
-                                      Width="220" Height="30" FontSize="11.5" Margin="0,0,8,0"
-                                      VerticalAlignment="Center"
+                                      Width="230" Height="30" FontSize="11.5" VerticalAlignment="Center"
                                       ToolTip="切换要管理的版本"
                                       AutomationProperties.AutomationId="ModsInstancePicker">
                                 <ComboBox.ItemTemplate>
@@ -162,6 +161,9 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
+                        </StackPanel>
+                        <UniformGrid x:Name="ActionGrid" Grid.Row="1" Grid.ColumnSpan="3" Rows="0" Columns="3"
+                                     HorizontalAlignment="Stretch" Margin="0,14,0,0">
                             <Button Content="打开 mods 目录" Style="{StaticResource GhostButton}"
                                     Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" Margin="0,0,8,8" />
                             <Button Content="重新扫描" Style="{StaticResource SecondaryButton}"
@@ -398,7 +400,7 @@
         </ScrollViewer>
 
         <!-- ===== 两栏：模组列表 + 右侧概览/安装（各自滚动，列表可虚拟化） ===== -->
-        <Grid Grid.Row="2" Margin="24,10,24,20">
+        <Grid x:Name="BodyGrid" Grid.Row="2" Margin="24,10,24,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="300" />

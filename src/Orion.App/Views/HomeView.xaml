@@ -212,10 +212,10 @@
                 <Border Style="{StaticResource HomeCard}" Padding="20,14" Margin="0,16,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
+                            <ColumnDefinition Width="*" MinWidth="0" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Margin="0,0,18,0">
@@ -271,7 +271,7 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" MinWidth="0" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
@@ -301,9 +301,9 @@
 
                 <Grid Margin="0,14,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" MinWidth="0" />
+                        <ColumnDefinition Width="*" MinWidth="0" />
+                        <ColumnDefinition Width="*" MinWidth="0" />
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Style="{StaticResource HomeCard}" Padding="16,12" Margin="0,0,8,0">
