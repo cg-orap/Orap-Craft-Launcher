@@ -58,7 +58,8 @@ public sealed class ActivityItem : ObservableObject
             var measured = Orion.Core.Net.TransferMeter.FormatSpeed();
             if (!string.IsNullOrWhiteSpace(measured)) return measured;
 
-            return _speed;
+            // 没有字节在流动（例如正在装加载器）时也占个位，别让这一列看起来是空的
+            return string.IsNullOrWhiteSpace(_speed) ? "" : _speed;
         }
     }
 

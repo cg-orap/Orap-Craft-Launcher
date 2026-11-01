@@ -431,6 +431,48 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
     private static string? Sha1Of(CurseForgeFileDto dto) =>
         dto.Hashes?.FirstOrDefault(h => h.Algo == 1)?.Value;
 
+    /// <summary>
+    /// 解析整合包 zip 的下载地址。
+    ///
+    /// 官方 download-url 在两种情况下返回 data=null：
+    /// · 作者关掉了第三方分发；
+    /// · 触发了当天的下载额度（这时 HTTP 往往是 429/403）。
+    /// 只要有 fileName，就还能拼出 ForgeCDN 直链——Axolotl 也是这么做的（derived_curseforge_download_url）。
+    /// </summary>
+    private async Task<string?> ResolvePackDownloadUrlAsync(CurseForgeFile file, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(file.DirectUrl)) return file.DirectUrl;
+
+        if (!HasKey) return null;
+
+        try
+        {
+            var url = $"{Base}mods/{file.ModId}/files/{file.FileId}/download-url";
+            using var response = await SendAsync(HttpMethod.Get, url, ct).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var payload = await response.Content
+                    .ReadFromJsonAsync<DataResponse<string?>>(JsonOptions, ct).ConfigureAwait(false);
+
+                if (!string.IsNullOrWhiteSpace(payload?.Data)) return payload!.Data;
+            }
+            else
+            {
+                Orion.Core.Diagnostics.AppLog.Warn("curseforge", "pack-download-url-failed",
+                    ("status", (int)response.StatusCode), ("file", file.FileName));
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
+        {
+            Orion.Core.Diagnostics.AppLog.Warn("curseforge", "pack-download-url-error", ("file", file.FileName), ("error", ex.Message));
+        }
+
+        // 退回 CDN 直链
+        var cdn = CurseForgeCdn.Urls(file.FileId, file.FileName);
+        return cdn.Count > 0 ? cdn[0] : null;
+    }
+
     /// <summary>CurseForge 的 modLoaderType：1 Forge / 4 Fabric / 5 Quilt / 6 NeoForge。</summary>
     public static int? LoaderTypeOf(LoaderKind loader) => loader switch
     {

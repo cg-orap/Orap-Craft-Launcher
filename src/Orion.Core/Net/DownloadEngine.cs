@@ -502,6 +502,7 @@ public sealed class DownloadEngine
                         {
                             await sink.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                             state.OnBytesTransferred(read);
+                            TransferMeter.Report(read);   // 全局速率表：下载管理/下载中心的实时速度
                             RecordHostBytes(url.Host, read, request.Size >= LargeFileThreshold);
                         }
                     }
@@ -640,6 +641,7 @@ public sealed class DownloadEngine
             {
                 await sink.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                 state.OnBytesTransferred(read);
+                TransferMeter.Report(read);   // 全局速率表：下载管理/下载中心的实时速度
                 RecordHostBytes(url.Host, read, request.Size >= LargeFileThreshold);
 
                 rate.Add(read);
