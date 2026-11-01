@@ -37,15 +37,43 @@ public sealed class HomeViewModel : ObservableObject
     private double? _cpuPercent;
     private double? _gpuPercent;
 
+    /// <summary>最近一次采样看到的是"游戏"还是"启动器"。</summary>
+    private bool _memorySampleIsGame;
+
     private void RefreshMemorySample()
     {
         try
         {
-            using var process = System.Diagnostics.Process.GetCurrentProcess();
-            var mb = (int)Math.Round(process.WorkingSet64 / 1024.0 / 1024.0);
-            if (mb != _launcherMemoryMb)
+            // 以前这里固定读启动器自己的 WorkingSet，所以游戏吃了 4 GB 时首页还显示 200 MB。
+            // 现在游戏在跑就读游戏进程（没有权限就退回启动器自身，并如实标注）。
+            var mb = 0;
+            var fromGame = false;
+
+            if (_session is { } session)
+            {
+                try
+                {
+                    using var game = System.Diagnostics.Process.GetProcessById(session.ProcessId);
+                    mb = (int)Math.Round(game.WorkingSet64 / 1024.0 / 1024.0);
+                    fromGame = mb > 0;
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
+                                               or System.ComponentModel.Win32Exception)
+                {
+                    fromGame = false;
+                }
+            }
+
+            if (!fromGame)
+            {
+                using var self = System.Diagnostics.Process.GetCurrentProcess();
+                mb = (int)Math.Round(self.WorkingSet64 / 1024.0 / 1024.0);
+            }
+
+            if (mb != _launcherMemoryMb || fromGame != _memorySampleIsGame)
             {
                 _launcherMemoryMb = mb;
+                _memorySampleIsGame = fromGame;
                 OnPropertyChanged(nameof(MemoryUsageText));
                 OnPropertyChanged(nameof(MemoryPercent));
             }
@@ -155,6 +183,9 @@ public sealed class HomeViewModel : ObservableObject
             OnPropertyChanged();
             OnPropertyChanged(nameof(InstanceTitle));
             OnPropertyChanged(nameof(InstanceAvatarBrush));
+            OnPropertyChanged(nameof(MemoryText));
+            OnPropertyChanged(nameof(MemoryUsageText));
+            OnPropertyChanged(nameof(MemoryPercent));
             RefreshInstanceIcon();
             OnPropertyChanged(nameof(InstanceSubtitle));
             OnPropertyChanged(nameof(LaunchVersionLine));
@@ -285,7 +316,27 @@ public sealed class HomeViewModel : ObservableObject
 
     public string RuntimeText => string.IsNullOrWhiteSpace(JavaStatus) ? "自动选择" : JavaStatus;
 
-    public string MemoryText => ((_main.CurrentInstance?.MemoryMb ?? _main.Context.Settings.MemoryMb)).ToString() + " MB";
+    /// <summary>
+    /// 这个实例实际会分配多少内存（MB）。
+    /// 必须和启动时用同一套规则：实例手动值 → 自动分配推荐值 → 设置里的默认值。
+    /// </summary>
+    public int AllocatedMemoryMb
+    {
+        get
+        {
+            var instance = _main.CurrentInstance;
+            if (instance?.MemoryMb is { } manual) return manual;
+
+            var settings = _main.Context.Settings;
+            if (!settings.AutoMemory) return settings.MemoryMb;
+
+            var mods = instance is null ? 0 : CountMods(instance.GameDirectory);
+            return Orion.Core.Game.MemoryPlanner.RecommendForPack(
+                Orion.Core.Game.MemoryPlanner.TotalMemoryMb, mods);
+        }
+    }
+
+    public string MemoryText => AllocatedMemoryMb.ToString() + " MB";
 
     public string StateText => IsLaunching ? "运行中" : "就绪";
 
@@ -295,7 +346,7 @@ public sealed class HomeViewModel : ObservableObject
     {
         get
         {
-            var allocated = Math.Max(1, _main.CurrentInstance?.EffectiveMemory ?? _main.Context.Settings.MemoryMb);
+            var allocated = Math.Max(1, AllocatedMemoryMb);
             return Math.Clamp(_launcherMemoryMb * 100.0 / allocated, 0, 100);
         }
     }
@@ -315,8 +366,12 @@ public sealed class HomeViewModel : ObservableObject
         get
         {
             var used = _launcherMemoryMb;
-            var allocated = _main.CurrentInstance?.MemoryMb ?? _main.Context?.Settings.MemoryMb ?? 0;
-            return $"{used} MB 已用 · {allocated} MB 分配";
+            var allocated = AllocatedMemoryMb;
+
+            // 首页这一格很窄：用紧凑写法；游戏在跑时明确标出来
+            return _memorySampleIsGame
+                ? $"游戏 {used} / {allocated} MB"
+                : $"{used} / {allocated} MB";
         }
     }
 
@@ -589,11 +644,8 @@ public sealed class HomeViewModel : ObservableObject
                 GameDirectory = instance.GameDirectory,
                 // 自动分配内存：按物理内存 + 这个实例的模组数量算；
                 // 用户在版本设置里手动指定过就尊重手动值。
-                MemoryMb = instance.MemoryMb
-                           ?? (context.Settings.AutoMemory
-                               ? Orion.Core.Game.MemoryPlanner.RecommendForPack(
-                                   Orion.Core.Game.MemoryPlanner.TotalMemoryMb, CountMods(instance.GameDirectory))
-                               : context.Settings.MemoryMb),
+                // 与首页显示同一个来源，避免"界面写 4 GB、实际按 6 GB 启动"
+                MemoryMb = AllocatedMemoryMb,
                 MinMemoryMb = instance.MinMemoryMb ?? context.Settings.MinMemoryMb,
                 ExtraJvmArguments = instance.JvmArguments ?? context.Settings.JvmArguments,
                 ExtraGameArguments = instance.GameArguments,
