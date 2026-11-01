@@ -40,16 +40,72 @@ public sealed class HomeViewModel : ObservableObject
     /// <summary>最近一次采样看到的是"游戏"还是"启动器"。</summary>
     private bool _memorySampleIsGame;
 
-    private void RefreshMemorySample()
+    private bool _sampleRunning;
+
+    /// <summary>
+    /// 采一次内存 / CPU / GPU。
+    ///
+    /// 采样本身必须在**线程池**里做：`PerformanceCounter("Processor")` 和 "GPU Engine"
+    /// 分类第一次创建要 1 秒左右（读性能计数器注册表 + 枚举实例）。之前它们跑在 UI 线程上，
+    /// 于是双击启动后启动动画会整个卡住 1 秒多（实测 ui-stall maxGapMs≈1100）。
+    /// </summary>
+    private async void RefreshMemorySample()
+    {
+        if (_sampleRunning) return;      // 上一轮还没回来就跳过，避免堆任务
+        _sampleRunning = true;
+
+        try
+        {
+            var session = _session;
+            var sample = await Task.Run(() => SampleOffThread(session)).ConfigureAwait(true);
+
+            if (sample is null) return;
+
+            if (sample.Value.Megabytes != _launcherMemoryMb || sample.Value.FromGame != _memorySampleIsGame)
+            {
+                _launcherMemoryMb = sample.Value.Megabytes;
+                _memorySampleIsGame = sample.Value.FromGame;
+                OnPropertyChanged(nameof(MemoryUsageText));
+                OnPropertyChanged(nameof(MemoryPercent));
+            }
+
+            var cpu = sample.Value.Cpu;
+            if (cpu is null ? _cpuPercent is not null : Math.Abs((cpu ?? 0) - (_cpuPercent ?? 0)) >= 1)
+            {
+                _cpuPercent = cpu;
+                OnPropertyChanged(nameof(CpuText));
+                OnPropertyChanged(nameof(CpuPercent));
+            }
+
+            var gpu = sample.Value.Gpu;
+            if (gpu is null ? _gpuPercent is not null : Math.Abs((gpu ?? 0) - (_gpuPercent ?? 0)) >= 1)
+            {
+                _gpuPercent = gpu;
+                OnPropertyChanged(nameof(GpuText));
+                OnPropertyChanged(nameof(GpuPercent));
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        {
+            // 进程已经退出：跳过这次采样
+        }
+        finally
+        {
+            _sampleRunning = false;
+        }
+    }
+
+    private readonly record struct PerfSample(int Megabytes, bool FromGame, double? Cpu, double? Gpu);
+
+    /// <summary>线程池里跑：读进程内存 + 性能计数器。</summary>
+    private PerfSample? SampleOffThread(GameSession? session)
     {
         try
         {
-            // 以前这里固定读启动器自己的 WorkingSet，所以游戏吃了 4 GB 时首页还显示 200 MB。
-            // 现在游戏在跑就读游戏进程（没有权限就退回启动器自身，并如实标注）。
             var mb = 0;
             var fromGame = false;
 
-            if (_session is { } session)
+            if (session is not null)
             {
                 try
                 {
@@ -70,33 +126,11 @@ public sealed class HomeViewModel : ObservableObject
                 mb = (int)Math.Round(self.WorkingSet64 / 1024.0 / 1024.0);
             }
 
-            if (mb != _launcherMemoryMb || fromGame != _memorySampleIsGame)
-            {
-                _launcherMemoryMb = mb;
-                _memorySampleIsGame = fromGame;
-                OnPropertyChanged(nameof(MemoryUsageText));
-                OnPropertyChanged(nameof(MemoryPercent));
-            }
-
-            var cpu = _perf.SampleCpu();
-            if (cpu is null ? _cpuPercent is not null : Math.Abs((cpu ?? 0) - (_cpuPercent ?? 0)) >= 1)
-            {
-                _cpuPercent = cpu;
-                OnPropertyChanged(nameof(CpuText));
-                OnPropertyChanged(nameof(CpuPercent));
-            }
-
-            var gpu = _perf.SampleGpu();
-            if (gpu is null ? _gpuPercent is not null : Math.Abs((gpu ?? 0) - (_gpuPercent ?? 0)) >= 1)
-            {
-                _gpuPercent = gpu;
-                OnPropertyChanged(nameof(GpuText));
-                OnPropertyChanged(nameof(GpuPercent));
-            }
+            return new PerfSample(mb, fromGame, _perf.SampleCpu(), _perf.SampleGpu());
         }
         catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
         {
-            // process already gone: the sample is simply skipped
+            return null;
         }
     }
 
@@ -120,6 +154,14 @@ public sealed class HomeViewModel : ObservableObject
         ChooseBackgroundCommand = new RelayCommand(ChooseBackground);
         ClearBackgroundCommand = new RelayCommand(ClearBackground, () => HasBackgroundImage);
         OpenVersionPickerCommand = new RelayCommand(() => _main.Navigate("instances"));
+        SelectInstanceCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is not Core.Instances.Instance instance) return;
+
+            // 和下拉框选版本走同一条路：改全局当前版本 + 刷新首页那几块显示
+            SelectedLaunchInstance = instance;
+            ShowToast($"已切换到 {instance.Name}");
+        });
         OpenVersionSettingsCommand = new RelayCommand(() => _main.Navigate("instances"));   // sub-page, not a rail entry
 
         _memoryTimer.Interval = TimeSpan.FromSeconds(2);
@@ -169,6 +211,9 @@ public sealed class HomeViewModel : ObservableObject
     public ICommand ClearBackgroundCommand { get; }
     public ICommand OpenVersionPickerCommand { get; }
     public ICommand OpenVersionSettingsCommand { get; }
+
+    /// <summary>点「最近游玩」里的一行 → 切换到那个版本。</summary>
+    public ICommand SelectInstanceCommand { get; }
 
     public Instance? SelectedInstance => _main.CurrentInstance;
 

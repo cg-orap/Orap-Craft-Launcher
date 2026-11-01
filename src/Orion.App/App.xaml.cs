@@ -57,6 +57,9 @@ public partial class App : Application
             window.Show();
             var showMs = vmClock.ElapsedMilliseconds;
 
+            // 启动期间测「UI 线程最大停顿」：动画卡不卡看这个数，而不是看总耗时。
+            StartUiStallProbe();
+
             // 启动耗时埋点：定位"双击后要等一会儿才看到窗口"到底花在哪一步
             Orion.Core.Diagnostics.AppLog.Info("startup", "timing",
                 ("contextMs", contextMs),
@@ -82,6 +85,49 @@ public partial class App : Application
             Dialogs.Error("启动器初始化失败", $"启动器初始化失败：{ex.Message}", "详细信息已写入日志目录。");
             Shutdown(1);
         }
+    }
+
+
+    /// <summary>
+    /// 启动阶段每 15 ms 打一次点，记录 UI 线程最长的一次停顿。
+    /// 动画卡顿 = UI 线程被同步 IO 占住；把这个数记进日志，改完能立刻验证。
+    /// </summary>
+    private static void StartUiStallProbe()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var last = 0L;
+        var worst = 0L;
+        var ticks = 0;
+
+        var timer = new DispatcherTimer(DispatcherPriority.Send)
+        {
+            Interval = TimeSpan.FromMilliseconds(15),
+        };
+
+        timer.Tick += (_, _) =>
+        {
+            var now = clock.ElapsedMilliseconds;
+            var gap = now - last;
+            last = now;
+            ticks++;
+
+            if (ticks > 2 && gap > worst) worst = gap;
+
+            if (ticks > 2 && gap > 100)
+            {
+                Orion.Core.Diagnostics.AppLog.Info("startup", "ui-gap", ("atMs", now), ("gapMs", gap));
+            }
+
+            // 6 秒后收工（启动早就结束）
+            if (now < 6000) return;
+
+            timer.Stop();
+            Orion.Core.Diagnostics.AppLog.Info("startup", "ui-stall",
+                ("maxGapMs", worst),
+                ("samples", ticks));
+        };
+
+        timer.Start();
     }
 
     /// <summary>

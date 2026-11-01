@@ -265,9 +265,26 @@
                 <ItemsControl ItemsSource="{Binding Instances}" anim:StaggerIn.IsEnabled="True">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="{DynamicResource SurfaceBg}"
-                                    BorderBrush="{DynamicResource BorderBrushSoft}"
-                                    BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,6">
+                            <Button Command="{Binding DataContext.SelectInstanceCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Name}"
+                                    Cursor="Hand" Padding="0" Margin="0" BorderThickness="0"
+                                    Background="Transparent" HorizontalContentAlignment="Stretch"
+                                    ToolTip="切换到该版本">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="RowBg" Background="{DynamicResource SurfaceBg}"
+                                                BorderBrush="{DynamicResource BorderBrushSoft}"
+                                                BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,6">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="RowBg" Property="Background" Value="{DynamicResource SurfaceHover}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -294,7 +311,7 @@
                                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
                                                Foreground="{DynamicResource MutedTextBrush}" />
                                 </Grid>
-                            </Border>
+                            </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

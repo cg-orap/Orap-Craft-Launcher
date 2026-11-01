@@ -54,6 +54,9 @@ public sealed class BootAnimation : Grid
                 },
             },
             Effect = new BlurEffect { Radius = 40 },
+            // 关键：BlurEffect 每帧重算会把 UI 线程占满（实测启动动画卡 1 秒多）。
+            // 加 BitmapCache 后模糊只栅格化一次，呼吸动画只是合成透明度。
+            CacheMode = new System.Windows.Media.BitmapCache(),
             IsHitTestVisible = false,
         };
 
@@ -70,6 +73,7 @@ public sealed class BootAnimation : Grid
             BorderThickness = new Thickness(1),
             RenderTransform = new TransformGroup { Children = { _logoScale, _logoRotate } },
             RenderTransformOrigin = new Point(0.5, 0.5),
+            CacheMode = new System.Windows.Media.BitmapCache(),
             Child = new Image
             {
                 Source = IconSource(),

@@ -355,12 +355,27 @@ public sealed class MainViewModel : ObservableObject
     public void RefreshBackupUsage()
     {
         var quotaMb = Context.Settings.BackupQuotaMb;
-        var usage = Core.Instances.BackupUsage.MeasureForInstances(
-            Instances.Select(i => i.GameDirectory), quotaMb);
+        var directories = Instances.Select(i => i.GameDirectory).ToList();
 
-        BackupUsageText = usage.Text;
-        BackupUsagePercent = usage.Percent;
-        BackupUsageNearLimit = usage.IsNearLimit;
+        // 递归数文件可能几百毫秒：放线程池算，算完再回 UI 赋值。
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var usage = Core.Instances.BackupUsage.MeasureForInstances(directories, quotaMb);
+
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    BackupUsageText = usage.Text;
+                    BackupUsagePercent = usage.Percent;
+                    BackupUsageNearLimit = usage.IsNearLimit;
+                }));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                AppLog.Warn("startup", "backup-usage-failed", ("error", ex.Message));
+            }
+        });
     }
     public ToolboxViewModel ToolboxPage { get; }
     public HomeViewModel Home { get; }
@@ -817,6 +832,7 @@ public sealed class MainViewModel : ObservableObject
     {
         BootProgress = progress;
         BootPhase = phase;
+        Orion.Core.Diagnostics.AppLog.Info("startup", "boot-step", ("phase", phase), ("at", Environment.TickCount64));
 
         if (minimumMilliseconds > 0) await Task.Delay(minimumMilliseconds).ConfigureAwait(true);
     }
@@ -829,7 +845,10 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             await BootStepAsync(0.08, "读取启动器配置…", 0).ConfigureAwait(true);
-            await Context.InitializeAsync().ConfigureAwait(true);
+
+            // InitializeAsync 里是同步的 LoadAll（逐个读 instance.json），
+            // 直接 await 会占着 UI 线程，启动动画就卡在那了。
+            await Task.Run(() => Context.InitializeAsync()).ConfigureAwait(true);
 
             await BootStepAsync(0.3, "载入账户…").ConfigureAwait(true);
             await ReloadAccountsAsync().ConfigureAwait(true);
@@ -890,20 +909,37 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task ReloadAccountsAsync()
     {
-        var accounts = await Context.AccountStore.LoadAsync().ConfigureAwait(true);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        // 读盘放到线程池：以前在 UI 线程上 await，磁盘慢的时候启动动画会整个卡住。
+        var accounts = await Task.Run(() => Context.AccountStore.LoadAsync()).ConfigureAwait(true);
+        var loadMs = clock.ElapsedMilliseconds;
+
         Accounts.Replace(accounts);
+        var replaceMs = clock.ElapsedMilliseconds;
 
         var selectedId = Context.Settings.SelectedAccountId;
         CurrentAccount = accounts.FirstOrDefault(a => string.Equals(a.Id, selectedId, StringComparison.OrdinalIgnoreCase))
                          ?? accounts.FirstOrDefault();
+        var setMs = clock.ElapsedMilliseconds;
+
+        AppLog.Info("startup", "accounts-timing",
+            ("count", accounts.Count), ("loadMs", loadMs), ("replaceMs", replaceMs), ("currentMs", setMs));
     }
 
     public async Task ReloadInstancesAsync()
     {
-        var instances = Context.Instances.LoadAll();
+        // LoadAll 会逐个读 instance.json，全同步；放在 UI 线程会冻住启动动画。
+        var instances = await Task.Run(() => Context.Instances.LoadAll()).ConfigureAwait(true);
         Instances.Replace(instances);
-        BackupPage.Refresh();
         RefreshBackupUsage();
+
+        // 快照列表也要读目录，同样挪走
+        _ = Task.Run(() =>
+        {
+            try { BackupPage.Refresh(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        });
 
         var lastId = Context.Settings.LastInstanceId;
 
