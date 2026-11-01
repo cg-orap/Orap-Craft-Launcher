@@ -1467,11 +1467,25 @@ public sealed class CatalogViewModel : ObservableObject
                     if (fraction >= 0) _main.Activities.Report(activity, 0.25 + (fraction * 0.75), line, "");
                 });
 
+                // 装之前先问实例名（默认就是整合包名称）
+                var request = Dialogs.AskPackInstall(
+                    row.Title,
+                    [(file.FileId.ToString(), file.FileName)],
+                    row.Title,
+                    row.Title);
+
+                if (request is null)
+                {
+                    Status = "已取消安装。";
+                    _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
+                    return;
+                }
+
                 var result = await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(zip, row.Title, installerJava, installProgress)
+                    .InstallCurseForgeAsync(zip, request.InstanceName, installerJava, installProgress)
                     .ConfigureAwait(true);
 
-                Status = result.Success ? $"已安装整合包 {row.Title}" : "安装失败: " + (result.Error ?? "未知错误");
+                Status = result.Success ? $"已安装整合包 {request.InstanceName}" : "安装失败: " + (result.Error ?? "未知错误");
                 _main.Activities.Finish(activity,
                     result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
                 if (result.Success) await _main.ReloadInstancesAsync().ConfigureAwait(true);

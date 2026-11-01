@@ -101,9 +101,17 @@ public static class Dialogs
 
         dialog.ExtraContent = panel;
         dialog.GlyphText = "↓";
+
+        Orion.Core.Diagnostics.AppLog.Info("dialog", "local-pack-install-shown",
+            ("zip", System.IO.Path.GetFileName(zipPath)));
         dialog.ShowDialog();
 
-        if (!dialog.Accepted) return null;
+        if (!dialog.Accepted)
+        {
+            Orion.Core.Diagnostics.AppLog.Info("dialog", "local-pack-install-cancelled",
+                ("zip", System.IO.Path.GetFileName(zipPath)));
+            return null;
+        }
 
         return string.IsNullOrWhiteSpace(nameBox.Text) ? suggestedName : nameBox.Text.Trim();
     }
@@ -158,9 +166,15 @@ public static class Dialogs
 
         dialog.ExtraContent = panel;
         dialog.GlyphText = "↓";
+
+        Orion.Core.Diagnostics.AppLog.Info("dialog", "pack-install-shown", ("pack", packTitle));
         dialog.ShowDialog();
 
-        if (!dialog.Accepted) return null;
+        if (!dialog.Accepted)
+        {
+            Orion.Core.Diagnostics.AppLog.Info("dialog", "pack-install-cancelled", ("pack", packTitle));
+            return null;
+        }
 
         var index = Math.Clamp(versionBox.SelectedIndex, 0, versions.Count - 1);
         var name = string.IsNullOrWhiteSpace(nameBox.Text) ? suggestedName : nameBox.Text.Trim();
