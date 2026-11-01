@@ -99,7 +99,7 @@ public sealed class AsyncRelayCommand : ICommand
         catch (Exception ex)
         {
             if (_onError is not null) _onError(ex);
-            else MessageBox.Show(ex.Message, "操作失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            else Dialogs.Error("操作失败", ex.Message);
         }
         finally
         {

@@ -59,8 +59,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             AppLog.Error("app", "startup-failed", ex);
-            MessageBox.Show($"启动器初始化失败：{ex.Message}\n\n详细信息已写入日志。",
-                "Orap Craft Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
+            Dialogs.Error("启动器初始化失败", $"启动器初始化失败：{ex.Message}", "详细信息已写入日志目录。");
             Shutdown(1);
         }
     }
@@ -230,8 +229,7 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         AppLog.Error("app", "unhandled-ui-exception", e.Exception);
-        MessageBox.Show($"发生未处理的错误：{e.Exception.Message}\n\n日志目录: {AppLog.LogDirectory}",
-            "Orap Craft Launcher", MessageBoxButton.OK, MessageBoxImage.Error);
+        Dialogs.Error("发生未处理的错误", $"发生未处理的错误：{e.Exception.Message}", $"日志目录：{AppLog.LogDirectory}");
         e.Handled = true;
     }
 

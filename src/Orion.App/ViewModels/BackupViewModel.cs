@@ -214,14 +214,10 @@ public sealed class BackupViewModel : ObservableObject
     {
         if (parameter is not RestoreBackupRow row) return;
 
-        var answer = System.Windows.MessageBox.Show(
-            $"删除 {row.TimeText} 的单条恢复备份（{row.Detail}）？{Environment.NewLine}{Environment.NewLine}" +
-            "这些是恢复时被覆盖的旧文件，删除后移入 Windows 回收站，可以从资源管理器还原。",
-            "删除恢复备份",
-            System.Windows.MessageBoxButton.YesNo,
-            System.Windows.MessageBoxImage.Question);
+        var answer = Dialogs.Ask("删除恢复备份", $"删除 {row.TimeText} 的单条恢复备份（{row.Detail}）？{Environment.NewLine}{Environment.NewLine}" +
+            "这些是恢复时被覆盖的旧文件，删除后移入 Windows 回收站，可以从资源管理器还原。");
 
-        if (answer != System.Windows.MessageBoxResult.Yes)
+        if (answer != DialogOutcome.Yes)
         {
             Status = "已取消删除。";
             return;

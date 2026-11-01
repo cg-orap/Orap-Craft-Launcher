@@ -1264,14 +1264,10 @@ public sealed class CatalogViewModel : ObservableObject
             if (result.Success && missingNote is not null)
             {
                 var details = string.Join("\n", result.Warnings!.Take(14));
-                var go = System.Windows.MessageBox.Show(
-                    details + "\n\n现在启动游戏很可能会停在「Error loading mods」界面。\n" +
-                    "要打开「Mod 管理」用『按日志补齐』再补一次吗？",
-                    "前置没补齐",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Warning);
+                var go = Dialogs.Ask("前置没补齐", details + "\n\n现在启动游戏很可能会停在「Error loading mods」界面。\n" +
+                    "要打开「Mod 管理」用『按日志补齐』再补一次吗？");
 
-                if (go == System.Windows.MessageBoxResult.Yes) _main.Navigate("mods");
+                if (go == DialogOutcome.Yes) _main.Navigate("mods");
             }
         }
         catch (OperationCanceledException)
@@ -1457,13 +1453,23 @@ public sealed class CatalogViewModel : ObservableObject
             }
 
             var folder = Orion.Core.Mods.CurseForgeClient.InstallFolderOf(kind)!;
-            var target = Path.Combine(instance!.GameDirectory, folder);
+
+            // 用户可能在下载位置对话框里选了「只下载到…」：那就只把文件存过去，
+            // 绝不写进当前版本（之前这里无论怎么选都装进版本，是明确的 bug）。
+            var downloadOnly = _main.PendingDownloadOnlyDirectory;
+
+            var target = downloadOnly is null
+                ? Path.Combine(instance!.GameDirectory, folder)
+                : downloadOnly;
+
             Status = $"正在下载 {file.FileName}…";
             var saved = await _main.Context.CurseForge
                 .DownloadFileAsync(file, target, new Progress<long>(p => Status = $"正在下载 {file.FileName}… {p}%"))
                 .ConfigureAwait(true);
 
-            Status = $"已安装 {row.Title} → {folder}/{Path.GetFileName(saved)}";
+            Status = downloadOnly is null
+                ? $"已安装 {row.Title} → {folder}/{Path.GetFileName(saved)}"
+                : $"已下载到 {saved}（按你的选择，没有装进版本）";
             _main.Activities.Finish(activity, ActivityState.Completed);
             _main.LogsPage.AppendSystem(Status);
         }
@@ -1606,8 +1612,22 @@ public sealed class CatalogViewModel : ObservableObject
                     if (fraction >= 0) _main.Activities.Report(activity, 0.25 + (fraction * 0.75), line, "");
                 });
 
+                // 合并成一个对话框：下载位置 + 实例名（版本沿用当前选中的整合包文件）
+                var request = Dialogs.AskPackInstall(
+                    row.Title,
+                    [(file.FileId.ToString(), file.FileName)],
+                    row.Title,
+                    row.Title);
+
+                if (request is null)
+                {
+                    Status = "已取消安装。";
+                    _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
+                    return;
+                }
+
                 var result = await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(zip, row.Title, installerJava, installProgress, _installCts.Token)
+                    .InstallCurseForgeAsync(zip, request.InstanceName, installerJava, installProgress, _installCts.Token)
                     .ConfigureAwait(true);
 
                 if (result.Success)

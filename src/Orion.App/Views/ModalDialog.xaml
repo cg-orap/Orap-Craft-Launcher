@@ -1,0 +1,91 @@
+﻿<Window x:Class="Orion.App.Views.ModalDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Orap Craft"
+        Width="560" SizeToContent="Height"
+        MinWidth="420"
+        MaxHeight="720"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        FontFamily="{DynamicResource UiFont}">
+
+    <!-- 自绘对话框：和启动器同一套配色/圆角/按钮，替代 Windows 原生 MessageBox -->
+    <Border Background="{DynamicResource WindowBg}"
+            BorderBrush="{DynamicResource BorderBrushSoft}"
+            BorderThickness="1" CornerRadius="10" Margin="12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.18" Color="#000000" />
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏：可拖动 -->
+            <Grid Grid.Row="0" Background="Transparent" MouseLeftButtonDown="OnHeaderDrag">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MinWidth="0" />
+                    <ColumnDefinition Width="*" MinWidth="0" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Border x:Name="GlyphHost" Grid.Column="0" Width="22" Height="22" CornerRadius="6"
+                        Margin="16,14,0,0" VerticalAlignment="Top"
+                        Background="{DynamicResource AccentBrush}">
+                    <TextBlock x:Name="Glyph" Text="?" FontSize="12" FontWeight="Bold" Foreground="White"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <TextBlock x:Name="HeaderText" Grid.Column="1" Text="提示" FontSize="14" FontWeight="SemiBold"
+                           Margin="10,16,0,0" VerticalAlignment="Top"
+                           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                           Foreground="{DynamicResource TextBrush}" />
+
+                <Button Grid.Column="2" Content="&#x2715;" Style="{StaticResource CaptionButton}"
+                        FontSize="12"
+                        HorizontalAlignment="Right" Margin="0,10,10,0"
+                        Click="OnCancel" AutomationProperties.AutomationId="DialogClose" />
+            </Grid>
+
+            <!-- 正文 -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="440"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="16,10,16,0">
+                    <TextBlock x:Name="MessageText" FontSize="12.5" TextWrapping="Wrap" LineHeight="20"
+                               Foreground="{DynamicResource TextBrush}" />
+
+                    <Border x:Name="DetailCard" Style="{StaticResource Card}" Padding="12,10" Margin="0,12,0,0"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="DetailText" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource MutedTextBrush}" LineHeight="17" />
+                    </Border>
+
+                    <!-- 额外内容（安装整合包时的版本选择、实例名） -->
+                    <ContentPresenter x:Name="ExtraHost" Margin="0,12,0,0" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 按钮 -->
+            <WrapPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                       Margin="16,14,16,14">
+                <Button x:Name="CancelButton" Content="取消" Style="{StaticResource GhostButton}"
+                        MinWidth="88" Padding="14,7" Margin="0,0,8,0" Click="OnCancel"
+                        AutomationProperties.AutomationId="DialogCancel" />
+                <Button x:Name="NoButton" Content="否" Style="{StaticResource SecondaryButton}"
+                        MinWidth="88" Padding="14,7" Margin="0,0,8,0" Click="OnNo"
+                        AutomationProperties.AutomationId="DialogNo" />
+                <Button x:Name="YesButton" Content="是" Style="{StaticResource PrimaryButton}"
+                        MinWidth="96" Padding="14,7" Click="OnYes" IsDefault="True"
+                        AutomationProperties.AutomationId="DialogYes" />
+            </WrapPanel>
+        </Grid>
+    </Border>
+</Window>

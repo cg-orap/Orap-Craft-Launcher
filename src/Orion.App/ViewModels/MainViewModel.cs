@@ -415,33 +415,31 @@ public sealed class MainViewModel : ObservableObject
     /// 下载前询问保存位置：返回 false 表示用户取消，不要继续下载。
     /// 默认目录 / 选择其他目录 / 取消；选择的自定义目录会被记住（下次仍会询问，可在设置里关掉）。
     /// </summary>
-    public bool ConfirmDownloadLocation(string title)
+    /// <summary>最近一次"只下载到指定目录"的选择（null = 走默认安装流程）。</summary>
+    public string? PendingDownloadOnlyDirectory { get; private set; }
+
+    /// <summary>
+    /// 下载位置确认。返回 true 表示继续；
+    /// 如果用户选了「只下载到…」，<see cref="PendingDownloadOnlyDirectory"/> 会是那个目录。
+    /// </summary>
+    public bool ConfirmDownloadLocation(string title, string? fileName = null)
     {
+        PendingDownloadOnlyDirectory = null;
+
         if (!Context.Settings.AskDownloadLocation) return true;
 
         var defaultDir = Core.Game.DownloadPaths.Default(Context.Paths);
         var current = EffectiveDownloadsDir;
 
-        var answer = MessageBox.Show(
-            $"要把「{title}」下载到默认目录吗？\n\n默认目录：{defaultDir}\n当前目录：{current}\n\n" +
-            "「是」用当前目录下载\n「否」选择其他目录\n「取消」不下载",
-            "选择下载位置",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question);
+        var choice = Dialogs.AskDownloadLocation(title, fileName ?? title, defaultDir, current);
+        if (choice is null) return false;
 
-        if (answer == MessageBoxResult.Cancel) return false;
-        if (answer == MessageBoxResult.Yes) return true;
+        var (directory, downloadOnly) = choice.Value;
+        if (!downloadOnly) return true;
 
-        var picker = new Microsoft.Win32.OpenFolderDialog
-        {
-            Title = "选择下载目录",
-            InitialDirectory = Directory.Exists(current) ? current : defaultDir,
-            Multiselect = false,
-        };
-
-        if (picker.ShowDialog() != true) return false;
-
-        SetDownloadDirectory(picker.FolderName);
+        // 用户明确要求"只下载到别处"：记住目录，安装逻辑不再往版本里写文件。
+        SetDownloadDirectory(directory);
+        PendingDownloadOnlyDirectory = directory;
         return true;
     }
 

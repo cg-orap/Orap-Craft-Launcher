@@ -651,6 +651,16 @@ public sealed class ModsViewModel : ObservableObject
         var instance = SelectedInstance;
         if (instance is null) return;
 
+        // 删模组前确认一下（用启动器自己的对话框，不是系统 MessageBox）
+        var confirm = Dialogs.Ask(
+            "删除模组",
+            $"要从「{instance.Name}」里移除 {row.Title} 吗？\n\n文件会被移到回收目录，不会直接删除。",
+            "移到回收目录",
+            "取消",
+            "");
+
+        if (confirm != DialogOutcome.Yes) return;
+
         var trashRoot = Path.Combine(_main.Context.Paths.Root, "trash", "mods");
         Directory.CreateDirectory(trashRoot);
 
@@ -789,15 +799,13 @@ public sealed class ModsViewModel : ObservableObject
             if (result.Installed.Count > 0
                 && PackArchiveInstaller.ReadPackManifest(instance.GameDirectory) is not null)
             {
-                var answer = System.Windows.MessageBox.Show(
+                var answer = Dialogs.Ask(
+                    "补齐前置：是否还原整合包",
                     $"这次往整合包里补了 {result.Installed.Count} 个模组。\n\n"
                     + "整合包是按它自己的版本配好的，额外加模组有概率导致启动崩溃。\n"
-                    + "要现在还原成整合包原始内容吗？（多出来的模组会移到 .orap-quarantine，随时能拿回来）",
-                    "补齐前置：是否还原整合包",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Question);
+                    + "要现在还原成整合包原始内容吗？（多出来的模组会移到 .orap-quarantine，随时能拿回来）");
 
-                if (answer == System.Windows.MessageBoxResult.Yes)
+                if (answer == DialogOutcome.Yes)
                 {
                     var restored = await _main.Context.PackArchives
                         .RestoreToPackAsync(instance.GameDirectory,

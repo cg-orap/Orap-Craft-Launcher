@@ -473,24 +473,24 @@ public sealed class HomeViewModel : ObservableObject
 
             var list = string.Join("\n", result.Remaining.Take(10)
                 .Select(m => $"· {m.ModId}（被 {m.RequiredBy} 需要）"));
-            var answer = MessageBox.Show(
+            var answer = Dialogs.Ask(
+                "前置缺失",
                 $"还有 {result.Remaining.Count} 个前置没补上：\n\n{list}\n\n" +
                 "现在启动很可能会停在「Error loading mods」界面。仍要启动吗？",
-                "前置缺失",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
+                "仍要启动",
+                "取消启动");
 
-            return answer == MessageBoxResult.Yes;
+            return answer == DialogOutcome.Yes;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
-            var answer = MessageBox.Show(
-                "检查前置时网络出错：" + ex.Message + "\n\n仍要尝试启动吗？",
+            var answer = Dialogs.Ask(
                 "检查前置失败",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
+                "检查前置时网络出错：" + ex.Message + "\n\n仍要尝试启动吗？",
+                "仍要启动",
+                "取消启动");
 
-            return answer == MessageBoxResult.Yes;
+            return answer == DialogOutcome.Yes;
         }
     }
 

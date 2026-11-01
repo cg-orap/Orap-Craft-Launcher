@@ -279,8 +279,8 @@ public sealed class InstancesViewModel : ObservableObject
             ? $"版本「{instance.Name}」包含存档或 Mod。\n\n删除不会永久抹掉文件：整个版本目录会被放进 Windows 回收站，你可以从资源管理器还原。\n\n是否继续？"
             : $"确定要删除版本「{instance.Name}」吗？\n\n整个版本目录会被放进 Windows 回收站，可从资源管理器还原。";
 
-        if (System.Windows.MessageBox.Show(message, "删除版本", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning)
-            != System.Windows.MessageBoxResult.OK)
+        if (Dialogs.Ask("删除版本", message)
+            != DialogOutcome.Yes)
         {
             return;
         }
@@ -641,14 +641,10 @@ public sealed class InstancesViewModel : ObservableObject
     {
         if (SelectedInstance is not { } instance || parameter is not BackupSnapshot snapshot) return;
 
-        var answer = System.Windows.MessageBox.Show(
-            $"要把「{instance.Name}」恢复到 {snapshot.TimeText} 的快照吗？{Environment.NewLine}{Environment.NewLine}" +
-            "当前的 saves / config / mods 会被替换。恢复前会自动把当前状态另存为一份「恢复前」快照，可再恢复回来。",
-            "恢复快照",
-            System.Windows.MessageBoxButton.YesNo,
-            System.Windows.MessageBoxImage.Warning);
+        var answer = Dialogs.Ask("恢复快照", $"要把「{instance.Name}」恢复到 {snapshot.TimeText} 的快照吗？{Environment.NewLine}{Environment.NewLine}" +
+            "当前的 saves / config / mods 会被替换。恢复前会自动把当前状态另存为一份「恢复前」快照，可再恢复回来。");
 
-        if (answer != System.Windows.MessageBoxResult.Yes) return;
+        if (answer != DialogOutcome.Yes) return;
 
         var activity = _main.Activities.Begin("恢复快照", snapshot.TimeText);
         try
@@ -672,13 +668,9 @@ public sealed class InstancesViewModel : ObservableObject
     {
         if (SelectedInstance is not { } instance || parameter is not BackupSnapshot snapshot) return;
 
-        var answer = System.Windows.MessageBox.Show(
-            $"删除 {snapshot.TimeText} 的快照（{snapshot.SizeText}）？{Environment.NewLine}{Environment.NewLine}快照目录会移入 Windows 回收站，可以从资源管理器还原。",
-            "删除快照",
-            System.Windows.MessageBoxButton.YesNo,
-            System.Windows.MessageBoxImage.Question);
+        var answer = Dialogs.Ask("删除快照", $"删除 {snapshot.TimeText} 的快照（{snapshot.SizeText}）？{Environment.NewLine}{Environment.NewLine}快照目录会移入 Windows 回收站，可以从资源管理器还原。");
 
-        if (answer != System.Windows.MessageBoxResult.Yes) return;
+        if (answer != DialogOutcome.Yes) return;
 
         Status = _backups.Delete(instance, snapshot.Id) ? "快照已删除。" : "删除失败：找不到该快照。";
         RefreshSnapshots();
@@ -706,14 +698,10 @@ public sealed class InstancesViewModel : ObservableObject
             return;
         }
 
-        var answer = System.Windows.MessageBox.Show(
-            $"只恢复「{entry.RelativePath}」？{Environment.NewLine}{Environment.NewLine}" +
-            "该路径会被快照里的版本覆盖，其它存档与配置不受影响；覆盖前的文件会另存到 backups/manual-restores。",
-            "单条恢复",
-            System.Windows.MessageBoxButton.YesNo,
-            System.Windows.MessageBoxImage.Question);
+        var answer = Dialogs.Ask("单条恢复", $"只恢复「{entry.RelativePath}」？{Environment.NewLine}{Environment.NewLine}" +
+            "该路径会被快照里的版本覆盖，其它存档与配置不受影响；覆盖前的文件会另存到 backups/manual-restores。");
 
-        if (answer != System.Windows.MessageBoxResult.Yes) return;
+        if (answer != DialogOutcome.Yes) return;
 
         var activity = _main.Activities.Begin("恢复条目", entry.RelativePath);
         try
