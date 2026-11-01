@@ -138,6 +138,9 @@ public sealed class InstancesViewModel : ObservableObject
 
     public ObservableList<string> VersionOptions { get; } = [];
 
+    /// <summary>供「版本设置」里的下拉框使用：直接复用主视图的实例列表。</summary>
+    public ObservableList<Instance> Instances => _main.Instances;
+
     public Instance? SelectedInstance
     {
         get => _selectedInstance;
