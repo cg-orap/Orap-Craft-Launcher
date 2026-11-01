@@ -15,6 +15,9 @@ public sealed class LauncherSettings
     [JsonPropertyName("javaPath")] public string? JavaPath { get; set; }
     [JsonPropertyName("memoryMb")] public int MemoryMb { get; set; } = 4096;
     [JsonPropertyName("minMemoryMb")] public int MinMemoryMb { get; set; } = 512;
+
+    /// <summary>自动按物理内存 + 模组数量分配最大内存（用户不用再自己算）。</summary>
+    [JsonPropertyName("autoMemory")] public bool AutoMemory { get; set; } = true;
     [JsonPropertyName("jvmArguments")] public string? JvmArguments { get; set; }
 
         /// <summary>

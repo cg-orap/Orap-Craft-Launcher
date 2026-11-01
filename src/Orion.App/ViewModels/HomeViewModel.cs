@@ -182,6 +182,15 @@ public sealed class HomeViewModel : ObservableObject
         }
     }
 
+    /// <summary>数一下这个实例有多少 jar（自动分配内存用）。</summary>
+    private static int CountMods(string gameDirectory)
+    {
+        var mods = System.IO.Path.Combine(gameDirectory, "mods");
+        if (!System.IO.Directory.Exists(mods)) return 0;
+
+        return System.IO.Directory.GetFiles(mods, "*.jar").Length;
+    }
+
     private static System.Windows.Media.Color ColorFromHue(int hue, double saturation, double lightness)
     {
         var h = hue / 360.0;
@@ -578,7 +587,13 @@ public sealed class HomeViewModel : ObservableObject
                 Account = account,
                 Java = java,
                 GameDirectory = instance.GameDirectory,
-                MemoryMb = instance.MemoryMb ?? context.Settings.MemoryMb,
+                // 自动分配内存：按物理内存 + 这个实例的模组数量算；
+                // 用户在版本设置里手动指定过就尊重手动值。
+                MemoryMb = instance.MemoryMb
+                           ?? (context.Settings.AutoMemory
+                               ? Orion.Core.Game.MemoryPlanner.RecommendForPack(
+                                   Orion.Core.Game.MemoryPlanner.TotalMemoryMb, CountMods(instance.GameDirectory))
+                               : context.Settings.MemoryMb),
                 MinMemoryMb = instance.MinMemoryMb ?? context.Settings.MinMemoryMb,
                 ExtraJvmArguments = instance.JvmArguments ?? context.Settings.JvmArguments,
                 ExtraGameArguments = instance.GameArguments,

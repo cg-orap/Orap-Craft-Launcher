@@ -101,8 +101,8 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
             {
                 throw;
             }
-            catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException
-                                           or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or IOException or InvalidOperationException
+                                           or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 failed.Add($"{dependency.ModId}：{ex.Message}");
                 Orion.Core.Diagnostics.AppLog.Warn("deps", "repair-one-failed",
@@ -233,7 +233,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                 var pack = await client.GetPackAsync(id.Value, ct).ConfigureAwait(false);
                 if (pack is not null) result.Add(pack);
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 // 单个 slug 失败不影响后面的模糊搜索
             }
@@ -251,7 +251,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                     result.Add(known);
                 }
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 // 忽略，继续走搜索
             }
@@ -265,7 +265,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                 hits = await client.SearchAsync(CurseForgeKind.Mod, query, gameVersion, MaxCandidates, ct)
                     .ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 continue;
             }
@@ -314,7 +314,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                 {
                     await DownloadAsync(file, temporary, ct).ConfigureAwait(false);
                 }
-                catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+                catch (Exception ex) when ((ex is HttpRequestException or InvalidOperationException or TaskCanceledException) && !ct.IsCancellationRequested)
                 {
                     progress?.Report($"{candidate.Name} 下载失败（{ex.Message}），换下一个候选…");
                     Orion.Core.Diagnostics.AppLog.Warn("deps", "download-failed",
@@ -455,7 +455,7 @@ public sealed class ModDependencyRepair(CurseForgeClient client, HttpClient http
                 await source.CopyToAsync(destination, ct).ConfigureAwait(false);
                 return;
             }
-            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or IOException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 last = ex;
             }

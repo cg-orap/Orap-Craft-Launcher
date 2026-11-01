@@ -44,6 +44,26 @@ public sealed class ActivityItem : ObservableObject
     /// <summary>进度百分比文本（下载管理行里显示具体数值，进度条只看大概）。</summary>
     public string PercentText => _fraction <= 0 ? "" : _fraction >= 1 ? "100%" : $"{_fraction * 100:0.0}%";
     public string Speed { get => _speed; set => SetProperty(ref _speed, value); }
+
+    /// <summary>
+    /// 实时速度文本：优先用任务自己上报的，没有就退到全局字节计量（TransferMeter）。
+    /// 下载管理行里显示的就是这个——之前这里一直是空的，所以看不到速度。
+    /// </summary>
+    public string SpeedText
+    {
+        get
+        {
+            if (!IsRunning) return "";
+
+            var measured = Orion.Core.Net.TransferMeter.FormatSpeed();
+            if (!string.IsNullOrWhiteSpace(measured)) return measured;
+
+            return _speed;
+        }
+    }
+
+    /// <summary>刷新速度显示（由 ActivityCenter 的计时器统一驱动）。</summary>
+    public void RefreshSpeed() => OnPropertyChanged(nameof(SpeedText));
     public string? Error { get => _error; set => SetProperty(ref _error, value); }
     public DateTimeOffset StartedAt { get; } = DateTimeOffset.Now;
     public string StartedDisplay => StartedAt.ToString("HH:mm:ss");
@@ -56,6 +76,7 @@ public sealed class ActivityItem : ObservableObject
             if (!SetProperty(ref _state, value)) return;
             OnPropertyChanged(nameof(StateText));
             OnPropertyChanged(nameof(IsRunning));
+            OnPropertyChanged(nameof(SpeedText));
         }
     }
 

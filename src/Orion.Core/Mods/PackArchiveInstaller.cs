@@ -271,7 +271,13 @@ public sealed class PackArchiveInstaller
             result.Warnings.AddRange(warnings);
             return result;
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException or OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            // 用户主动取消：交给上层标成"已取消"，不要伪装成安装失败
+            AppLog.Info("packs", "install-cancelled");
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException)
         {
             AppLog.Warn("packs", "curseforge-install-failed", ("error", ex.Message));
             return new MrPackResult { Success = false, Error = ex.Message };
@@ -918,7 +924,7 @@ public sealed class PackArchiveInstaller
                         meta!.Sha1, meta.Size, meta.DirectUrl);
                 }
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 AppLog.Warn("packs", "resolve-failed", ("project", file.ProjectId), ("file", file.FileId),
                     ("error", ex.Message));
@@ -993,7 +999,7 @@ public sealed class PackArchiveInstaller
                 resolved.Add(new ResolvedCurseForgeFile((int)file.ProjectId, (int)file.FileId, name,
                     meta?.Sha1, meta?.Size ?? 0, meta?.DirectUrl));
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 unavailable.Enqueue($"{file.ProjectId}/{file.FileId}");
             }
@@ -1015,6 +1021,7 @@ public sealed class PackArchiveInstaller
 
         var downloadJobs = targets.Select(async target =>
         {
+            ct.ThrowIfCancellationRequested();
             await downloadGate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
@@ -1035,6 +1042,7 @@ public sealed class PackArchiveInstaller
         });
 
         await Task.WhenAll(downloadJobs).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
 
         var names = new List<string>(targets.Count);
         foreach (var target in targets)
@@ -1125,7 +1133,7 @@ public sealed class PackArchiveInstaller
 
                 return true;
             }
-            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or IOException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 TryDeleteFile(path);
             }
@@ -1213,7 +1221,7 @@ public sealed class PackArchiveInstaller
 
                 return true;
             }
-            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+            catch (Exception ex) when ((ex is HttpRequestException or IOException or TaskCanceledException) && !ct.IsCancellationRequested)
             {
                 // 半截文件（超时/断流）必须删掉，否则会留在 mods 里让游戏启动失败
                 TryDeleteFile(target);

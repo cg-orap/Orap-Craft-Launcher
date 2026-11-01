@@ -271,6 +271,7 @@
                                         <Slider Minimum="1024" Maximum="32768" TickFrequency="512" SmallChange="512"
                                                 LargeChange="2048" IsSnapToTickEnabled="True" Margin="0,6,0,0"
                                                 Value="{Binding MemoryMb, Mode=TwoWay}"
+                                                IsEnabled="{Binding MemoryControlsEnabled}"
                                                 AutomationProperties.AutomationId="MemorySlider" />
                                         <TextBox Text="{Binding MemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
                                                  Width="120" HorizontalAlignment="Left" />
@@ -280,11 +281,17 @@
                                         <Slider Minimum="512" Maximum="16384" TickFrequency="256" SmallChange="256"
                                                 LargeChange="1024" IsSnapToTickEnabled="True" Margin="0,6,0,0"
                                                 Value="{Binding MinMemoryMb, Mode=TwoWay}"
+                                                IsEnabled="{Binding MemoryControlsEnabled}"
                                                 AutomationProperties.AutomationId="MinMemorySlider" />
                                         <TextBox Text="{Binding MinMemoryMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
                                                  Width="120" HorizontalAlignment="Left" />
                                     </StackPanel>
                                 </Grid>
+                                <CheckBox Content="自动分配内存（按物理内存和模组数量）" IsChecked="{Binding AutoMemory}"
+                                          Margin="0,12,0,0"
+                                          AutomationProperties.AutomationId="AutoMemoryToggle" />
+                                <TextBlock Text="{Binding MemoryHint}" Style="{StaticResource CaptionText}"
+                                           TextWrapping="Wrap" Margin="0,6,0,0" />
                                 <TextBlock Text="1.21.1 + NeoForge 建议 3072–6144 MB。" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
                             </StackPanel>
                         </Border>

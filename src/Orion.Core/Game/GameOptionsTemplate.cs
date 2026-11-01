@@ -23,6 +23,9 @@ public sealed class GameOptionsTemplate
     public string Particles { get; set; } = "all";
     public bool BobView { get; set; } = true;
 
+    /// <summary>游戏语言（写成 options.txt 的 lang 键，例如 zh_cn / en_us）。</summary>
+    public string Lang { get; set; } = "zh_cn";
+
     /// <summary>启动器启动时注入的当前模板；InstanceManager 建新版本时用它。</summary>
     public static GameOptionsTemplate Default { get; set; } = new();
 
@@ -38,11 +41,26 @@ public sealed class GameOptionsTemplate
         ["gamma"] = Math.Clamp(Gamma, 0, 1).ToString("0.0", CultureInfo.InvariantCulture),
         ["particles"] = NormaliseParticles(Particles),
         ["bobView"] = BobView ? "true" : "false",
+        ["lang"] = NormaliseLang(Lang),
     };
 
     public string Summary =>
         $"视距 {RenderDistance} · 界面尺寸 {(GuiScale == 0 ? "自动" : GuiScale.ToString(CultureInfo.InvariantCulture))} · "
-        + $"自动跳跃 {(AutoJump ? "开" : "关")} · FOV {Fov}";
+        + $"自动跳跃 {(AutoJump ? "开" : "关")} · FOV {Fov} · 语言 {Lang}";
+
+    /// <summary>只接受 Minecraft 认识的 locale 形式（xx_yy），其余回落到简体中文。</summary>
+    public static string NormaliseLang(string? value)
+    {
+        var lang = (value ?? "").Trim().ToLowerInvariant();
+        if (lang.Length < 2) return "zh_cn";
+
+        foreach (var ch in lang)
+        {
+            if (!char.IsAsciiLetterOrDigit(ch) && ch != '_') return "zh_cn";
+        }
+
+        return lang;
+    }
 
     private static string NormaliseParticles(string value) => value switch
     {

@@ -303,7 +303,10 @@
                             </StackPanel>
 
                             <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,12,0,0">
-                                <TextBlock Text="开关" Style="{StaticResource CaptionText}" />
+                                <TextBlock Text="游戏语言" Style="{StaticResource CaptionText}" />
+                                <ComboBox ItemsSource="{Binding LangOptions}" SelectedItem="{Binding SelectedLanguage}"
+                                          DisplayMemberPath="Name" Margin="0,6,0,0"
+                                          AutomationProperties.AutomationId="GameLanguageCombo" />
                                 <CheckBox Content="自动跳跃" IsChecked="{Binding AutoJump}" Margin="0,8,0,0" />
                                 <CheckBox Content="视角摇晃" IsChecked="{Binding BobView}" Margin="0,4,0,0" />
                             </StackPanel>

@@ -308,8 +308,47 @@ public sealed class ToolboxViewModel : ObservableObject
     public IReadOnlyList<int> GuiScaleOptions { get; } = [0, 1, 2, 3, 4];
     public IReadOnlyList<string> ParticlesOptions { get; } = ["all", "decreased", "minimal"];
 
+    /// <summary>游戏语言：值写进 options.txt 的 lang 键。</summary>
+    public IReadOnlyList<GameLanguage> LangOptions { get; } =
+    [
+        new("zh_cn", "简体中文"),
+        new("zh_tw", "繁體中文"),
+        new("en_us", "English (US)"),
+        new("ja_jp", "日本語"),
+        new("ko_kr", "한국어"),
+        new("ru_ru", "Русский"),
+        new("de_de", "Deutsch"),
+        new("fr_fr", "Français"),
+        new("es_es", "Español"),
+        new("pt_br", "Português (BR)"),
+    ];
+
+    private string _lang = "zh_cn";
+
+    public string Lang
+    {
+        get => _lang;
+        set
+        {
+            if (!SetProperty(ref _lang, value)) return;
+            OnPropertyChanged(nameof(DefaultsSummary));
+            OnPropertyChanged(nameof(SelectedLanguage));
+        }
+    }
+
+    /// <summary>下拉框用（ComboBox 绑定对象，显示中文名）。</summary>
+    public GameLanguage? SelectedLanguage
+    {
+        get => LangOptions.FirstOrDefault(o => o.Code == _lang) ?? LangOptions[0];
+        set
+        {
+            if (value is null) return;
+            Lang = value.Code;
+        }
+    }
+
     public string DefaultsSummary => $"视距 {RenderDistance} · 界面尺寸 {(GuiScale == 0 ? "自动" : GuiScale.ToString())} · "
-        + $"自动跳跃 {(AutoJump ? "开" : "关")} · FOV {Fov}";
+        + $"自动跳跃 {(AutoJump ? "开" : "关")} · FOV {Fov} · 语言 {(SelectedLanguage?.Name ?? Lang)}";
 
     public ICommand SaveDefaultsCommand { get; }
     public ICommand ApplyDefaultsCommand { get; }
@@ -332,6 +371,7 @@ public sealed class ToolboxViewModel : ObservableObject
         _gamma = template.Gamma;
         _particles = template.Particles;
         _bobView = template.BobView;
+        _lang = template.Lang;
 
         GameOptionsTemplate.Default = template;
 
@@ -343,6 +383,8 @@ public sealed class ToolboxViewModel : ObservableObject
         OnPropertyChanged(nameof(Gamma));
         OnPropertyChanged(nameof(Particles));
         OnPropertyChanged(nameof(BobView));
+        OnPropertyChanged(nameof(Lang));
+        OnPropertyChanged(nameof(SelectedLanguage));
         OnPropertyChanged(nameof(DefaultsSummary));
     }
 
@@ -364,6 +406,7 @@ public sealed class ToolboxViewModel : ObservableObject
         Gamma = Gamma,
         Particles = Particles,
         BobView = BobView,
+        Lang = Lang,
     };
 
     private async void SaveDefaults()
@@ -669,4 +712,10 @@ public sealed class StructureFilterOption : ObservableObject
         "stronghold" => ["stronghold"],
         _ => [],
     };
+}
+
+/// <summary>一个游戏语言选项：options.txt 里的 lang 值 + 给人看的名字。</summary>
+public sealed record GameLanguage(string Code, string Name)
+{
+    public override string ToString() => Name;
 }

@@ -183,6 +183,45 @@ public sealed class SettingsViewModel : ObservableObject
         set => SetProperty(ref _javaPath, value);
     }
 
+    /// <summary>自动按物理内存 + 模组数量分配最大内存。</summary>
+    public bool AutoMemory
+    {
+        get => _autoMemory;
+        set
+        {
+            if (!SetProperty(ref _autoMemory, value)) return;
+            OnPropertyChanged(nameof(MemoryHint));
+            OnPropertyChanged(nameof(MemoryControlsEnabled));
+        }
+    }
+
+    /// <summary>自动模式下推荐值只读，避免用户改完又被覆盖。</summary>
+    public bool MemoryControlsEnabled => !_autoMemory;
+
+    public string MemoryHint => _autoMemory
+        ? $"自动分配：这台机器共 {Orion.Core.Game.MemoryPlanner.TotalMemoryMb / 1024.0:0.#} GB 内存，" +
+          $"当前版本建议 {Orion.Core.Game.MemoryPlanner.RecommendForPack(Orion.Core.Game.MemoryPlanner.TotalMemoryMb, ModCountOfCurrentInstance())} MB。"
+        : "手动模式：按自己的需要设置上限（大整合包建议不低于 6 GB）。";
+
+    private bool _autoMemory = true;
+
+    /// <summary>自动分配时，启动前用它算最大内存。</summary>
+    public int ResolveMemoryMb(int modCount) =>
+        _autoMemory
+            ? Orion.Core.Game.MemoryPlanner.RecommendForPack(Orion.Core.Game.MemoryPlanner.TotalMemoryMb, modCount)
+            : MemoryMb;
+
+    private int ModCountOfCurrentInstance()
+    {
+        var dir = _main.CurrentInstance?.GameDirectory;
+        if (string.IsNullOrWhiteSpace(dir)) return 0;
+
+        var mods = System.IO.Path.Combine(dir, "mods");
+        if (!System.IO.Directory.Exists(mods)) return 0;
+
+        return System.IO.Directory.GetFiles(mods, "*.jar").Length;
+    }
+
     public int MemoryMb
     {
         get => _memoryMb;
@@ -307,6 +346,7 @@ public sealed class SettingsViewModel : ObservableObject
         var settings = _main.Context.Settings;
 
         JavaPath = settings.JavaPath ?? "";
+        AutoMemory = settings.AutoMemory;
         MemoryMb = settings.MemoryMb;
         _reduceMotion = settings.ReduceMotion;
         Animations.Motion.ReduceMotion = settings.ReduceMotion;

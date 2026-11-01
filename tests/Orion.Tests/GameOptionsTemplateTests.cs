@@ -68,7 +68,7 @@ public sealed class GameOptionsTemplateTests
         try
         {
             var template = new GameOptionsTemplate { RenderDistance = 20, AutoJump = true };
-            Assert.Equal(7, template.Apply(dir));
+            Assert.Equal(8, template.Apply(dir));   // 7 项 + lang
             var written = File.ReadAllText(Path.Combine(dir, "options.txt"));
             Assert.Contains("renderDistance:20", written);
             Assert.Contains("autoJump:true", written);
