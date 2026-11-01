@@ -35,14 +35,33 @@ public static class BiomeMapStyler
     /// <param name="borders">是否画群系边界。</param>
     public static void Stylize(byte[] rgba, int width, int height,
         int worldLeft, int worldTop, int blocksPerPixel,
-        bool textures = true, bool borders = true)
+        bool textures = true, bool borders = true, bool hillshade = true)
     {
         if (rgba is null || width <= 1 || height <= 1) return;
         if (rgba.Length < width * height * 4) return;
-        if (!textures && !borders) return;
+        if (!textures && !borders && !hillshade) return;
 
         // 纹理在世界里的格子大小：放大视图时纹理粗一点，缩小时细一点
         var tileWorld = Math.Max(4, blocksPerPixel * 2);
+
+        // 近似高程：cubiomes 没有暴露地表高度，这里按群系类别给一个"高度档"，
+        // 再加一点确定性起伏，用来做方向光阴影。**这是近似值**，界面上也要这么说。
+        short[]? heights = null;
+
+        if (hillshade)
+        {
+            heights = new short[width * height];
+            for (var y = 0; y < height; y++)
+            {
+                var row = y * width * 4;
+                for (var x = 0; x < width; x++)
+                {
+                    var i = row + x * 4;
+                    if (rgba[i + 3] == 0) continue;
+                    heights[y * width + x] = ElevationOf(rgba[i], rgba[i + 1], rgba[i + 2], worldLeft + x, worldTop + y);
+                }
+            }
+        }
 
         for (var y = 0; y < height; y++)
         {
@@ -55,6 +74,22 @@ public static class BiomeMapStyler
                 if (alpha == 0) continue;
 
                 var color = Pack(rgba[i], rgba[i + 1], rgba[i + 2]);
+
+                // 方向光（左上打光）：取右邻与下邻的高差
+                var shade = 128;
+
+                if (heights is not null)
+                {
+                    var h = heights[y * width + x];
+                    var hRight = x + 1 < width ? heights[y * width + x + 1] : h;
+                    var hDown = y + 1 < height ? heights[(y + 1) * width + x] : h;
+                    var slope = (hRight - h) + (hDown - h);
+
+                    // slope 每单位约 1 格；缩放后适当放大，避免高差太小看不出来
+                    var strength = blocksPerPixel >= 16 ? 2.2 : 3.2;
+                    shade = (int)Math.Round(128 + slope * strength);
+                    shade = Math.Clamp(shade, 92, 164);
+                }
 
                 if (textures)
                 {
@@ -69,6 +104,13 @@ public static class BiomeMapStyler
                     rgba[i + 0] = Scale(rgba[i + 0], factor);
                     rgba[i + 1] = Scale(rgba[i + 1], factor);
                     rgba[i + 2] = Scale(rgba[i + 2], factor);
+                }
+
+                if (shade != 128)
+                {
+                    rgba[i + 0] = Scale(rgba[i + 0], shade);
+                    rgba[i + 1] = Scale(rgba[i + 1], shade);
+                    rgba[i + 2] = Scale(rgba[i + 2], shade);
                 }
 
                 if (!borders) continue;
@@ -94,6 +136,39 @@ public static class BiomeMapStyler
                 rgba[i + 2] = (byte)(rgba[i + 2] * 0.76);
             }
         }
+    }
+
+    /// <summary>
+    /// 按群系基色猜一个"高度档"（单位：相对格数，用于计算坡度，不是真实海拔）。
+    /// 深水最低 → 海洋 → 河流/沙滩 → 平原/森林 → 丘陵/恶地 → 山地/雪峰 最高。
+    /// </summary>
+    private static short ElevationOf(byte r, byte g, byte b, int worldX, int worldZ)
+    {
+        var brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+        // 水：蓝色占优，越暗越深
+        if (b > r + 18 && b > g + 6)
+        {
+            var depth = Math.Clamp(90 - brightness, 0, 90);
+            return (short)(-depth / 3);
+        }
+
+        // 雪/山地：很亮且偏冷
+        if (brightness > 205 && b >= r) return (short)(70 + (brightness - 205) / 2);
+
+        // 恶地/沙漠：暖色，偏干
+        if (r > g + 16 && r > b + 30) return (short)(28 + (r - g) / 6);
+
+        // 森林：绿占优
+        if (g > r + 14 && g > b + 10) return (short)(18 + (g - r) / 5);
+
+        // 其余（平原、草地、沙滩…）
+        var baseHeight = brightness > 180 ? 14 : 6;
+
+        // 确定性起伏：让平原也有缓坡，阴影不会一片死平
+        var ripple = (int)(Noise((uint)(worldX * 31 + worldZ * 17), 7, 11) & 0x0F);
+
+        return (short)(baseHeight + ripple);
     }
 
     private static byte Scale(byte channel, int factor) =>

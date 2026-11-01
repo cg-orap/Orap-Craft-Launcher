@@ -92,6 +92,15 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private int _bitmapCenterZ;
     private int _bitmapStep = 16;
 
+    // 预览层：整屏 1/4 分辨率的粗图，用来在拖动/缩放期间垫底，避免出现空白。
+    private BitmapSource? _previewBitmap;
+    private int _previewCenterX;
+    private int _previewCenterZ;
+    private int _previewStep = 16;
+    private int _previewVersion;
+    private bool _previewQueued;
+    private long _previewStartedAt;
+
     private bool _loading;
     private DispatcherTimer? _inertiaTimer;
     private double _inertiaVx;
@@ -385,6 +394,75 @@ public sealed class BiomeMapCanvas : FrameworkElement
     }
 
     // ── 渲染（后台线程算像素，UI 线程建位图） ─────────────
+    /// <summary>
+    /// 渲染一张整屏 1/4 分辨率的粗图（约 1/16 的像素量），用于垫底。
+    /// 拖动时高清图还没回来，画面底下有这层就不会露出空白。
+    /// </summary>
+    private void QueuePreviewRender()
+    {
+        if (_previewQueued) return;
+        if (ActualWidth < 8 || ActualHeight < 8) return;
+
+        _previewQueued = true;
+        _previewStartedAt = Environment.TickCount64;
+
+        var width = Math.Max(8, (int)Math.Round(ActualWidth) / 4);
+        var height = Math.Max(8, (int)Math.Round(ActualHeight) / 4);
+        var centerX = _centerBlockX;
+        var centerZ = _centerBlockZ;
+        var step = BlocksPerPixel;
+        var seed = _seed;
+        var versionIndex = EngineVersionIndex;
+        var dimension = _dimension;
+        var renderScale = step >= 64 ? 64 : step >= 16 ? 16 : step >= 4 ? 4 : 1;
+        var supersample = Math.Max(1, step / renderScale);
+        var version = Interlocked.Increment(ref _previewVersion);
+        var styled = _styled;
+
+        Task.Run(() =>
+        {
+            try
+            {
+                var pixelWidth = width * supersample;
+                var pixelHeight = height * supersample;
+
+                var pixels = CubiomesNative.RenderRgba(seed, versionIndex, dimension,
+                                 centerX, centerZ, renderScale, pixelWidth, pixelHeight)
+                             ?? SimplifiedBiomeMap.RenderRgba(seed, centerX, centerZ, renderScale, pixelWidth, pixelHeight)
+                             ?? new byte[pixelWidth * pixelHeight * 4];
+
+                if (styled)
+                {
+                    var worldLeft = centerX - (int)(width * supersample / 2.0 * step);
+                    var worldTop = centerZ - (int)(height * supersample / 2.0 * step);
+                    BiomeMapStyler.Stylize(pixels, pixelWidth, pixelHeight, worldLeft, worldTop,
+                        Math.Max(1, step / supersample), textures: false, borders: false, hillshade: true);
+                }
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _previewQueued = false;
+                    if (version != _previewVersion) return;
+
+                    var bitmap = BitmapSource.Create(pixelWidth, pixelHeight, 96, 96,
+                        PixelFormats.Bgra32, null, ToBgra(pixels), pixelWidth * 4);
+                    bitmap.Freeze();
+
+                    _previewBitmap = bitmap;
+                    _previewCenterX = centerX;
+                    _previewCenterZ = centerZ;
+                    _previewStep = step;
+                    InvalidateVisual();
+                }));
+            }
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException
+                                           or InvalidOperationException or ArgumentException)
+            {
+                Dispatcher.BeginInvoke(new Action(() => _previewQueued = false));
+            }
+        });
+    }
+
     private void RequestRender()
     {
         if (_renderQueued) return;
@@ -397,6 +475,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
             _loading = true;
             _lastRenderStarted = Environment.TickCount64;
+            QueuePreviewRender();
             InvalidateVisual();
 
             // 位图尺寸必须与元素一致，否则右侧/底部会留下未绘制的深色条。
@@ -576,6 +655,17 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var step = BlocksPerPixel;
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
+        // 预览层先垫底：拖出去的那部分不会是空白，而是"稍旧的粗图"
+        if (_previewBitmap is not null)
+        {
+            var pdx = _previewStep > 0 ? (_previewCenterX - _centerBlockX) / (double)_previewStep : 0;
+            var pdz = _previewStep > 0 ? (_previewCenterZ - _centerBlockZ) / (double)_previewStep : 0;
+
+            dc.PushOpacity(0.9);
+            dc.DrawImage(_previewBitmap, new Rect(pdx, pdz, width, height));
+            dc.Pop();
+        }
+
         if (_bitmap is not null)
         {
             // 旧图按"位图中心 vs 当前中心"的差平移：拖动时画面跟着走，
@@ -718,6 +808,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
     {
         base.OnMouseLeftButtonDown(e);
         _dragging = true;
+
+        // 拖之前先确保底下有一层预览图，否则拖动过程中边缘会是空白
+        if (_previewBitmap is null || Environment.TickCount64 - _previewStartedAt > 1500)
+        {
+            QueuePreviewRender();
+        }
+
         _dragStart = e.GetPosition(this);
         _dragCenterX = _centerBlockX;
         _dragCenterZ = _centerBlockZ;
