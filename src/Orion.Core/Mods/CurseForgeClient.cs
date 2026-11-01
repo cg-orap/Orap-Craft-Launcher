@@ -46,7 +46,9 @@ public sealed record CurseForgeFile(
     string FileName,
     string? DisplayName,
     string? DirectUrl,
-    IReadOnlyList<string> GameVersions);
+    IReadOnlyList<string> GameVersions,
+    string? Sha1 = null,
+    long Size = 0);
 
 /// <summary>
 /// CurseForge 官方 API 的最小客户端（只做整合包：搜索 → 选文件 → 拿下载地址）。
@@ -339,7 +341,7 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
             if (dto is null || string.IsNullOrWhiteSpace(dto.FileName)) return null;
 
             return new CurseForgeFile(dto.ModId, dto.Id, dto.FileName, dto.DisplayName, dto.DownloadUrl,
-                dto.GameVersions);
+                dto.GameVersions, Sha1Of(dto), dto.FileLength);
         }
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
         {
@@ -424,6 +426,10 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
 
         return target;
     }
+
+    /// <summary>从 hashes 里取 sha1（CurseForge 的 algo：1 = sha1）。</summary>
+    private static string? Sha1Of(CurseForgeFileDto dto) =>
+        dto.Hashes?.FirstOrDefault(h => h.Algo == 1)?.Value;
 
     /// <summary>CurseForge 的 modLoaderType：1 Forge / 4 Fabric / 5 Quilt / 6 NeoForge。</summary>
     public static int? LoaderTypeOf(LoaderKind loader) => loader switch
@@ -548,5 +554,11 @@ public sealed class CurseForgeClient(HttpClient http, string? apiKey)
         [JsonPropertyName("fileDate")] public DateTimeOffset FileDate { get; init; }
         [JsonPropertyName("downloadUrl")] public string? DownloadUrl { get; init; }
         [JsonPropertyName("gameVersions")] public List<string> GameVersions { get; init; } = [];
+        [JsonPropertyName("fileLength")] public long FileLength { get; init; }
+        [JsonPropertyName("hashes")] public List<HashDto>? Hashes { get; init; }
     }
+
+    private sealed record HashDto(
+        [property: JsonPropertyName("value")] string? Value,
+        [property: JsonPropertyName("algo")] int Algo);
 }

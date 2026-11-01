@@ -208,45 +208,27 @@ public sealed class PackArchiveInstaller
             }
 
 
-            // 3. mods: CurseForge manifests carry ids only. Like PCL2/HMCL we build the ForgeCDN URL
-            // from the id pair (+ manifest fileName when present), fall back to the public redirect,
-            // download several files at once and hand the user a browser link for anything left.
-            var manifest = ReadManifest(archivePath);
+            // 3. 模组文件：照 Axolotl 的做法——先解析清单（真实文件名 + sha1 + 大小），再下载并校验。
             var modsDirectory = Path.Combine(instance.GameDirectory, "mods");
             Directory.CreateDirectory(modsDirectory);
 
-            var files = manifest?.Files ?? [];
-            var queue = new System.Collections.Concurrent.ConcurrentQueue<string>();
-            var done = 0;
-            using var gate = new SemaphoreSlim(6);   // enough to hide per-connection throttling
+            var downloadResult = await DownloadPackModsAsync(archivePath, modsDirectory, output, ct)
+                .ConfigureAwait(false);
 
-            var jobs = files.Select(async file =>
+            var downloaded = downloadResult.Downloaded;
+
+            if (downloadResult.UnavailableCount > 0)
             {
-                await gate.WaitAsync(ct).ConfigureAwait(false);
-                try
-                {
-                    var ok = await DownloadCurseForgeFileCoreAsync(file, modsDirectory, queue, warnings, ct).ConfigureAwait(false);
-                    if (ok)
-                    {
-                        var finished = Interlocked.Increment(ref done);
-                        output?.Report($"下载模组 {finished}/{files.Count}…");
-                    }
-                }
-                finally
-                {
-                    gate.Release();
-                }
-            });
-
-            await Task.WhenAll(jobs).ConfigureAwait(false);
-
-            foreach (var item in queue) unresolved.Add(item);
-            var downloaded = done;
-            if (unresolved.Count > 0)
-            {
-                warnings.Add($"有 {unresolved.Count} 个模组无法自动下载，需要手动补齐（CurseForge 只提供项目/文件 ID）：");
-                warnings.AddRange(unresolved.Take(20));
+                warnings.Add($"有 {downloadResult.UnavailableCount} 个文件拿不到元数据（CurseForge 没返回文件名/校验和）。");
             }
+
+            if (downloadResult.Failed.Count > 0)
+            {
+                warnings.Add($"有 {downloadResult.Failed.Count} 个文件没下载成功：");
+                warnings.AddRange(downloadResult.Failed.Take(20));
+            }
+
+            foreach (var item in downloadResult.Failed) unresolved.Add(item);
 
             // 收尾自检：坏 jar 留一个就会让 Forge 启动失败，宁可这里删掉并提示
             var pruned = PruneBrokenJars(Path.Combine(instance.GameDirectory, "mods"), warnings);
@@ -261,7 +243,7 @@ public sealed class PackArchiveInstaller
             // 有文件没下下来时不能只说"已安装"：用户看到的就是启动后"缺前置"的红字。
             if (unresolved.Count > 0)
             {
-                output?.Report($"整合包不完整：{downloaded}/{files.Count} 个模组下载成功，{unresolved.Count} 个失败。");
+                output?.Report($"整合包不完整：{downloaded}/{downloadResult.Downloaded + downloadResult.Failed.Count} 个模组下载成功，{unresolved.Count} 个失败。");
                 warnings.Add($"整合包不完整：{unresolved.Count} 个文件没下载下来（启动会报缺前置）。");
             }
             else
@@ -269,7 +251,9 @@ public sealed class PackArchiveInstaller
                 output?.Report($"整合包已安装：{name}（{downloaded} 个模组，{overridesCopied} 个配置文件）");
             }
 
-            await WriteInstallReportAsync(instance.GameDirectory, name, files.Count, downloaded, unresolved)
+            await WriteInstallReportAsync(instance.GameDirectory, name,
+                    downloadResult.Downloaded + downloadResult.Failed.Count + downloadResult.UnavailableCount,
+                    downloaded, unresolved)
                 .ConfigureAwait(false);
 
             var result = new MrPackResult
@@ -801,68 +785,225 @@ public sealed class PackArchiveInstaller
         List<string>? warnings,
         CancellationToken ct)
     {
-        // 文件名优先用真实名字：manifest 里通常没有，就先查一次元数据。
-        // 用 curseforge-<projectID>-<fileID>.jar 这种占位名会导致
-        //   ① 用户看不懂 ② 整合包自带的完整性检查（如 Better MC 的 "Too Many Changes"）把这些当成被人改过
-        //   ③ 更新时对不上原来的文件
-        var resolvedName = CurseForgeCdn.NormalizeFileName(file.FileName);
+        // 统一走"解析元数据 → 下载 → 校验"的新流程（与整合包安装一致）。
+        // 拿不到元数据时才退回"按 manifest 名字拼 CDN"，至少别让文件缺失。
+        ResolvedCurseForgeFile? target = null;
 
-        if (resolvedName is null && !string.IsNullOrWhiteSpace(_curseForgeApiKey))
+        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey))
         {
             try
             {
-                var metaClient = new CurseForgeClient(_http, _curseForgeApiKey);
-                var meta = await metaClient.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct)
-                    .ConfigureAwait(false);
-                resolvedName = CurseForgeCdn.NormalizeFileName(meta?.FileName);
+                var client = new CurseForgeClient(_http, _curseForgeApiKey);
+                var meta = await client.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct).ConfigureAwait(false);
+                var name = CurseForgeCdn.NormalizeFileName(meta?.FileName);
+                if (name is not null)
+                {
+                    target = new ResolvedCurseForgeFile((int)file.ProjectId, (int)file.FileId, name,
+                        meta!.Sha1, meta.Size, meta.DirectUrl);
+                }
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                // 查不到就用占位名继续下载，至少别让文件缺失
+                AppLog.Warn("packs", "resolve-failed", ("project", file.ProjectId), ("file", file.FileId),
+                    ("error", ex.Message));
             }
         }
 
-        var name = resolvedName ?? $"curseforge-{file.ProjectId}-{file.FileId}.jar";
+        target ??= new ResolvedCurseForgeFile((int)file.ProjectId, (int)file.FileId,
+            CurseForgeCdn.NormalizeFileName(file.FileName) ?? $"curseforge-{file.ProjectId}-{file.FileId}.jar",
+            null, 0, null);
 
-        // 1) 先按已有信息试：CDN 直链（需要文件名）→ API download-url → curseforge 跳转
-        if (await TryDownloadAsync(file, CurseForgeCdn.Urls((int)file.FileId, resolvedName), modsDirectory,
-                name, warnings, ct).ConfigureAwait(false))
+        if (await downloadContentAsync(target, modsDirectory, warnings, ct).ConfigureAwait(false))
         {
             return true;
         }
 
-        // 2) 全都失败：如果 manifest 里没有文件名，就问一次文件元数据再拼 CDN。
-        //    整合包 manifest 只给 projectID + fileID；作者禁用 API 下载时 download-url 返回 data=null，
-        //    没有文件名就再也拼不出链接——这就是"同一个包 PCL 能装、我们装不上"的那批文件。
-        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey) && CurseForgeCdn.NormalizeFileName(file.FileName) is null)
+        unresolved.Enqueue($"{target.FileName}  →  {CurseForgeCdn.BrowserUrl(target.ProjectId, target.FileId)}");
+        return false;
+    }
+
+    /// <summary>整合包模组下载结果。</summary>
+    public sealed record ModDownloadResult(int Downloaded, int UnavailableCount, IReadOnlyList<string> Failed);
+
+    /// <summary>
+    /// 下载一个 CurseForge 整合包里清单列出的全部模组文件。
+    ///
+    /// 步骤完全照 Axolotl 的做法：
+    /// 1) 先把每个 (projectID, fileID) 解析成真实文件名 + sha1 + 大小（并发、限流）；
+    /// 2) 再按"直链 → ForgeCDN → 官方 download-url"的顺序下载，边下边记速度；
+    /// 3) 下完按 sha1/大小校验，不合格就删掉重试下一个源。
+    ///
+    /// 与旧实现的差别：不猜文件名（不会留下 curseforge-123-456.jar）、不信任半截文件、
+    /// 单个文件失败只记进 Failed，不影响其它文件。
+    /// </summary>
+    public async Task<ModDownloadResult> DownloadPackModsAsync(
+        string archivePath,
+        string modsDirectory,
+        IProgress<string>? output = null,
+        CancellationToken ct = default)
+    {
+        Directory.CreateDirectory(modsDirectory);
+
+        var manifest = ReadManifest(archivePath);
+        var files = manifest?.Files ?? [];
+
+        if (files.Count == 0) return new ModDownloadResult(0, 0, Array.Empty<string>());
+
+        output?.Report($"解析清单：{files.Count} 个文件…");
+
+        var resolver = new CurseForgeClient(_http, _curseForgeApiKey);
+        var resolved = new System.Collections.Concurrent.ConcurrentBag<ResolvedCurseForgeFile>();
+        var unavailable = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        using var resolveGate = new SemaphoreSlim(MaxConcurrentDownloads);
+
+        var resolveJobs = files.Select(async file =>
         {
-            global::Orion.Core.Mods.CurseForgeFile? meta = null;
+            await resolveGate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                var metaClient = new CurseForgeClient(_http, _curseForgeApiKey);
-                meta = await metaClient.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct).ConfigureAwait(false);
+                var meta = await resolver.GetFileAsync((int)file.ProjectId, (int)file.FileId, ct).ConfigureAwait(false);
+                var name = CurseForgeCdn.NormalizeFileName(meta?.FileName ?? file.FileName);
+
+                if (name is null)
+                {
+                    unavailable.Enqueue($"{file.ProjectId}/{file.FileId}");
+                    return;
+                }
+
+                resolved.Add(new ResolvedCurseForgeFile((int)file.ProjectId, (int)file.FileId, name,
+                    meta?.Sha1, meta?.Size ?? 0, meta?.DirectUrl));
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                AppLog.Warn("packs", "file-metadata-failed",
-                    ("project", file.ProjectId), ("file", file.FileId), ("error", ex.Message));
+                unavailable.Enqueue($"{file.ProjectId}/{file.FileId}");
             }
-
-            var resolved = CurseForgeCdn.NormalizeFileName(meta?.FileName);
-            if (resolved is not null)
+            finally
             {
-                AppLog.Info("packs", "file-name-resolved",
-                    ("project", file.ProjectId), ("file", file.FileId), ("name", resolved));
+                resolveGate.Release();
+            }
+        });
 
-                if (await TryDownloadAsync(file, CurseForgeCdn.Urls((int)file.FileId, resolved), modsDirectory,
-                        resolved, warnings, ct).ConfigureAwait(false))
+        await Task.WhenAll(resolveJobs).ConfigureAwait(false);
+
+        var targets = resolved.ToList();
+        output?.Report($"清单解析完成：{targets.Count} 个可下载、{unavailable.Count} 个拿不到元数据。");
+
+        var done = 0;
+        var failed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var warnings = new List<string>();
+        using var downloadGate = new SemaphoreSlim(MaxConcurrentDownloads);
+
+        var downloadJobs = targets.Select(async target =>
+        {
+            await downloadGate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (await downloadContentAsync(target, modsDirectory, warnings, ct).ConfigureAwait(false))
                 {
-                    return true;
+                    var finished = Interlocked.Increment(ref done);
+                    if (finished % 10 == 0) output?.Report($"下载模组 {finished}/{targets.Count}…");
                 }
+                else
+                {
+                    failed.Enqueue($"{target.FileName}  →  {CurseForgeCdn.BrowserUrl(target.ProjectId, target.FileId)}");
+                }
+            }
+            finally
+            {
+                downloadGate.Release();
+            }
+        });
+
+        await Task.WhenAll(downloadJobs).ConfigureAwait(false);
+
+        return new ModDownloadResult(done, unavailable.Count, failed.ToArray());
+    }
+
+    /// <summary>整合包并发下载数：8 个连接足够吃满家用带宽，又不会把 CDN 打出 429。</summary>
+    private const int MaxConcurrentDownloads = 8;
+
+    /// <summary>
+    /// 下载一个已解析的文件：直链（元数据给的）→ ForgeCDN（mediafilez/edge）→ 官方 download-url。
+    /// 下载后按 sha1 / 大小校验，不一致就当失败（半截文件不能留在 mods 里）。
+    /// </summary>
+    private async Task<bool> downloadContentAsync(
+        ResolvedCurseForgeFile target,
+        string modsDirectory,
+        List<string>? warnings,
+        CancellationToken ct)
+    {
+        var path = Path.Combine(modsDirectory, target.FileName);
+
+        // 已经下过且校验通过就不用再下
+        if (target.Matches(new FileInfo(path))) return true;
+
+        var candidates = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(target.DownloadUrl)) candidates.Add(target.DownloadUrl!);
+        foreach (var cdn in CurseForgeCdn.Urls(target.FileId, target.FileName)) candidates.Add(cdn);
+        if (!string.IsNullOrWhiteSpace(_curseForgeApiKey))
+        {
+            candidates.Add(
+                $"https://api.curseforge.com/v1/mods/{target.ProjectId}/files/{target.FileId}/download-url");
+        }
+
+        foreach (var candidate in candidates)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                using var perFile = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                perFile.CancelAfter(TimeSpan.FromMinutes(5));
+
+                var url = candidate;
+                if (url.Contains("/download-url", StringComparison.OrdinalIgnoreCase))
+                {
+                    url = await ResolveCurseForgeUrlAsync(url, perFile.Token).ConfigureAwait(false) ?? "";
+                    if (string.IsNullOrWhiteSpace(url)) continue;
+                }
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                if (url.StartsWith("https://api.curseforge.com", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(_curseForgeApiKey))
+                {
+                    request.Headers.TryAddWithoutValidation("x-api-key", _curseForgeApiKey);
+                }
+
+                using var response = await _http
+                    .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, perFile.Token).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode) continue;
+
+                await using (var stream = await response.Content.ReadAsStreamAsync(perFile.Token).ConfigureAwait(false))
+                await using (var destination = File.Create(path))
+                {
+                    await CopyWithMeterAsync(stream, destination, perFile.Token).ConfigureAwait(false);
+                }
+
+                var info = new FileInfo(path);
+                if (!LooksLikeZip(path) || !target.Matches(info))
+                {
+                    AppLog.Warn("packs", "file-verify-failed",
+                        ("name", target.FileName), ("size", info.Length), ("expected", target.Size),
+                        ("source", new Uri(url).Host));
+                    TryDeleteFile(path);
+                    continue;
+                }
+
+                var routed = PackFileClassifier.Route(path, Path.GetDirectoryName(modsDirectory)!, out var kind);
+                if (warnings is not null && kind is PackFileKind.ResourcePack or PackFileKind.ShaderPack)
+                {
+                    warnings.Add($"{Path.GetFileName(routed)} 识别为资源包/光影，已放到对应目录");
+                }
+
+                return true;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+            {
+                TryDeleteFile(path);
             }
         }
 
-        unresolved.Enqueue($"{name}  →  {CurseForgeCdn.BrowserUrl((int)file.ProjectId, (int)file.FileId)}");
         return false;
     }
 
