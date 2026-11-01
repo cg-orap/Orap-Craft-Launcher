@@ -737,6 +737,32 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>Loads accounts, instances, Java runtimes and version metadata into the shell.</summary>
+    private double _bootProgress;
+    private string _bootPhase = "正在启动…";
+
+    /// <summary>启动动画进度（0..1），由真实的初始化阶段推动。</summary>
+    public double BootProgress
+    {
+        get => _bootProgress;
+        private set => SetProperty(ref _bootProgress, value);
+    }
+
+    /// <summary>启动动画的当前阶段文字。</summary>
+    public string BootPhase
+    {
+        get => _bootPhase;
+        private set => SetProperty(ref _bootPhase, value);
+    }
+
+    /// <summary>更新启动动画：进度 + 阶段文字，并让界面至少显示一会儿（避免"闪一下就没了"）。</summary>
+    private async Task BootStepAsync(double progress, string phase, int minimumMilliseconds = 220)
+    {
+        BootProgress = progress;
+        BootPhase = phase;
+
+        if (minimumMilliseconds > 0) await Task.Delay(minimumMilliseconds).ConfigureAwait(true);
+    }
+
     public async Task InitializeAsync()
     {
         // The splash must never hinge on anything slow or fragile: everything that touches the disk
@@ -744,13 +770,19 @@ public sealed class MainViewModel : ObservableObject
         // never sit on 正在初始化… again.
         try
         {
+            await BootStepAsync(0.08, "读取启动器配置…", 0).ConfigureAwait(true);
             await Context.InitializeAsync().ConfigureAwait(true);
 
+            await BootStepAsync(0.3, "载入账户…").ConfigureAwait(true);
             await ReloadAccountsAsync().ConfigureAwait(true);
+
+            await BootStepAsync(0.52, "扫描版本实例…").ConfigureAwait(true);
             await ReloadInstancesAsync().ConfigureAwait(true);
 
+            await BootStepAsync(0.74, "查找 Java 运行时…", 0).ConfigureAwait(true);
             var runtimes = await Context.JavaDetector.DiscoverAsync().ConfigureAwait(true);
             JavaRuntimes.Replace(runtimes);
+            await BootStepAsync(0.92, "准备界面…").ConfigureAwait(true);
 
             VersionStatus = $"数据目录 {Context.Paths.Root}";
             SettingsPage.LoadFromSettings();
@@ -765,6 +797,18 @@ public sealed class MainViewModel : ObservableObject
         }
         finally
         {
+            BootProgress = 1;
+            BootPhase = "就绪";
+
+            // 让进度条走完再收遮罩，否则会"啪"地消失。
+            // ORAP_BOOT_HOLD_MS 是给截图/演示用的：让启动动画多停一会儿。
+            var hold = 180;
+            if (int.TryParse(Environment.GetEnvironmentVariable("ORAP_BOOT_HOLD_MS"), out var extra) && extra > 0)
+            {
+                hold = Math.Min(15000, hold + extra);
+            }
+
+            await Task.Delay(hold).ConfigureAwait(true);
             IsReady = true;
             AppLog.Info("ui", "ready");
         }

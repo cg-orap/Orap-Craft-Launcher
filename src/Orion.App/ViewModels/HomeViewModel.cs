@@ -325,10 +325,14 @@ public sealed class HomeViewModel : ObservableObject
         get
         {
             var instance = _main.CurrentInstance;
-            if (instance?.MemoryMb is { } manual) return manual;
-
             var settings = _main.Context.Settings;
-            if (!settings.AutoMemory) return settings.MemoryMb;
+
+            // 自动分配优先：开着自动时忽略实例里的旧手动值，
+            // 否则用户开了"自动"却还在按上次手动留下的 5902 MB 启动。
+            if (!settings.AutoMemory)
+            {
+                return instance?.MemoryMb ?? settings.MemoryMb;
+            }
 
             var mods = instance is null ? 0 : CountMods(instance.GameDirectory);
             return Orion.Core.Game.MemoryPlanner.RecommendForPack(

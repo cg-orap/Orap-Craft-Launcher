@@ -434,29 +434,16 @@
                     </Grid>
                 </Border>
 
-                <!-- 初始化遮罩：应用图标 + 旋转加载环 + 状态文字 -->
-                <Border Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource WindowBg}"
-                        Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <Border Width="76" Height="76" CornerRadius="20" ClipToBounds="True"
-                                HorizontalAlignment="Center">
-                            <Image Source="Assets/app-icon.png" Stretch="UniformToFill"
-                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                        </Border>
-
-                        <TextBlock Text="Orap Craft Launcher" FontSize="22" FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" Margin="0,18,0,0" />
-
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,0">
-                            <controls:LoadingSpinner Size="16" Thickness="2.2"
-                                                     Stroke="{DynamicResource AccentBrush}"
-                                                     VerticalAlignment="Center" />
-                            <TextBlock Text="正在初始化…" Style="{StaticResource CaptionText}"
-                                       Margin="10,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
             </Grid>
         </Grid>
+
+        <!-- 启动动画：图标落位 + 光环 + 逐字字标 + 真实进度（覆盖整个窗口） -->
+        <Border x:Name="BootOverlay" Grid.Row="0" Grid.RowSpan="2"
+                Background="{DynamicResource WindowBg}"
+                Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+            <controls:BootAnimation Progress="{Binding BootProgress}"
+                                    PhaseText="{Binding BootPhase}"
+                                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+        </Border>
     </Grid>
 </Window>
