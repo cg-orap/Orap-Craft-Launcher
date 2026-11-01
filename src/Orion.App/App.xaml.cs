@@ -285,8 +285,13 @@ public partial class App : Application
         //   · 卡片次之（能看见玻璃，但内容必须清楚）
         //   · 内容区/侧栏最实，保证文字对比度
         // 都是 opacity 的线性函数：用户把 0.45 拉到底时整体才真正通透。
-        byte AlphaOf(double baseAlpha, double gain) =>
-            (byte)Math.Clamp((int)Math.Round(255 * Math.Clamp(baseAlpha + (opacity - 0.45) * gain, 0, 1)), 0, 255);
+        byte AlphaOf(double baseAlpha, double gain)
+        {
+            // 不透明度 = 1（默认）时直接给不透明，避免玻璃关掉后还留着淡淡的透边
+            if (opacity >= 0.995) return 255;
+
+            return (byte)Math.Clamp((int)Math.Round(255 * Math.Clamp(baseAlpha + (opacity - 0.45) * gain, 0, 1)), 0, 255);
+        }
 
         var glass = new ResourceDictionary
         {

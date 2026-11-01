@@ -41,11 +41,14 @@ public sealed class LauncherSettings
     /// <summary>减少动效：关闭位移/缩放，只保留极短的透明度过渡（无障碍设置）。</summary>
     [JsonPropertyName("reduceMotion")] public bool ReduceMotion { get; set; }
 
-    /// <summary>毛玻璃（系统亚克力）开关；系统不支持时自动降级。</summary>
-    [JsonPropertyName("glassEnabled")] public bool GlassEnabled { get; set; } = true;
+    /// <summary>
+    /// 系统亚克力开关。默认关闭：默认外观是「不透明面板 + 玻璃质感边框」，
+    /// 想要整窗透明再到设置里打开（部分系统/壁纸下透明会显得发灰）。
+    /// </summary>
+    [JsonPropertyName("glassEnabled")] public bool GlassEnabled { get; set; }
 
-    /// <summary>界面不透明度 0.45–1.0：越小越透（玻璃感越强），1.0 = 完全不透明。</summary>
-    [JsonPropertyName("glassOpacity")] public double GlassOpacity { get; set; } = 0.78;
+    /// <summary>界面不透明度 0.45–1.0：越小越透；1.0 = 完全不透明（默认）。</summary>
+    [JsonPropertyName("glassOpacity")] public double GlassOpacity { get; set; } = 1.0;
 
     /// <summary>
     /// 下载保存目录。为空表示用默认目录（数据根目录下的 downloads）。

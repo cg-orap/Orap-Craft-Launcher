@@ -31,12 +31,18 @@ public sealed class CatalogKindOption(string key, string name, string? projectTy
 }
 
 /// <summary>分类下拉项：中文名 + Modrinth slug（null = 全部分类）。</summary>
-public sealed class ModCategoryOption(string? slug, string name)
+public sealed class ModCategoryOption(string? slug, string name, int? curseForgeId = null)
 {
+    /// <summary>Modrinth 的 category slug（CurseForge 分类时为空）。</summary>
     public string? Slug { get; } = slug;
+
+    /// <summary>界面上显示的中文名。</summary>
     public string Name { get; } = name;
 
-    public bool IsAny => string.IsNullOrWhiteSpace(Slug);
+    /// <summary>CurseForge 的分类 id（CurseForge 分类时才有）。</summary>
+    public int? CurseForgeId { get; } = curseForgeId;
+
+    public bool IsAny => string.IsNullOrWhiteSpace(Slug) && CurseForgeId is null;
 
     public override string ToString() => Name;
 }
@@ -342,19 +348,70 @@ public sealed class CatalogViewModel : ObservableObject
 
     private static readonly ModCategoryOption AnyCategory = new(null, "全部分类");
 
-    /// <summary>分类下拉：中文名 + Modrinth slug（空 = 全部）。</summary>
-    public IReadOnlyList<ModCategoryOption> Categories => _kind.Key switch
+    private IReadOnlyList<ModCategoryOption>? _cfCategoryOptions;
+
+    /// <summary>
+    /// CurseForge 的分类下拉：直接来自 CF 的 categories 接口，
+    /// 名字翻成中文（翻不到就保留英文，但**一定能筛**——这才是关键）。
+    /// </summary>
+    private async Task LoadCurseForgeCategoriesAsync()
     {
+        var kind = CurrentCurseForgeKind;
+
+        if (_cfCategoryOptions is not null && _cfCategoryKind == kind) return;
+
+        try
+        {
+            var categories = await _main.Context.CurseForge.GetCategoriesAsync(kind).ConfigureAwait(true);
+            if (categories.Count == 0) return;
+
+            var options = new List<ModCategoryOption> { AnyCategory };
+            foreach (var (id, name) in categories.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                options.Add(new ModCategoryOption(null, Core.Mods.ModCategories.CurseForgeDisplayName(name), id));
+            }
+
+            _cfCategoryOptions = options;
+            _cfCategoryKind = kind;
+
+            _categoryOption = AnyCategory;
+            _category = null;
+
+            OnPropertyChanged(nameof(Categories));
+            OnPropertyChanged(nameof(SelectedCategoryOption));
+            OnPropertyChanged(nameof(SelectedCategory));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            AppLog.Warn("catalog", "cf-categories-failed", ("error", ex.Message));
+        }
+    }
+
+    private Orion.Core.Mods.CurseForgeKind? _cfCategoryKind;
+
+    /// <summary>分类下拉：中文名 + Modrinth slug（空 = 全部）。</summary>
+    public IReadOnlyList<ModCategoryOption> Categories
+    {
+        get
+        {
+            // CurseForge 的分类体系和 Modrinth 完全不同：必须用 CF 自己的分类，
+            // 否则"装备/实用工具/地形生成"这类中文标签在 CF 里根本对不上，选了等于没选。
+            if (IsCurseForgeSource && _cfCategoryOptions is not null) return _cfCategoryOptions;
+
+            return _kind.Key switch
+            {
         "modpack" => CategoryList("adventure", "combat", "optimization", "technology", "magic", "quests",
             "worldgen", "challenging", "kitchen-sink", "lightweight", "multiplayer"),
         "mod" => CategoryList("optimization", "technology", "magic", "storage", "decoration", "library",
             "adventure", "mobs", "food", "equipment", "utility", "worldgen", "game-mechanics"),
         "shader" => CategoryList("realistic", "semi-realistic", "fantasy", "cartoon", "vanilla-like",
             "simplistic", "potato", "medium", "heavy", "core-shaders"),
-        "resourcepack" => CategoryList("combat", "themed", "tweaks", "fonts", "realistic", "cartoon",
-            "vanilla-like", "simplistic", "gui", "blocks", "items", "environment", "audio"),
-        _ => [AnyCategory],
-    };
+            "resourcepack" => CategoryList("combat", "themed", "tweaks", "fonts", "realistic", "cartoon",
+                "vanilla-like", "simplistic", "gui", "blocks", "items", "environment", "audio"),
+                _ => [AnyCategory],
+            };
+        }
+    }
 
     private static IReadOnlyList<ModCategoryOption> CategoryList(params string[] slugs)
     {
@@ -472,6 +529,10 @@ public sealed class CatalogViewModel : ObservableObject
 
     private async Task<int?> ResolveCurseForgeCategoryIdAsync(Orion.Core.Mods.CurseForgeKind kind)
     {
+        // 现在下拉里的每项都自带 CurseForgeId（来自 CF 自己的 categories 接口），
+        // 这项就直接可用；下面那套按名字猜的逻辑只作为兜底保留。
+        if (_categoryOption.CurseForgeId is { } direct) return direct;
+
         if (string.IsNullOrWhiteSpace(SelectedCategory)) return null;
 
         var key = kind.ToString();
@@ -613,10 +674,20 @@ public sealed class CatalogViewModel : ObservableObject
             OnPropertyChanged(nameof(FilterSummary));
 
             // CurseForge 没有"游戏版本"这一类，切过去时自动落到模组
-            if (clamped == 1 && _kind.ProjectType is null) Kind = Kinds[2];
+            if (clamped == 1 && _kind.ProjectType is null)
+            {
+                Kind = Kinds[2];
+                return;      // Kind setter 已经会去拉 CF 分类并搜索
+            }
 
             _cfPage = 0;
-            _ = SearchAsync(0);
+            _categoryOption = AnyCategory;
+            _category = null;
+            _cfCategoryOptions = null;
+            OnPropertyChanged(nameof(Categories));
+            OnPropertyChanged(nameof(SelectedCategoryOption));
+
+            _ = RefreshCategoriesAndSearchAsync();
         }
     }
 
@@ -702,10 +773,11 @@ public sealed class CatalogViewModel : ObservableObject
             Results.Clear();
             _page = 0;
             _totalHits = 0;
+            _cfCategoryOptions = null;
             RaisePaging();
             UpdateTargetInfo();
 
-            if (IsCatalogueTab) _ = SearchAsync(0);
+            if (IsCatalogueTab) _ = RefreshCategoriesAndSearchAsync();
         }
     }
 
@@ -1619,6 +1691,14 @@ public sealed class CatalogViewModel : ObservableObject
     }
 
     /// <summary>CurseForge 搜索（模组/整合包/材质/光影）。</summary>
+    /// <summary>切页签/切来源时：先把分类下拉准备好（CurseForge 需要联网拉列表），再搜索。</summary>
+    private async Task RefreshCategoriesAndSearchAsync()
+    {
+        if (IsCurseForgeSource) await LoadCurseForgeCategoriesAsync().ConfigureAwait(true);
+
+        await SearchAsync(0).ConfigureAwait(true);
+    }
+
     private async Task SearchCurseForgeAsync(int page = 0)
     {
         var kind = CurrentCurseForgeKind;

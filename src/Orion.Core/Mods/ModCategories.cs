@@ -69,6 +69,83 @@ public static class ModCategories
     private static readonly Dictionary<string, string> NameToSlug =
         All.ToDictionary(x => x.Name, x => x.Slug, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// CurseForge 分类名的中文翻译（按 CF 的英文名归一化后匹配）。
+    /// 翻不出来就保留原名 —— 显示英文也比"选了没反应"好。
+    /// </summary>
+    private static readonly Dictionary<string, string> CurseForgeNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Adventure"] = "冒险",
+        ["API and Library"] = "前置库",
+        ["Armor, Tools, and Weapons"] = "装备",
+        ["Armor Tools and Weapons"] = "装备",
+        ["Cosmetic"] = "外观装饰",
+        ["Decoration"] = "装饰",
+        ["Food"] = "食物",
+        ["Magic"] = "魔法",
+        ["Technology"] = "科技",
+        ["Storage"] = "存储",
+        ["World Gen"] = "地形生成",
+        ["World Generation"] = "地形生成",
+        ["Mobs"] = "生物",
+        ["Utility & QoL"] = "实用工具",
+        ["Utility and QoL"] = "实用工具",
+        ["Game Mechanics"] = "机制改动",
+        ["Optimization"] = "优化",
+        ["Performance"] = "优化",
+        ["Server Utility"] = "服务器工具",
+        ["Transport"] = "交通",
+        ["Player Transport"] = "玩家交通",
+        ["Automation"] = "自动化",
+        ["Energy"] = "能源",
+        ["Generators"] = "发电机",
+        ["Redstone"] = "红石",
+        ["Processing"] = "处理",
+        ["Map and Information"] = "地图与信息",
+        ["Miscellaneous"] = "杂项",
+        ["Education"] = "教学",
+        ["Economy"] = "经济",
+        ["Create"] = "机械动力",
+        ["Twitch Integration"] = "Twitch 集成",
+        ["Font Packs"] = "字体",
+        ["Themed"] = "主题",
+        ["Tweaks"] = "微调",
+        ["Realistic"] = "写实",
+        ["Semi-realistic"] = "半写实",
+        ["Fantasy"] = "奇幻",
+        ["Cartoon"] = "卡通",
+        ["Simplistic"] = "简洁",
+        ["Vanilla-like"] = "原版风格",
+        ["Modded"] = "模组向",
+        ["Questing"] = "任务",
+        ["Quests"] = "任务",
+        ["Hardcore"] = "硬核",
+        ["Challenge"] = "挑战",
+        ["Extra Large"] = "超大",
+        ["Large"] = "大型",
+        ["Medium"] = "中型",
+        ["Small"] = "小型",
+        ["Lightweight"] = "轻量",
+        ["Multiplayer"] = "多人",
+        ["Sci-Fi"] = "科幻",
+        ["Steampunk"] = "蒸汽朋克",
+        ["Medieval"] = "中世纪",
+        ["Modern"] = "现代",
+        ["Core Shaders"] = "核心光影",
+        ["Shaders"] = "光影",
+        ["Potato"] = "低配可用",
+        ["Low"] = "低配",
+    };
+
+    /// <summary>CurseForge 分类名 → 中文；翻不出来原样返回。</summary>
+    public static string CurseForgeDisplayName(string? curseForgeName)
+    {
+        if (string.IsNullOrWhiteSpace(curseForgeName)) return "";
+
+        var key = curseForgeName.Trim();
+        return CurseForgeNames.TryGetValue(key, out var chinese) ? chinese : key;
+    }
+
     /// <summary>某个分类的中文名；查不到时把 slug 首字母大写，避免显示成英文小写。</summary>
     public static string DisplayName(string? slug)
     {
