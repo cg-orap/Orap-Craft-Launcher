@@ -95,21 +95,20 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
         <Grid.RowDefinitions>
-            <!-- 头部（标题/筛选/冲突卡片）按内容自适应，太高的窗口内滚动 -->
+            <!-- 头部（标题 + 操作按钮）：整块固定，不放进滚动区，按钮才有确定宽度 -->
+            <RowDefinition Height="Auto" />
+            <!-- 冲突 / 更新 / 状态：内容多时自己滚动 -->
             <RowDefinition Height="Auto" />
             <!-- 模组列表 + 右栏占满剩余高度：ListBox 拿到有限高度才会启用虚拟化 -->
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                      MaxHeight="430">
-        <StackPanel Margin="24,20,24,0"
-                    Width="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <StackPanel Grid.Row="0" Margin="24,20,24,0">
 
             <!-- ===== 头部卡片：实例身份 + 操作 + 页签 ===== -->
-            <Border Style="{StaticResource Card}" Padding="20,16">
+            <Border x:Name="HeaderCard" Style="{StaticResource Card}" Padding="20,16">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -147,8 +146,8 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <WrapPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal"
-                                   HorizontalAlignment="Left" Margin="0,14,0,0">
+                        <UniformGrid Grid.Row="1" Grid.ColumnSpan="3" Rows="0" Columns="3"
+                                     HorizontalAlignment="Stretch" Margin="0,14,0,0">
                             <!-- 在本页直接切换版本 -->
                             <ComboBox ItemsSource="{Binding Instances}"
                                       SelectedItem="{Binding SelectedInstance, Mode=TwoWay}"
@@ -164,25 +163,25 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
                             <Button Content="打开 mods 目录" Style="{StaticResource GhostButton}"
-                                    Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" />
+                                    Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" Margin="0,0,8,8" />
                             <Button Content="重新扫描" Style="{StaticResource SecondaryButton}"
-                                    Command="{Binding RescanCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0" />
+                                    Command="{Binding RescanCommand}" FontSize="11.5" Padding="12,6" Margin="0,0,8,8" />
                             <Button Content="检查更新" Style="{StaticResource GhostButton}"
-                                    Command="{Binding CheckUpdatesCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                    Command="{Binding CheckUpdatesCommand}" FontSize="11.5" Padding="12,6" Margin="0,0,8,8"
                                     ToolTip="只检查，不下载；发现更新会先询问你" />
                             <Button Content="补齐前置" Style="{StaticResource SecondaryButton}"
-                                    Command="{Binding RepairDependenciesCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                    Command="{Binding RepairDependenciesCommand}" FontSize="11.5" Padding="12,6" Margin="0,0,8,8"
                                     ToolTip="扫描 mods 里每个 mods.toml 的必需依赖，缺的用 CurseForge 自动下载补齐"
                                     AutomationProperties.AutomationId="RepairDependencies" />
                             <Button Content="补下缺失文件" Style="{StaticResource GhostButton}"
-                                    Command="{Binding RepairPackFilesCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                    Command="{Binding RepairPackFilesCommand}" FontSize="11.5" Padding="12,6" Margin="0,0,8,8"
                                     AutomationProperties.AutomationId="RepairPackFilesButton"
                                     ToolTip="读取整合包的安装报告，按 projectID/fileID 把当时没下下来的文件重新下一次" />
                             <Button Content="按日志补齐" Style="{StaticResource GhostButton}"
-                                    Command="{Binding RepairFromLogCommand}" FontSize="11.5" Padding="12,6" Margin="8,0,0,0"
+                                    Command="{Binding RepairFromLogCommand}" FontSize="11.5" Padding="12,6" Margin="0,0,8,8"
                                     AutomationProperties.AutomationId="RepairFromLogButton"
                                     ToolTip="读取 crash-reports / logs/latest.log，按游戏自己报的『缺少 xxx』去补齐（比扫描更准）" />
-                        </WrapPanel>
+                        </UniformGrid>
                     </Grid>
 
                     <Border BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
@@ -192,6 +191,12 @@
                     </Border>
                     </StackPanel>
             </Border>
+
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      MaxHeight="240" Margin="24,0,24,0">
+        <StackPanel>
 
             <!-- ===== 冲突检测结果（有冲突才出现） ===== -->
             <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,12,0,0"
@@ -393,7 +398,7 @@
         </ScrollViewer>
 
         <!-- ===== 两栏：模组列表 + 右侧概览/安装（各自滚动，列表可虚拟化） ===== -->
-        <Grid Grid.Row="1" Margin="24,10,24,20">
+        <Grid Grid.Row="2" Margin="24,10,24,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="300" />
