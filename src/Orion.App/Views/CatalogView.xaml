@@ -130,6 +130,25 @@
                             <TextBlock Text="{Binding KindLabel}" FontSize="10"
                                        Foreground="{DynamicResource AccentBrush}" />
                         </Border>
+                        <!-- 这个资源自己的标签（就是它的分类，中文） -->
+                        <ItemsControl ItemsSource="{Binding TagLabels}" Margin="8,0,0,0"
+                                      VerticalAlignment="Center">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4"
+                                            Padding="6,1" Margin="0,0,4,0">
+                                        <TextBlock Text="{Binding}" FontSize="10"
+                                                   Foreground="{DynamicResource MutedTextBrush}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
                         <TextBlock Text="{Binding AuthorText}" FontSize="10" Margin="8,0,0,0"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource MutedTextBrush}"
@@ -231,8 +250,10 @@
 
                         <TextBlock Text="分类" Style="{StaticResource CaptionText}" VerticalAlignment="Center"
                                    Margin="16,0,8,0" />
-                        <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
-                                  Width="180" Height="28" FontSize="11.5" VerticalAlignment="Center"
+                        <ComboBox ItemsSource="{Binding Categories}"
+                                  SelectedItem="{Binding SelectedCategoryOption, Mode=TwoWay}"
+                                  DisplayMemberPath="Name"
+                                  Width="150" Height="28" FontSize="11.5" VerticalAlignment="Center"
                                   AutomationProperties.AutomationId="CatalogCategoryFilter" />
                     </WrapPanel>
                     </StackPanel>

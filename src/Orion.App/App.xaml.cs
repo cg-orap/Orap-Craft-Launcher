@@ -291,7 +291,7 @@ public partial class App : Application
         var glass = new ResourceDictionary
         {
             // 窗口底：0.45 → 0.42，1.0 → 1.0
-            ["WindowBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.42, 1.02), windowColor.R, windowColor.G, windowColor.B)),
+            ["WindowBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.30, 1.10), windowColor.R, windowColor.G, windowColor.B)),
             // 卡片：保底 0.80，保证文字对比度
             ["SurfaceBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.80, 0.34), surfaceColor.R, surfaceColor.G, surfaceColor.B)),
             // 次级面（输入框、块内小卡片）
@@ -324,7 +324,14 @@ public partial class App : Application
             window.Background = Brushes.Transparent;
 
             var dark = windowColor.R + windowColor.G + windowColor.B < 384;
-            var tint = Color.FromArgb((byte)Math.Clamp((int)(opacity * 210), 0, 255),
+
+            // 着色层要"薄"：太厚会把玻璃糊成一块纯色（这就是之前偏灰的原因）。
+            // 深色主题用更小的 alpha，让背后模糊的光影透出来。
+            var tintAlpha = dark
+                ? 120 + (int)((opacity - 0.45) * 130)     // 0.45 → 120，1.0 → 191
+                : 150 + (int)((opacity - 0.45) * 140);    // 浅色要多一点，否则文字发飘
+
+            var tint = Color.FromArgb((byte)Math.Clamp(tintAlpha, 0, 255),
                 surfaceColor.R, surfaceColor.G, surfaceColor.B);
 
             Services.GlassService.Apply(window, enabled, tint, dark);

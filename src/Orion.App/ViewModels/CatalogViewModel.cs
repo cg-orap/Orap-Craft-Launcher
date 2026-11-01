@@ -30,6 +30,17 @@ public sealed class CatalogKindOption(string key, string name, string? projectTy
     public override string ToString() => Name;
 }
 
+/// <summary>分类下拉项：中文名 + Modrinth slug（null = 全部分类）。</summary>
+public sealed class ModCategoryOption(string? slug, string name)
+{
+    public string? Slug { get; } = slug;
+    public string Name { get; } = name;
+
+    public bool IsAny => string.IsNullOrWhiteSpace(Slug);
+
+    public override string ToString() => Name;
+}
+
 /// <summary>A Modrinth search hit shown in the catalogue list.</summary>
 public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, CatalogKindOption kind) : ObservableObject
 {
@@ -55,9 +66,12 @@ public sealed class CatalogRow(ModrinthProject project, CatalogViewModel owner, 
 
     public string KindLabel => Kind.Name;
 
-    public string CategoryText => Project.Categories.Count == 0
-        ? ""
-        : string.Join(" · ", Project.Categories.Take(3));
+    /// <summary>分类标签（中文），列表里以 chip 形式显示。</summary>
+    public IReadOnlyList<string> TagLabels => Core.Mods.ModCategories.DisplayNames(Project.Categories, 3);
+
+    public string CategoryText => string.Join(" · ", TagLabels);
+
+    public bool HasTags => TagLabels.Count > 0;
 
     /// <summary>Project icon from Modrinth (downloaded and cached in memory).</summary>
     public ImageSource? Icon
@@ -265,7 +279,7 @@ public sealed class CatalogViewModel : ObservableObject
         {
             var sort = SortOptions[Math.Clamp(SortIndex, 0, SortOptions.Count - 1)];
             var loader = LoaderOptions[Math.Clamp(LoaderIndex, 0, LoaderOptions.Count - 1)];
-            var category = string.IsNullOrWhiteSpace(SelectedCategory) ? "全部分类" : SelectedCategory!;
+            var category = _categoryOption.Name;
 
             return string.Join(" · ", new[]
             {
@@ -326,13 +340,33 @@ public sealed class CatalogViewModel : ObservableObject
         }
     });
 
-    public IReadOnlyList<string> Categories => _kind.Key switch
+    private static readonly ModCategoryOption AnyCategory = new(null, "全部分类");
+
+    /// <summary>分类下拉：中文名 + Modrinth slug（空 = 全部）。</summary>
+    public IReadOnlyList<ModCategoryOption> Categories => _kind.Key switch
     {
-        "modpack" => ["", "adventure", "combat", "optimization", "technology", "magic", "quests"],
-        "mod" => ["", "optimization", "technology", "magic", "storage", "decoration", "library", "adventure", "mobs"],
-        "resourcepack" => ["", "combat", "themed", "tweaks", "fonts"],
-        _ => [""],
+        "modpack" => CategoryList("adventure", "combat", "optimization", "technology", "magic", "quests",
+            "worldgen", "challenging", "kitchen-sink", "lightweight", "multiplayer"),
+        "mod" => CategoryList("optimization", "technology", "magic", "storage", "decoration", "library",
+            "adventure", "mobs", "food", "equipment", "utility", "worldgen", "game-mechanics"),
+        "shader" => CategoryList("realistic", "semi-realistic", "fantasy", "cartoon", "vanilla-like",
+            "simplistic", "potato", "medium", "heavy", "core-shaders"),
+        "resourcepack" => CategoryList("combat", "themed", "tweaks", "fonts", "realistic", "cartoon",
+            "vanilla-like", "simplistic", "gui", "blocks", "items", "environment", "audio"),
+        _ => [AnyCategory],
     };
+
+    private static IReadOnlyList<ModCategoryOption> CategoryList(params string[] slugs)
+    {
+        var list = new List<ModCategoryOption> { AnyCategory };
+
+        foreach (var slug in slugs)
+        {
+            list.Add(new ModCategoryOption(slug, Core.Mods.ModCategories.DisplayName(slug)));
+        }
+
+        return list;
+    }
 
     public AsyncRelayCommand SearchCommand { get; }
 
@@ -459,7 +493,27 @@ public sealed class CatalogViewModel : ObservableObject
             _cfCategoryIds[key] = map;
         }
 
-        return map.TryGetValue(SelectedCategory, out var categoryId) ? categoryId : null;
+        // 以前直接拿英文 slug（adventure）去查 CurseForge 的分类名（Adventure），
+        // 大小写/写法不一致就查不到 → 选任何分类都返回 null，看起来"筛选没效果"。
+        // 现在按 中文名 → slug → 首字母大写 → 空格替代 几个候选依次尝试。
+        var slug = _categoryOption.Slug;
+        if (string.IsNullOrWhiteSpace(slug)) return null;
+
+        foreach (var candidate in Core.Mods.ModCategories.CurseForgeNameCandidates(slug))
+        {
+            if (map.TryGetValue(candidate, out var id)) return id;
+        }
+
+        // 再退一步：模糊匹配（去掉空格/连字符后比较）
+        static string Normalize(string value) => value.Replace(" ", "").Replace("-", "").ToLowerInvariant();
+        var target = Normalize(_categoryOption.Name);
+        foreach (var (name, id) in map)
+        {
+            if (Normalize(name) == target) return id;
+        }
+
+        AppLog.Warn("catalog", "cf-category-unresolved", ("slug", slug), ("name", _categoryOption.Name));
+        return null;
     }
 
     /// <summary>换了排序/筛选就回到第一页重搜（只重搜当前来源）。</summary>
@@ -674,15 +728,39 @@ public sealed class CatalogViewModel : ObservableObject
         set => SetProperty(ref _searchText, value);
     }
 
-    public string? SelectedCategory
+    private ModCategoryOption _categoryOption = AnyCategory;
+
+    /// <summary>当前选中的分类（中文显示，内部用 Slug 去查询）。</summary>
+    public ModCategoryOption SelectedCategoryOption
     {
-        get => _category;
+        get => _categoryOption;
         set
         {
-            var normalized = string.IsNullOrWhiteSpace(value) ? null : value;
-            if (!SetProperty(ref _category, normalized)) return;
+            var option = value ?? AnyCategory;
+            if (ReferenceEquals(_categoryOption, option)) return;
+
+            _categoryOption = option;
+            _category = option.Slug;
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedCategory));
             OnPropertyChanged(nameof(FilterSummary));
             _ = RerunSearchAsync();
+        }
+    }
+
+    /// <summary>兼容旧绑定：字符串版本（传中文名或 slug 都能识别）。</summary>
+    public string? SelectedCategory
+    {
+        get => _categoryOption.Name;
+        set
+        {
+            var slug = Core.Mods.ModCategories.SlugOf(value);
+            var option = Categories.FirstOrDefault(c =>
+                             string.Equals(c.Slug, slug, StringComparison.OrdinalIgnoreCase))
+                         ?? AnyCategory;
+
+            SelectedCategoryOption = option;
         }
     }
 

@@ -81,6 +81,28 @@ public static class GlassService
                 return;
             }
 
+            // 深色主题必须告诉 DWM，否则它会按浅色绘制阴影/边框，整体就发灰
+            var dark = darkTheme ? 1 : 0;
+            DwmSetWindowAttribute(handle, DwmwaUseImmersiveDarkMode, ref dark, Marshal.SizeOf<int>());
+
+            var cornerRadius = 2; // round
+            DwmSetWindowAttribute(handle, DwmwaWindowCornerPreference, ref cornerRadius, Marshal.SizeOf<int>());
+
+            // 先试 composition 亚克力：它是唯一能**精确控制着色**的路径
+            // （参考 https://dotnet-campus.github.io//post/set-window-composition-attribute.html ：
+            //   ACCENT_ENABLE_ACRYLICBLURBEHIND 支持与半透明 GradientColor 叠加，
+            //   但 alpha=0 会完全没有效果，所以必须给一个带 alpha 的底色）。
+            if (TryApplyAcrylic(handle, tintColor))
+            {
+                // 再关掉系统 backdrop，避免两套效果叠在一起变灰
+                var none = 0;
+                DwmSetWindowAttribute(handle, DwmwaSystemBackdropType, ref none, Marshal.SizeOf<int>());
+
+                IsGlassActive = true;
+                AppLog.Info("ui", "glass-acrylic", ("mode", "composition"), ("dark", darkTheme));
+                return;
+            }
+
             var win11 = Environment.OSVersion.Version.Build >= 22000;
 
             if (win11 && DwmSetWindowAttribute(handle, DwmwaSystemBackdropType,
@@ -91,7 +113,7 @@ public static class GlassService
                 DwmSetWindowAttribute(handle, DwmwaWindowCornerPreference, ref corner, Marshal.SizeOf<int>());
 
                 IsGlassActive = true;
-                AppLog.Info("ui", "glass-acrylic", ("mode", "dwm-backdrop"));
+                AppLog.Info("ui", "glass-acrylic", ("mode", "dwm-backdrop"), ("dark", darkTheme));
                 return;
             }
 
