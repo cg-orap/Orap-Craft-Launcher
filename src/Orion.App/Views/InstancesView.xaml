@@ -153,34 +153,42 @@
 
                 <Border Grid.Column="0" Style="{StaticResource Card}" Padding="18,14" Margin="0,0,14,0">
                     <StackPanel>
-                        <TextBlock Text="版本信息" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
-                                   Margin="0,0,0,8" />
-                        <Grid Margin="0,4">
+                        <TextBlock Text="版本信息" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="这个版本的启动参数与内存分配；修改请到「设置」页签。"
+                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,12" />
+                        <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,0,0,8" />
+
+                        <Grid Margin="0,7">
                             <TextBlock Text="名称" Style="{StaticResource StatLabel}" />
                             <TextBlock Text="{Binding DisplayName}" Style="{StaticResource StatValue}" TextTrimming="CharacterEllipsis" MaxWidth="320" />
                         </Grid>
 
-                        <Grid Margin="0,4">
+                        <Grid Margin="0,7">
                             <TextBlock Text="最大内存" Style="{StaticResource StatLabel}" />
                             <TextBlock Style="{StaticResource StatValue}">
                                 <Run Text="{Binding MemoryMb, Mode=OneWay}" /><Run Text=" MB" />
                             </TextBlock>
                         </Grid>
-                        <Grid Margin="0,4">
+
+                        <Grid Margin="0,7">
                             <TextBlock Text="窗口尺寸" Style="{StaticResource StatLabel}" />
                             <TextBlock Style="{StaticResource StatValue}">
                                 <Run Text="{Binding WindowWidth, Mode=OneWay}" /><Run Text=" × " /><Run Text="{Binding WindowHeight, Mode=OneWay}" />
                             </TextBlock>
                         </Grid>
-                        <Grid Margin="0,4">
+
+                        <Grid Margin="0,7">
                             <TextBlock Text="全屏启动" Style="{StaticResource StatLabel}" />
                             <TextBlock Text="{Binding Fullscreen}" Style="{StaticResource StatValue}" />
                         </Grid>
-                        <Grid Margin="0,4">
+
+                        <Grid Margin="0,7">
                             <TextBlock Text="Java" Style="{StaticResource StatLabel}" />
                             <TextBlock Text="{Binding JavaPath, TargetNullValue='自动选择'}" Style="{StaticResource StatValue}"
                                        TextTrimming="CharacterEllipsis" MaxWidth="320" />
                         </Grid>
+
+                        <Border Height="1" Background="{DynamicResource BorderBrushSoft}" Margin="0,10,0,8" />
                         <TextBlock Text="每个版本拥有独立的游戏目录（存档、Mod、配置互不影响）。"
                                    Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,10,0,0" />
                     </StackPanel>
@@ -189,7 +197,7 @@
                 <StackPanel Grid.Column="1">
                     <Border Style="{StaticResource Card}" Padding="16,14">
                         <StackPanel>
-                            <TextBlock Text="操作" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"
+                            <TextBlock Text="操作" FontSize="13" FontWeight="SemiBold"
                                        Margin="0,0,0,8" />
                             <Button Content="检查完整性 / 修复" Style="{StaticResource SecondaryButton}"
                                     Command="{Binding VerifyCommand}" FontSize="11.5" Padding="12,6"
@@ -216,7 +224,7 @@
                             <Button Content="导入 .minecraft / Prism…" Style="{StaticResource GhostButton}"
                                     Command="{Binding ImportCommand}" FontSize="11" Padding="10,5"
                                     Margin="0,6,0,0" HorizontalAlignment="Stretch" />
-                            <Button Content="导入整合包 (.mrpack)…" Style="{StaticResource GhostButton}"
+                            <Button Content="导入整合包 (mrpack / zip)…" Style="{StaticResource GhostButton}"
                                     Command="{Binding ImportPackCommand}" FontSize="11" Padding="10,5"
                                     Margin="0,6,0,0" HorizontalAlignment="Stretch" />
                         </StackPanel>

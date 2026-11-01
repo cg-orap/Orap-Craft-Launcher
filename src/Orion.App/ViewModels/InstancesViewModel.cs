@@ -446,29 +446,43 @@ public sealed class InstancesViewModel : ObservableObject
     /// <summary>Installs a Modrinth .mrpack: creates a loader instance and extracts the pack into it.</summary>
     private async Task ImportPackAsync()
     {
+        // 支持主流整合包格式：Modrinth .mrpack、CurseForge 导出的 .zip（manifest.json）、
+        // 以及国内启动器导出的 .minecraft 压缩包。按内容识别，不靠扩展名。
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "选择 Modrinth 整合包 (.mrpack)",
-            Filter = "Modrinth 整合包|*.mrpack|ZIP 压缩包|*.zip|所有文件|*.*",
+            Title = "选择整合包（.mrpack / CurseForge .zip / .minecraft 压缩包）",
+            Filter = "整合包（mrpack / zip）|*.mrpack;*.zip|所有文件|*.*",
             CheckFileExists = true,
         };
 
         if (dialog.ShowDialog() != true) return;
 
         IsBusy = true;
-        Status = "正在读取整合包…";
+        Status = "正在识别整合包…";
         var activity = _main.Activities.Begin($"导入整合包 {Path.GetFileName(dialog.FileName)}");
 
         try
         {
-            var java = Core.Java.JavaDetector.SelectFor(21, _main.JavaRuntimes) ?? _main.JavaRuntimes.FirstOrDefault();
+            var info = Core.Mods.PackArchiveInstaller.Inspect(dialog.FileName);
             var output = new Progress<string>(line =>
             {
                 Status = line;
                 _main.Activities.Report(activity, 0.5, line, "");
             });
 
-            var result = await _main.Context.ModPacks.InstallAsync(dialog.FileName, null, java, output).ConfigureAwait(true);
+            var java = Core.Java.JavaDetector.SelectFor(21, _main.JavaRuntimes) ?? _main.JavaRuntimes.FirstOrDefault();
+
+            Core.Mods.MrPackResult result = info.Kind switch
+            {
+                Core.Mods.PackArchiveKind.CurseForge => await _main.Context.PackArchives
+                    .InstallCurseForgeAsync(dialog.FileName, info.Name, java, output).ConfigureAwait(true),
+
+                Core.Mods.PackArchiveKind.MinecraftZip => await _main.Context.PackArchives
+                    .InstallMinecraftZipAsync(dialog.FileName, info.Name, null, info.MinecraftVersion).ConfigureAwait(true),
+
+                _ => await _main.Context.ModPacks
+                    .InstallAsync(dialog.FileName, null, java, output).ConfigureAwait(true),
+            };
 
             if (!result.Success)
             {
