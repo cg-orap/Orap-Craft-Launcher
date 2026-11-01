@@ -73,6 +73,42 @@ public static class Dialogs
     }
 
     /// <summary>
+    /// 本地整合包（拖入 zip / mrpack）：只有"安装"和"取消"，没有"只下载到…"。
+    /// 实例名默认用压缩包文件名。
+    /// </summary>
+    public static string? AskLocalPackInstall(string zipPath, string suggestedName, string detail)
+    {
+        var nameBox = new TextBox { Text = suggestedName, Height = 30, FontSize = 12 };
+
+        var panel = new StackPanel();
+        panel.Children.Add(new TextBlock
+        {
+            Text = "实例名称",
+            FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 4),
+            Foreground = (System.Windows.Media.Brush)Application.Current.FindResource("MutedTextBrush"),
+        });
+        panel.Children.Add(nameBox);
+
+        var dialog = Create(
+            "安装整合包",
+            $"要把「{System.IO.Path.GetFileName(zipPath)}」安装成一个新的版本吗？",
+            detail,
+            danger: false,
+            "安装",
+            "",
+            "取消");
+
+        dialog.ExtraContent = panel;
+        dialog.GlyphText = "↓";
+        dialog.ShowDialog();
+
+        if (!dialog.Accepted) return null;
+
+        return string.IsNullOrWhiteSpace(nameBox.Text) ? suggestedName : nameBox.Text.Trim();
+    }
+
+    /// <summary>
     /// 安装整合包：版本选择 + 实例名，和"下载位置"合并成一个对话框。
     /// 返回 null 表示用户取消。
     /// </summary>
@@ -88,6 +124,7 @@ public static class Dialogs
             SelectedIndex = 0,
             Height = 30,
             FontSize = 12,
+            Visibility = versions.Count > 1 ? Visibility.Visible : Visibility.Collapsed,
         };
 
         var nameBox = new TextBox { Text = suggestedName, Height = 30, FontSize = 12 };

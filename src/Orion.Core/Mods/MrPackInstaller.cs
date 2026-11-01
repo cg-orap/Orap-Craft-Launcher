@@ -146,7 +146,7 @@ public sealed class MrPackInstaller
         var downloadProgress = output is null
             ? null
             : new Progress<DownloadProgress>(p =>
-                output.Report($"下载整合包文件 {p.CompletedFiles + p.FailedFiles}/{Math.Max(1, p.TotalFiles)} · {p.BytesPerSecond / 1024:0} KB/s"));
+                output.Report($"下载整合包文件 {p.CompletedFiles + p.FailedFiles}/{Math.Max(1, p.TotalFiles)}"));
 
         var report = await _downloader.DownloadAsync(requests, downloadProgress, ct).ConfigureAwait(false);
 

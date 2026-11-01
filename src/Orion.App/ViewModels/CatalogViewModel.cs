@@ -1182,10 +1182,23 @@ public sealed class CatalogViewModel : ObservableObject
     /// <summary>Installs a pack file from disk (<c>.mrpack</c> or a Modrinth <c>.zip</c> export).</summary>
     public async Task InstallPackFileAsync(string path, string? name, CancellationToken ct = default)
     {
-        // 下载前询问保存位置（用户可在设置里关掉）。取消就什么都不做。
-        if (!_main.ConfirmDownloadLocation(name ?? Path.GetFileName(path))) return;
+        // 本地文件（拖入 / 已下载）：只问"装成什么名字"，不提供"只下载到…"。
+        var suggested = string.IsNullOrWhiteSpace(name)
+            ? Path.GetFileNameWithoutExtension(path)
+            : name!;
 
-        var activity = _main.Activities.Begin($"安装整合包 {name ?? Path.GetFileName(path)}", path);
+        var instanceName = Dialogs.AskLocalPackInstall(path, suggested,
+            "识别为 Modrinth 整合包（.mrpack）");
+
+        if (instanceName is null)
+        {
+            Status = "已取消安装。";
+            return;
+        }
+
+        name = instanceName;
+
+        var activity = _main.Activities.Begin($"安装整合包 {name}", path);
 
         Busy = true;
         Status = "正在安装整合包（会创建新版本）…";
@@ -1309,7 +1322,8 @@ public sealed class CatalogViewModel : ObservableObject
         switch (info.Kind)
         {
             case PackArchiveKind.Modrinth:
-                await InstallPackFileAsync(path, info.Name).ConfigureAwait(true);
+                // 传 null：对话框里默认用压缩包文件名（拖入场景的语言习惯）
+                await InstallPackFileAsync(path, null).ConfigureAwait(true);
                 return;
 
             case PackArchiveKind.CurseForge:
@@ -1708,7 +1722,20 @@ public sealed class CatalogViewModel : ObservableObject
 
     private async Task InstallCurseForgeAsync(string path, PackArchiveInfo info)
     {
-        var activity = _main.Activities.Begin($"安装 CurseForge 整合包 {info.Name}", path);
+        // 拖入的是本地 zip：只问"装成什么名字"，不提供"只下载到…"（文件已经在本地了）
+        var defaultName = Path.GetFileNameWithoutExtension(path);
+        var instanceName = Dialogs.AskLocalPackInstall(
+            path,
+            string.IsNullOrWhiteSpace(defaultName) ? info.Name : defaultName,
+            $"识别为 CurseForge 整合包 · MC {info.MinecraftVersion}");
+
+        if (instanceName is null)
+        {
+            Status = "已取消安装。";
+            return;
+        }
+
+        var activity = _main.Activities.Begin($"安装 CurseForge 整合包 {instanceName}", path);
         _installActivity = activity;
         _installCts?.Dispose();
         _installCts = new CancellationTokenSource();
@@ -1728,14 +1755,14 @@ public sealed class CatalogViewModel : ObservableObject
             });
 
             var result = await _main.Context.PackArchives
-                .InstallCurseForgeAsync(path, info.Name, null, progress, _installCts.Token)
+                .InstallCurseForgeAsync(path, instanceName, null, progress, _installCts.Token)
                 .ConfigureAwait(true);
 
             _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
             await _main.ReloadInstancesAsync().ConfigureAwait(true);
 
             Status = result.Success
-                ? $"CurseForge 整合包已安装：{info.Name}（{result.FilesDownloaded} 个模组，{result.OverridesCopied} 个配置）"
+                ? $"CurseForge 整合包已安装：{instanceName}（{result.FilesDownloaded} 个模组，{result.OverridesCopied} 个配置）"
                   + (result.Warnings.Count > 0 ? $"；有 {result.Warnings.Count} 条提示见日志" : "")
                 : "CurseForge 整合包安装失败：" + (result.Error ?? "未知错误");
 
@@ -1771,14 +1798,21 @@ public sealed class CatalogViewModel : ObservableObject
             return;
         }
 
-        var activity = _main.Activities.Begin($"导入整合包 {info.Name}", path);
+        var localName = Dialogs.AskLocalPackInstall(path, info.Name, "识别为 .minecraft 导出压缩包");
+        if (localName is null)
+        {
+            Status = "已取消导入。";
+            return;
+        }
+
+        var activity = _main.Activities.Begin($"导入整合包 {localName}", path);
         Busy = true;
-        Status = $"识别到压缩包整合包：{info.Name}";
+        Status = $"识别到压缩包整合包：{localName}";
 
         try
         {
             var result = await _main.Context.PackArchives
-                .InstallMinecraftZipAsync(path, info.Name, baseInstance?.VersionId, baseInstance?.GameVersion)
+                .InstallMinecraftZipAsync(path, localName, baseInstance?.VersionId, baseInstance?.GameVersion)
                 .ConfigureAwait(true);
 
             _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);

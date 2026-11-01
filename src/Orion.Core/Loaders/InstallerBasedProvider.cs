@@ -273,7 +273,7 @@ public abstract class InstallerBasedProvider : ILoaderProvider
         var preseedProgress = output is null
             ? null
             : new Progress<DownloadProgress>(p =>
-                output.Report($"正在预下载安装器依赖 {p.CompletedFiles + p.FailedFiles}/{p.TotalFiles} · {p.BytesPerSecond / 1024:0} KB/s"));
+                output.Report($"正在预下载安装器依赖 {p.CompletedFiles + p.FailedFiles}/{p.TotalFiles}"));
         var report = await Downloader.DownloadAsync(requests, preseedProgress, ct).ConfigureAwait(false);
         output?.Report($"安装器依赖预下载完成: {report.CompletedFiles} 个文件");
         return report;
