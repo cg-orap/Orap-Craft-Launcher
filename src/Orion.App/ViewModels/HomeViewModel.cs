@@ -125,7 +125,13 @@ public sealed class HomeViewModel : ObservableObject
         _memoryTimer.Interval = TimeSpan.FromSeconds(2);
         _memoryTimer.Tick += (_, _) => RefreshMemorySample();
         _memoryTimer.Start();
-        RefreshMemorySample();
+
+        // 首次采样**推迟**到窗口显示之后再做。
+        // 原因：PerformanceCounter("Processor"/"GPU Engine") 第一次创建要 1 秒多，
+        // 放在构造里会直接拖慢"双击 → 看到窗口"的时间（实测 1360 ms 里大部分是它）。
+        System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+            new Action(RefreshMemorySample),
+            System.Windows.Threading.DispatcherPriority.Background);
 
         _toastTimer.Tick += (_, _) =>
         {

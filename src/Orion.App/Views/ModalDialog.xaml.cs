@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using Orion.App.Animations;
 
 namespace Orion.App.Views;
 
@@ -12,10 +14,74 @@ namespace Orion.App.Views;
 /// </summary>
 public partial class ModalDialog : Window
 {
+    private bool _closing;
+
     public ModalDialog()
     {
         InitializeComponent();
         PreviewKeyDown += OnPreviewKeyDown;
+
+        // 进场：淡入 + 轻微放大（0.94 → 1，BackEase 收尾），避免"啪"地弹出来
+        Opacity = 0;
+        ShellScale.ScaleX = ShellScale.ScaleY = 0.94;
+
+        Loaded += (_, _) => PlayIntro();
+        Closing += OnClosingAnimate;
+    }
+
+    private void PlayIntro()
+    {
+        if (Motion.ReduceMotion)
+        {
+            Opacity = 1;
+            ShellScale.ScaleX = ShellScale.ScaleY = 1;
+            return;
+        }
+
+        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140))
+        {
+            EasingFunction = Motion.Soft,
+        };
+        BeginAnimation(OpacityProperty, fade);
+
+        var pop = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.22 };
+        var scale = new DoubleAnimation(0.94, 1, TimeSpan.FromMilliseconds(200))
+        {
+            EasingFunction = pop,
+        };
+
+        ShellScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+        ShellScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
+
+        // 内容再淡入一点点，形成层次
+        Shell.BeginAnimation(OpacityProperty, new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = Motion.Soft,
+        });
+    }
+
+    /// <summary>退场：淡出 + 微缩，动画结束后才真正关闭。</summary>
+    private void OnClosingAnimate(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_closing || Motion.ReduceMotion) return;
+
+        e.Cancel = true;
+        _closing = true;
+
+        var fade = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(110))
+        {
+            EasingFunction = Motion.Exit,
+        };
+        fade.Completed += (_, _) => Close();
+
+        BeginAnimation(OpacityProperty, fade);
+
+        var shrink = new DoubleAnimation(1, 0.97, TimeSpan.FromMilliseconds(110))
+        {
+            EasingFunction = Motion.Exit,
+        };
+        ShellScale.BeginAnimation(ScaleTransform.ScaleXProperty, shrink);
+        ShellScale.BeginAnimation(ScaleTransform.ScaleYProperty, shrink);
     }
 
     /// <summary>自定义内容（例如安装整合包时的版本下拉 + 实例名）。</summary>

@@ -341,17 +341,48 @@
                             <Grid Grid.Row="0" Margin="0,0,0,8">
                                 <Border Background="{DynamicResource SurfaceBg}" CornerRadius="6"
                                         BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1" Padding="8,5">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" MinWidth="0" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" Text="&#xE721;"
+                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                                    FontSize="10" Foreground="{DynamicResource MutedTextBrush}"
                                                    VerticalAlignment="Center" Margin="0,0,6,0" />
-                                        <TextBlock Text="搜索实例…" FontSize="11.5"
-                                                   Foreground="{DynamicResource MutedTextBrush}" />
-                                    </StackPanel>
+
+                                        <!-- 真正可输入的搜索框（以前这里是假占位，点了没反应） -->
+                                        <Grid Grid.Column="1">
+                                            <TextBox x:Name="InstanceSearchBox"
+                                                     Text="{Binding InstanceSearch, UpdateSourceTrigger=PropertyChanged}"
+                                                     Background="Transparent" BorderThickness="0" Padding="0"
+                                                     FontSize="11.5" VerticalAlignment="Center"
+                                                     AutomationProperties.AutomationId="InstanceSearchBox" />
+
+                                            <TextBlock Text="搜索实例…" FontSize="11.5" IsHitTestVisible="False"
+                                                       Foreground="{DynamicResource MutedTextBrush}"
+                                                       VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding InstanceSearch}" Value="">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding InstanceSearch}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
+                                    </Grid>
                                 </Border>
                             </Grid>
 
-                            <ListBox Grid.Row="1" ItemsSource="{Binding Home.Instances}"
+                            <ListBox Grid.Row="1" ItemsSource="{Binding InstanceView}"
                                      SelectedItem="{Binding Home.SelectedLaunchInstance, Mode=TwoWay}"
                                      Background="Transparent" BorderThickness="0"
                                      ItemContainerStyle="{StaticResource SidebarInstanceStyle}"

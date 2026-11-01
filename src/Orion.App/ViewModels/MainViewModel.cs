@@ -150,7 +150,12 @@ public sealed class ActivityCenter : ObservableObject
         {
             item.State = state;
             item.Error = error;
+
             if (state != ActivityState.Running) item.Speed = "";
+
+            // 完成就补到 100%：以前各阶段只报到 0.95（"还要留点余量"），
+            // 于是安装完条子停在 95%，看起来像没做完。
+            if (state == ActivityState.Completed) item.Fraction = 1;
         });
 
         IsBusy = Items.Any(i => i.State == ActivityState.Running);
@@ -195,25 +200,43 @@ public sealed class MainViewModel : ObservableObject
     private NavItem? _selectedNavItem;
     private bool _isReady;
 
+    /// <summary>
+    /// 创建页面 ViewModel 并记录耗时。
+    /// 启动时 `new MainViewModel` 曾经要 900 ms —— 先量出来是哪个页面贵，再决定要不要懒加载。
+    /// </summary>
+    private static T Time<T>(string name, Func<T> factory) where T : class
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var value = factory();
+        var ms = clock.ElapsedMilliseconds;
+
+        if (ms >= 15)
+        {
+            Orion.Core.Diagnostics.AppLog.Info("startup", "slow-vm", ("vm", name), ("ms", ms));
+        }
+
+        return value;
+    }
+
     public MainViewModel(LauncherContext context)
     {
         Context = context;
 
-        Home = new HomeViewModel(this);
-        VersionsPage = new VersionsViewModel(this);
-        InstancesPage = new InstancesViewModel(this);
-        CatalogPage = new CatalogViewModel(this);
-        VersionPickerPage = new VersionPickerViewModel(this);
-        ModsPage = new ModsViewModel(this);
-        ContentPage = new ContentViewModel(this);
-        SpacePage = new SpaceViewModel(this);
-        SavesPage = new SavesViewModel(this);
-        LibraryPage = new LibraryViewModel(this);
-        DownloadsPage = new DownloadsViewModel(this);
-        SettingsPage = new SettingsViewModel(this);
-        LogsPage = new LogsViewModel(this);
-        BackupPage = new BackupViewModel(this);
-        ToolboxPage = new ToolboxViewModel(this);
+        Home = Time("HomeViewModel", () => new HomeViewModel(this));
+        VersionsPage = Time("VersionsViewModel", () => new VersionsViewModel(this));
+        InstancesPage = Time("InstancesViewModel", () => new InstancesViewModel(this));
+        CatalogPage = Time("CatalogViewModel", () => new CatalogViewModel(this));
+        VersionPickerPage = Time("VersionPickerViewModel", () => new VersionPickerViewModel(this));
+        ModsPage = Time("ModsViewModel", () => new ModsViewModel(this));
+        ContentPage = Time("ContentViewModel", () => new ContentViewModel(this));
+        SpacePage = Time("SpaceViewModel", () => new SpaceViewModel(this));
+        SavesPage = Time("SavesViewModel", () => new SavesViewModel(this));
+        LibraryPage = Time("LibraryViewModel", () => new LibraryViewModel(this));
+        DownloadsPage = Time("DownloadsViewModel", () => new DownloadsViewModel(this));
+        SettingsPage = Time("SettingsViewModel", () => new SettingsViewModel(this));
+        LogsPage = Time("LogsViewModel", () => new LogsViewModel(this));
+        BackupPage = Time("BackupViewModel", () => new BackupViewModel(this));
+        ToolboxPage = Time("ToolboxViewModel", () => new ToolboxViewModel(this));
 
         NavigateCommand = new RelayCommand(parameter =>
         {
@@ -244,6 +267,10 @@ public sealed class MainViewModel : ObservableObject
             new NavItem("logs", "日志", "\uE8A5", "系统"),
         ]);
 
+        InstanceView = System.Windows.Data.CollectionViewSource.GetDefaultView(Instances);
+        InstanceView.Filter = item => MatchesInstanceSearch(item as Instance);
+        Instances.CollectionChanged += (_, _) => InstanceView.Refresh();
+
         NavView = System.Windows.Data.CollectionViewSource.GetDefaultView(NavItems);
         NavView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription("Group"));
 
@@ -262,6 +289,23 @@ public sealed class MainViewModel : ObservableObject
 
     public ObservableList<Account> Accounts { get; } = [];
     public ObservableList<Instance> Instances { get; } = [];
+
+    private string _instanceSearch = "";
+
+    /// <summary>侧栏实例搜索词。空 = 全部。</summary>
+    public string InstanceSearch
+    {
+        get => _instanceSearch;
+        set
+        {
+            if (!SetProperty(ref _instanceSearch, value ?? "")) return;
+            InstanceView.Refresh();
+        }
+    }
+
+    /// <summary>侧栏列表用的过滤视图（按名称 / 版本 / 加载器模糊匹配）。</summary>
+    public System.ComponentModel.ICollectionView InstanceView { get; }
+
     public ObservableList<JavaRuntime> JavaRuntimes { get; } = [];
 
     /// <summary>二级侧栏（实例列表）是否收起为 44px 窄条。</summary>
@@ -654,6 +698,20 @@ public sealed class MainViewModel : ObservableObject
     public void Navigate(string key) => NavigateCore(key);
 
     /// <summary>Cancels whatever catalogue/install operation is currently running.</summary>
+    /// <summary>实例是否匹配当前搜索词（名称 / 版本 / 加载器，大小写不敏感）。</summary>
+    private bool MatchesInstanceSearch(Instance? instance)
+    {
+        if (instance is null) return false;
+
+        var query = _instanceSearch.Trim();
+        if (query.Length == 0) return true;
+
+        return instance.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || (instance.Subtitle ?? "").Contains(query, StringComparison.OrdinalIgnoreCase)
+               || instance.GameVersion.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || instance.Loader.ToString().Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void CancelRunningWork() => CatalogPage.CancelOperation();
 
     /// <summary>

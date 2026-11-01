@@ -32,20 +32,40 @@ public partial class App : Application
             var rootIndex = Array.FindIndex(e.Args, a => a.Equals("--root", StringComparison.OrdinalIgnoreCase));
             var rootOverride = rootIndex >= 0 && rootIndex + 1 < e.Args.Length ? e.Args[rootIndex + 1] : null;
 
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
             _context = LauncherContext.Create(rootOverride);
+            var contextMs = clock.ElapsedMilliseconds;
 
             var window = new MainWindow();
             MainWindow = window;
             Services.WindowPlacement.FitToMonitor(window);
+            var windowMs = clock.ElapsedMilliseconds;
 
+            var vmClock = System.Diagnostics.Stopwatch.StartNew();
             var viewModel = new MainViewModel(_context);
             Shell = viewModel;
+            var vmMs = vmClock.ElapsedMilliseconds;
 
             ApplyTheme(_context.Settings.Theme, _context.Settings.Accent);
+            var themeMs = vmClock.ElapsedMilliseconds;
         Animations.Motion.ReduceMotion = _context.Settings.ReduceMotion;
 
             window.DataContext = viewModel;
+            var bindMs = vmClock.ElapsedMilliseconds;
+
             window.Show();
+            var showMs = vmClock.ElapsedMilliseconds;
+
+            // 启动耗时埋点：定位"双击后要等一会儿才看到窗口"到底花在哪一步
+            Orion.Core.Diagnostics.AppLog.Info("startup", "timing",
+                ("contextMs", contextMs),
+                ("windowMs", windowMs),
+                ("vmMs", vmMs),
+                ("themeMs", themeMs),
+                ("bindMs", bindMs),
+                ("showMs", showMs),
+                ("shownMs", clock.ElapsedMilliseconds));
 
             await viewModel.InitializeAsync().ConfigureAwait(true);
 

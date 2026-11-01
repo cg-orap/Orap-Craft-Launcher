@@ -15,9 +15,13 @@
         FontFamily="{DynamicResource UiFont}">
 
     <!-- 自绘对话框：和启动器同一套配色/圆角/按钮，替代 Windows 原生 MessageBox -->
-    <Border Background="{DynamicResource WindowBg}"
+    <Border x:Name="Shell" Background="{DynamicResource WindowBg}"
             BorderBrush="{DynamicResource BorderBrushSoft}"
-            BorderThickness="1" CornerRadius="10" Margin="12">
+            BorderThickness="1" CornerRadius="10" Margin="12"
+            RenderTransformOrigin="0.5,0.5">
+        <Border.RenderTransform>
+            <ScaleTransform x:Name="ShellScale" ScaleX="1" ScaleY="1" />
+        </Border.RenderTransform>
         <Border.Effect>
             <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.18" Color="#000000" />
         </Border.Effect>
