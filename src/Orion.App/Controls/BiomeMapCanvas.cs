@@ -56,6 +56,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private int _zoomIndex = 4;          // 默认 16 方块/像素
     private int? _pendingZoomIndex;
     private DispatcherTimer? _zoomTimer;
+
+    /// <summary>最近一次渲染失败的原因（界面可以用来提示）。</summary>
+    private string? _lastError;
     private int _centerBlockX;
     private int _centerBlockZ;
 
@@ -257,11 +260,38 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _zoomTimer.Start();
     }
 
+    /// <summary>
+    /// 兜底：缩放动画结束后如果新图迟迟没来（渲染失败/超时），
+    /// 把视觉缩放强制归位，避免整张地图被缩成一小块。
+    /// </summary>
     private void OnZoomTimerTick(object? sender, EventArgs e)
     {
         _zoomTimer?.Stop();
+
+        // 兜底：900ms 内新图还没来（渲染失败/超时）就把视觉缩放归位，
+        // 否则地图会一直停在"缩小的一小块"。
+        _zoomWatchdog ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+        _zoomWatchdog.Stop();
+        _zoomWatchdog.Tick -= OnZoomWatchdogTick;
+        _zoomWatchdog.Tick += OnZoomWatchdogTick;
+        _zoomWatchdog.Start();
         if (_pendingZoomIndex is not { } target || target == _zoomIndex) return;
    // 视觉倍率保持动画终值，等新图到达后在回调里归位
+    }
+
+    private DispatcherTimer? _zoomWatchdog;
+
+    private void OnZoomWatchdogTick(object? sender, EventArgs e)
+    {
+        _zoomWatchdog?.Stop();
+
+        if (_loading) return;                                  // 还在渲染，再等等
+        if (Math.Abs(VisualScale - 1.0) < 0.001) return;        // 已经归位
+
+        BeginAnimation(VisualScaleProperty, null);
+        VisualScale = 1.0;
+        InvalidateVisual();
+        RequestRender();
     }
 
     /// <summary>当前视图中心（方块坐标）——「扫描附近结构」用它当圆心。</summary>
@@ -277,7 +307,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
         base.OnRenderSizeChanged(sizeInfo);
-        RequestRender();
+
+        // 侧栏收起/展开会让画布变宽变窄：旧位图先被拉伸铺满（不闪白），
+        // 新图到达后再淡入，过渡就顺了。
+        if (_bitmap is not null) _fadeNextBitmap = true;
+
+        // 尺寸变化时的重新渲染也走防抖，避免连续 Resize 把渲染请求打爆
+        ScheduleRenderAfterGesture();
     }
 
     /// <summary>
@@ -286,7 +322,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     /// </summary>
     private void ScheduleRenderAfterGesture()
     {
-        _renderDebounce ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
+        _renderDebounce ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
         _renderDebounce.Stop();
         _renderDebounce.Tick -= OnRenderDebounceTick;
         _renderDebounce.Tick += OnRenderDebounceTick;
@@ -367,6 +403,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
             Task.Run(() =>
             {
+              try
+              {
                 // 有原生引擎就用真算法（cubiomes），否则退回简化模型。
                 var pixelWidth = width * supersample;
                 var pixelHeight = height * supersample;
@@ -445,6 +483,29 @@ public sealed class BiomeMapCanvas : FrameworkElement
                         RequestRenderThrottled();
                     }
                 }));
+              }
+              catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException
+                                             or InvalidOperationException or ArgumentException)
+              {
+                  // 渲染失败也必须把状态复位，否则 VisualScale 会卡在缩放值上（地图被缩成一小块）
+                  Orion.Core.Diagnostics.AppLog.Warn("seedmap", "render-failed", ("error", ex.Message));
+
+                  Dispatcher.BeginInvoke(new Action(() =>
+                  {
+                      _loading = false;
+                      _pendingZoomIndex = null;
+                      BeginAnimation(VisualScaleProperty, null);
+                      VisualScale = 1.0;
+                      _lastError = "地图渲染失败：" + ex.Message;
+                      InvalidateVisual();
+
+                      if (_renderAgainAfterLoad)
+                      {
+                          _renderAgainAfterLoad = false;
+                          RequestRenderThrottled();
+                      }
+                  }));
+              }
             });
         }), DispatcherPriority.Background);
     }

@@ -37,6 +37,8 @@ public sealed class ToolboxViewModel : ObservableObject
         ClearRecordsCommand = new RelayCommand(ClearRecords);
         LocateCommand = new RelayCommand(LocateTo);
         ScanStructuresCommand = new RelayCommand(ScanNearbyStructures);
+        FindBiomeCommand = new RelayCommand(FindBiome);
+        LoadBiomeOptions();
         LocateStructureCommand = new RelayCommand(param =>
         {
             if (param is not NearbyStructure row) return;
@@ -256,16 +258,30 @@ public sealed class ToolboxViewModel : ObservableObject
     /// <summary>结构筛选：只勾选的类型会画在地图上（空 = 全部）。</summary>
     public ObservableList<StructureFilterOption> StructureFilterOptions { get; } =
     [
+        // 主世界
         new("village", "村庄"),
-        new("outpost", "前哨站"),
+        new("outpost", "掠夺者前哨站"),
         new("monument", "海底神殿"),
         new("mansion", "林地府邸"),
-        new("temple", "神庙/神殿"),
+        new("desert_pyramid", "沙漠神殿"),
+        new("jungle_temple", "丛林神庙"),
+        new("swamp_hut", "女巫小屋"),
+        new("igloo", "雪屋"),
+        new("ocean_ruin", "海底废墟"),
         new("shipwreck", "沉船"),
-        new("treasure", "宝藏"),
-        new("ruins", "废墟/传送门"),
-        new("city", "远古城市/试炼"),
+        new("treasure", "埋藏的宝藏"),
+        new("ruined_portal", "废弃传送门"),
+        new("ancient_city", "远古城市"),
+        new("trail_ruins", "古迹废墟"),
+        new("trial_chambers", "试炼密室"),
         new("stronghold", "要塞"),
+        // 下界
+        new("fortress", "下界要塞"),
+        new("bastion", "堡垒遗迹"),
+        new("ruined_portal_nether", "下界废弃传送门"),
+        // 末地
+        new("end_city", "末地城"),
+        new("end_gateway", "末地折跃门"),
     ];
 
     public ICommand ToggleAllStructuresCommand { get; }
@@ -574,6 +590,116 @@ public sealed class ToolboxViewModel : ObservableObject
         OnPropertyChanged(nameof(SeedValue));
         MapStatus = $"种子 = {value} · 拖动平移，滚轮缩放，悬停看群系";
         _main.LogsPage.AppendSystem($"工具箱：已生成离线种子地图 {value}");
+    }
+
+    // ── 定位生物群系（像 cubiomes-viewer 的 biome finder）──────
+    public ObservableList<BiomeOption> BiomeOptions { get; } = [];
+
+    private BiomeOption? _selectedBiome;
+    private string _biomeSearchStatus = "选一个群系，从这里向外找一个最近的实例。";
+
+    public BiomeOption? SelectedBiome
+    {
+        get => _selectedBiome;
+        set => SetProperty(ref _selectedBiome, value);
+    }
+
+    public string BiomeSearchStatus
+    {
+        get => _biomeSearchStatus;
+        private set => SetProperty(ref _biomeSearchStatus, value);
+    }
+
+    public ICommand FindBiomeCommand { get; }
+
+    private void LoadBiomeOptions()
+    {
+        if (BiomeOptions.Count > 0) return;
+
+        var version = CubiomesNative.VersionIndexFor(SeedVersion);
+        var list = new List<BiomeOption>();
+
+        // cubiomes 的群系 id 有固定范围，逐个数比较慢，但只在第一次打开时做一次
+        for (var id = 0; id < 200; id++)
+        {
+            var name = CubiomesNative.BiomeName(version, id);
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            list.Add(new BiomeOption(id, BiomeCatalog.FromCubiomesName(name) ?? name));
+        }
+
+        BiomeOptions.Replace(list.OrderBy(b => b.Name, StringComparer.CurrentCulture));
+        SelectedBiome = BiomeOptions.FirstOrDefault(b => b.Name.Contains("平原")) ?? BiomeOptions.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// 从当前中心向外按 64 格步长找最近的该群系（先粗扫再逐步收紧）。
+    /// 只读原生查询，放在线程池里跑，避免卡住拖动。
+    /// </summary>
+    private async void FindBiome()
+    {
+        if (SelectedBiome is not { } target)
+        {
+            BiomeSearchStatus = "先在左边选一个群系。";
+            return;
+        }
+
+        if (!SeedMap.TryParseSeed(Seed, out var seed))
+        {
+            BiomeSearchStatus = "先填一个种子。";
+            return;
+        }
+
+        var (centerX, centerZ) = MapCenterProvider?.Invoke() ?? (0, 0);
+        var version = CubiomesNative.VersionIndexFor(SeedVersion);
+        var dimension = _dimensionIndex;
+        var biomeId = target.Id;
+
+        BiomeSearchStatus = $"正在寻找「{target.Name}」…";
+
+        var found = await Task.Run(() =>
+        {
+            // 由内向外扫描：环半径从 256 到 4096 格，步长 64
+            for (var radius = 256; radius <= 4096; radius *= 2)
+            {
+                var best = (X: 0, Z: 0, Distance: double.MaxValue);
+
+                for (var dz = -radius; dz <= radius; dz += 64)
+                {
+                    for (var dx = -radius; dx <= radius; dx += 64)
+                    {
+                        var x = centerX + dx;
+                        var z = centerZ + dz;
+
+                        if (CubiomesNative.BiomeAt(seed, version, dimension, 4, x, 64, z) != biomeId) continue;
+
+                        var distance = Math.Sqrt((double)dx * dx + (double)dz * dz);
+                        if (distance >= best.Distance) continue;
+
+                        best = (x, z, distance);
+                    }
+                }
+
+                if (best.Distance < double.MaxValue) return ((int X, int Z)?)(best.X, best.Z);
+            }
+
+            return ((int X, int Z)?)null;
+        }).ConfigureAwait(true);
+
+        if (found is { } position)
+        {
+            LocateX = position.X.ToString();
+            LocateZ = position.Z.ToString();
+            OnPropertyChanged(nameof(LocateX));
+            OnPropertyChanged(nameof(LocateZ));
+            LocateRequested?.Invoke(position.X, position.Z);
+
+            BiomeSearchStatus = $"找到「{target.Name}」：{position.X}, {position.Z}";
+            MapStatus = BiomeSearchStatus;
+        }
+        else
+        {
+            BiomeSearchStatus = $"4096 格内没找到「{target.Name}」，换个中心或换维度再试。";
+        }
     }
 
     // ── 附近结构（像 cubiomes-viewer 的结构列表）────────────────
@@ -965,4 +1091,13 @@ public sealed class NearbyStructure
         Z = z,
         Distance = Math.Sqrt(((double)x - centerX) * (x - centerX) + ((double)z - centerZ) * (z - centerZ)),
     };
+}
+
+/// <summary>群系下拉项：cubiomes 的 id + 中文名。</summary>
+public sealed class BiomeOption(int id, string name)
+{
+    public int Id { get; } = id;
+    public string Name { get; } = name;
+
+    public override string ToString() => Name;
 }
