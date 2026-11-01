@@ -318,6 +318,73 @@ ORAP_API int orap_find_structures(uint64_t seed, int version_index, int dim,
     return written;
 }
 
+/**
+ * 末地船：End City 是"结构 + 若干 piece"，船是其中一种 piece（END_SHIP）。
+ * 所以先按 End_City 找结构点，再把它的 pieces 展开、只挑出船的位置。
+ * 输出每个 2 个 int: x, z（方块坐标）。
+ */
+ORAP_API int orap_find_end_ships(uint64_t seed, int version_index,
+                                 int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
+                                 int *outBuf, int capacity)
+{
+    if (!outBuf || capacity <= 0) return -2;
+
+    int mc = orap_mc_from_index(version_index);
+
+    StructureConfig sconf;
+    if (!getStructureConfig(End_City, mc, &sconf)) return -4;
+    if (sconf.regionSize <= 0) return -4;
+
+    Generator g;
+    memset(&g, 0, sizeof(g));
+    if (run_generator(&g, version_index, 0, DIM_END, seed) != 0) return -3;
+
+    if (minChunkX > maxChunkX) { int t = minChunkX; minChunkX = maxChunkX; maxChunkX = t; }
+    if (minChunkZ > maxChunkZ) { int t = minChunkZ; minChunkZ = maxChunkZ; maxChunkZ = t; }
+
+    int regX0 = minChunkX / sconf.regionSize - 1;
+    int regX1 = maxChunkX / sconf.regionSize + 1;
+    int regZ0 = minChunkZ / sconf.regionSize - 1;
+    int regZ1 = maxChunkZ / sconf.regionSize + 1;
+
+    long regions = (long)(regX1 - regX0 + 1) * (long)(regZ1 - regZ0 + 1);
+    if (regions > 40000) return -5;
+
+    static Piece pieces[END_CITY_PIECES_MAX];
+    int written = 0;
+
+    for (int rz = regZ0; rz <= regZ1; rz++)
+    {
+        for (int rx = regX0; rx <= regX1; rx++)
+        {
+            Pos p;
+            if (!getStructurePos(End_City, mc, seed, rx, rz, &p)) continue;
+
+            int chunkX = p.x >> 4;
+            int chunkZ = p.z >> 4;
+            if (chunkX < minChunkX || chunkX > maxChunkX) continue;
+            if (chunkZ < minChunkZ || chunkZ > maxChunkZ) continue;
+
+            if (!isViableStructurePos(End_City, &g, p.x, p.z, 0)) continue;
+
+            int count = getEndCityPieces(pieces, seed, chunkX, chunkZ);
+            if (count <= 0) continue;
+
+            for (int i = 0; i < count && i < END_CITY_PIECES_MAX; i++)
+            {
+                if (pieces[i].type != END_SHIP) continue;
+                if (written >= capacity) return written;
+
+                outBuf[written * 2 + 0] = pieces[i].pos.x;
+                outBuf[written * 2 + 1] = pieces[i].pos.z;
+                written++;
+            }
+        }
+    }
+
+    return written;
+}
+
 /** 要塞（含末地传送门）：只在下界之外的 Overworld，最多 limit 个。输出每个 2 个 int: x, z */
 ORAP_API int orap_find_strongholds(uint64_t seed, int version_index, int *outBuf, int capacity)
 {

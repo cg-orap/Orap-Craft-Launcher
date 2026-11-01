@@ -443,6 +443,15 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
                         spawn = CubiomesNative.Spawn(seed, versionIndex);
                     }
+                    else if (dimension == CubiomesNative.DimEnd)
+                    {
+                        // 末地船是 End City 的一个 piece，单独取出来画（图标和末地城不同）
+                        foreach (var (x, z) in CubiomesNative.FindEndShips(seed, versionIndex,
+                                     leftChunk, topChunk, rightChunk, bottomChunk))
+                        {
+                            markers.Add(new StructureMarker("end_ship", StructureLabels.Resolve("end_ship"), x, z));
+                        }
+                    }
                 }
 
                 width = pixelWidth;
@@ -714,6 +723,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 position.X - _dragStart.X, position.Y - _dragStart.Y, step);
             _centerBlockX = centerX;
             _centerBlockZ = centerZ;
+
+            // 关键：拖动时必须立刻重绘。
+            // 以前这里只改了中心、只排了"稍后渲染"，画面要等新像素回来才动 ——
+            // 于是拖的时候地图不动，松手才跳到新位置。
+            // 现在先让旧图跟着指针平移（O(1)），新图随后补上。
+            InvalidateVisual();
             ScheduleRenderAfterGesture();
             return;
         }

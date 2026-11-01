@@ -227,6 +227,33 @@ public static class CubiomesNative
     }
 
     /// <summary>要塞坐标（Overworld，最多 capacity 个）。</summary>
+    /// <summary>末地船（End City 的 END_SHIP piece）位置，方块坐标。</summary>
+    public static IReadOnlyList<(int X, int Z)> FindEndShips(long seed, int versionIndex,
+        int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ, int capacity = 400)
+    {
+        EnsureProbed();
+        if (!_available) return [];
+
+        var buffer = new int[capacity * 2];
+
+        try
+        {
+            var written = orap_find_end_ships(unchecked((ulong)seed), versionIndex,
+                minChunkX, minChunkZ, maxChunkX, maxChunkZ, buffer, capacity);
+
+            if (written <= 0) return [];
+
+            var result = new List<(int X, int Z)>(written);
+            for (var i = 0; i < written; i++) result.Add((buffer[i * 2], buffer[i * 2 + 1]));
+
+            return result;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return [];
+        }
+    }
+
     public static IReadOnlyList<(int X, int Z)> FindStrongholds(long seed, int versionIndex, int capacity = 128)
     {
         EnsureProbed();
@@ -306,6 +333,11 @@ public static class CubiomesNative
     private static extern int orap_find_structures(ulong seed, int versionIndex, int dim,
         int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
         IntPtr outBuf, int capacity, out int outTotal);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_find_end_ships(
+        ulong seed, int versionIndex, int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
+        int[] outBuf, int capacity);
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int orap_find_strongholds(ulong seed, int versionIndex, IntPtr outBuf, int capacity);

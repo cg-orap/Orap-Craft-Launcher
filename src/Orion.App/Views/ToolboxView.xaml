@@ -68,6 +68,34 @@
 
                         <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                             <StackPanel>
+                                <TextBlock Text="定位结构" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="选一个结构类型，从当前位置向外找最近的一个并跳过去。"
+                                           Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" MinWidth="0" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <ComboBox Grid.Column="0" ItemsSource="{Binding LocateStructureOptions}"
+                                              SelectedItem="{Binding LocateStructureTarget, Mode=TwoWay}"
+                                              DisplayMemberPath="Label" Height="30" FontSize="11.5"
+                                              AutomationProperties.AutomationId="StructurePicker" />
+
+                                    <Button Grid.Column="1" Content="找最近" Style="{StaticResource SecondaryButton}"
+                                            FontSize="11" Padding="12,5" Margin="8,0,0,0"
+                                            Command="{Binding FindStructureCommand}"
+                                            AutomationProperties.AutomationId="FindStructureButton" />
+                                </Grid>
+
+                                <TextBlock Text="{Binding StructureLocateStatus}" Style="{StaticResource CaptionText}"
+                                           TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
                                 <TextBlock Text="定位生物群系" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="选一个群系，从这里向外找最近的实例（最多扫 4096 格）。"
                                            Style="{StaticResource CaptionText}" TextWrapping="Wrap" />

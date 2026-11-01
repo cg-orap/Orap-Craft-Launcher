@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 
 namespace Orion.App.Controls;
 
@@ -28,6 +28,7 @@ public static class StructureLabels
         ["bastion"] = "堡垒遗迹",
         ["ruined_portal_nether"] = "下界废弃传送门",
         ["end_city"] = "末地城",
+        ["end_ship"] = "末地船",
         ["end_gateway"] = "末地折跃门",
         ["stronghold"] = "要塞",
         ["spawn"] = "出生点",

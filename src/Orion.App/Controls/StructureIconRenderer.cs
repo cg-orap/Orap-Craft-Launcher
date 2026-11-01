@@ -126,7 +126,9 @@ public static class StructureIconRenderer
         "ocean_ruin" => Glyph.Columns,
         "ruined_portal" or "ruined_portal_nether" => Glyph.Arch,
         "fortress" or "bastion" => Glyph.Tower,
-        "end_city" or "end_gateway" => Glyph.Spire,
+        "end_city" => Glyph.Spire,          // 末地城：塔
+        "end_gateway" => Glyph.Arch,        // 末地折跃门：门框
+        "end_ship" => Glyph.Boat,           // 末地船：船（和末地城分开）
         "stronghold" => Glyph.Eye,
         "spawn" => Glyph.Cross,
         _ => Glyph.Dot,

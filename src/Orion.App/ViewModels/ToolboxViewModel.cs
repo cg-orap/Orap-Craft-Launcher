@@ -38,6 +38,8 @@ public sealed class ToolboxViewModel : ObservableObject
         LocateCommand = new RelayCommand(LocateTo);
         ScanStructuresCommand = new RelayCommand(ScanNearbyStructures);
         FindBiomeCommand = new RelayCommand(FindBiome);
+        FindStructureCommand = new RelayCommand(FindStructure);
+        LocateStructureTarget = StructureFilterOptions.FirstOrDefault();
         LoadBiomeOptions();
         LocateStructureCommand = new RelayCommand(param =>
         {
@@ -592,6 +594,111 @@ public sealed class ToolboxViewModel : ObservableObject
         _main.LogsPage.AppendSystem($"工具箱：已生成离线种子地图 {value}");
     }
 
+    // ── 定位结构（选类型 → 找最近的一个）──────────────────────
+    public ObservableList<StructureFilterOption> LocateStructureOptions => StructureFilterOptions;
+
+    private StructureFilterOption? _locateStructureTarget;
+
+    public StructureFilterOption? LocateStructureTarget
+    {
+        get => _locateStructureTarget;
+        set => SetProperty(ref _locateStructureTarget, value);
+    }
+
+    private string _structureLocateStatus = "选一个结构类型，从当前位置向外找最近的一个。";
+
+    public string StructureLocateStatus
+    {
+        get => _structureLocateStatus;
+        private set => SetProperty(ref _structureLocateStatus, value);
+    }
+
+    public ICommand FindStructureCommand { get; }
+
+    /// <summary>
+    /// 由内向外按 512 格的环找最近的结构实例（同类型只取一个，就近跳过去）。
+    /// </summary>
+    private async void FindStructure()
+    {
+        if (!CubiomesNative.Available)
+        {
+            StructureLocateStatus = "原生引擎未加载，算不出结构位置。";
+            return;
+        }
+
+        if (LocateStructureTarget is not { } target || string.IsNullOrWhiteSpace(target.Key.FirstOrDefault()))
+        {
+            StructureLocateStatus = "先在左边选一个结构类型。";
+            return;
+        }
+
+        if (!SeedMap.TryParseSeed(Seed, out var seed))
+        {
+            StructureLocateStatus = "先填一个种子。";
+            return;
+        }
+
+        var key = target.Key.FirstOrDefault() ?? "";
+        var (centerX, centerZ) = MapCenterProvider?.Invoke() ?? (0, 0);
+        var version = CubiomesNative.VersionIndexFor(SeedVersion);
+        var dimension = _dimensionIndex;
+
+        StructureLocateStatus = $"正在寻找最近的「{target.Label}」…";
+
+        var found = await Task.Run(() =>
+        {
+            for (var radiusChunks = 32; radiusChunks <= 1024; radiusChunks *= 2)
+            {
+                var minChunkX = (centerX - radiusChunks * 16) >> 4;
+                var maxChunkX = (centerX + radiusChunks * 16) >> 4;
+                var minChunkZ = (centerZ - radiusChunks * 16) >> 4;
+                var maxChunkZ = (centerZ + radiusChunks * 16) >> 4;
+
+                if (dimension == CubiomesNative.DimEnd && key == "end_ship")
+                {
+                    var ships = CubiomesNative.FindEndShips(seed, version, minChunkX, minChunkZ, maxChunkX, maxChunkZ);
+                    if (ships.Count > 0)
+                    {
+                        return ships.OrderBy(p => ((double)p.X - centerX) * (p.X - centerX) + ((double)p.Z - centerZ) * (p.Z - centerZ))
+                                    .Select(p => ((int X, int Z)?)(p.X, p.Z))
+                                    .FirstOrDefault();
+                    }
+
+                    continue;
+                }
+
+                var hits = CubiomesNative.FindStructures(seed, version, dimension, minChunkX, minChunkZ, maxChunkX, maxChunkZ)
+                    .Where(h => string.Equals(h.Key, key, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (hits.Count > 0)
+                {
+                    var best = hits.OrderBy(h => ((double)h.X - centerX) * (h.X - centerX) + ((double)h.Z - centerZ) * (h.Z - centerZ))
+                                   .First();
+                    return ((int X, int Z)?)(best.X, best.Z);
+                }
+            }
+
+            return ((int X, int Z)?)null;
+        }).ConfigureAwait(true);
+
+        if (found is { } position)
+        {
+            LocateX = position.X.ToString();
+            LocateZ = position.Z.ToString();
+            OnPropertyChanged(nameof(LocateX));
+            OnPropertyChanged(nameof(LocateZ));
+            LocateRequested?.Invoke(position.X, position.Z);
+
+            StructureLocateStatus = $"最近的「{target.Label}」：{position.X}, {position.Z}";
+            MapStatus = StructureLocateStatus;
+        }
+        else
+        {
+            StructureLocateStatus = $"附近没找到「{target.Label}」，换维度或换中心再试。";
+        }
+    }
+
     // ── 定位生物群系（像 cubiomes-viewer 的 biome finder）──────
     public ObservableList<BiomeOption> BiomeOptions { get; } = [];
 
@@ -996,6 +1103,8 @@ public sealed class StructureFilterOption : ObservableObject
     public string Group { get; }
     public string Label { get; }
 
+    public override string ToString() => Label;
+
     public event Action<StructureFilterOption>? Changed;
 
     public bool IsEnabled
@@ -1008,21 +1117,13 @@ public sealed class StructureFilterOption : ObservableObject
         }
     }
 
-    /// <summary>分组覆盖的 cubiomes 结构 key。</summary>
-    public IReadOnlyList<string> Key => Group switch
-    {
-        "village" => ["village"],
-        "outpost" => ["outpost"],
-        "monument" => ["monument"],
-        "mansion" => ["mansion"],
-        "temple" => ["desert_pyramid", "jungle_temple", "swamp_hut", "igloo"],
-        "shipwreck" => ["shipwreck", "ocean_ruin"],
-        "treasure" => ["treasure"],
-        "ruins" => ["ruined_portal", "ruined_portal_nether"],
-        "city" => ["ancient_city", "trail_ruins", "trial_chambers"],
-        "stronghold" => ["stronghold"],
-        _ => [],
-    };
+    /// <summary>
+    /// 这一项覆盖的 cubiomes 结构 key。
+    /// 现在「一项 = 一个结构类型」，所以直接就是 Group；
+    /// 以前这里是 10 个硬编码分组，新增的分组全落到 _ => []，
+    /// 结果勾选它们等于把地图上的结构全过滤掉。
+    /// </summary>
+    public IReadOnlyList<string> Key => [Group];
 }
 
 /// <summary>一个游戏语言选项：options.txt 里的 lang 值 + 给人看的名字。</summary>
