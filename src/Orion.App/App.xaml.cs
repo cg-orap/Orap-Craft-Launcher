@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Windows.Media;
 using Orion.App.ViewModels;
 using Orion.Core;
 using Orion.Core.Diagnostics;
@@ -251,7 +252,83 @@ public partial class App : Application
         }
 
         ApplyAccent(accent);
+        ApplyGlass();
         BreatheAfterThemeSwap();
+    }
+
+
+    /// <summary>
+    /// 玻璃材质：把界面底色做成半透明（alpha 由「界面不透明度」决定），
+    /// 再让 DWM 把窗口背后模糊，形成毛玻璃。
+    ///
+    /// 只覆盖几个"大片底色"，按钮/文字的画笔保持不透明，避免整体发灰。
+    /// </summary>
+    public static void ApplyGlass()
+    {
+        var app = Current;
+        if (app is null) return;
+
+        var settings = (app as App)?._context?.Settings;
+        if (settings is null) return;
+
+        var enabled = settings.GlassEnabled;
+        var opacity = Math.Clamp(settings.GlassOpacity, 0.45, 1.0);
+
+        // 主题底色（用于算玻璃上的着色 + 界面底色）
+        var windowColor = app.TryFindResource("WindowBgColor") is Color wc ? wc : Color.FromRgb(0x0F, 0x11, 0x15);
+        var surfaceColor = app.TryFindResource("SurfaceBgColor") is Color sc ? sc : Color.FromRgb(0x17, 0x1A, 0x21);
+        var altColor = app.TryFindResource("SurfaceAltBgColor") is Color ac ? ac : Color.FromRgb(0x1E, 0x22, 0x2B);
+        var railColor = app.TryFindResource("NavRailColor") is Color rc ? rc : Color.FromRgb(0x14, 0x17, 0x1D);
+
+        // 透明度分配（这是"精致"的关键）：
+        //   · 最底层窗口背景最透（透出毛玻璃）
+        //   · 卡片次之（能看见玻璃，但内容必须清楚）
+        //   · 内容区/侧栏最实，保证文字对比度
+        // 都是 opacity 的线性函数：用户把 0.45 拉到底时整体才真正通透。
+        byte AlphaOf(double baseAlpha, double gain) =>
+            (byte)Math.Clamp((int)Math.Round(255 * Math.Clamp(baseAlpha + (opacity - 0.45) * gain, 0, 1)), 0, 255);
+
+        var glass = new ResourceDictionary
+        {
+            // 窗口底：0.45 → 0.42，1.0 → 1.0
+            ["WindowBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.42, 1.02), windowColor.R, windowColor.G, windowColor.B)),
+            // 卡片：保底 0.80，保证文字对比度
+            ["SurfaceBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.80, 0.34), surfaceColor.R, surfaceColor.G, surfaceColor.B)),
+            // 次级面（输入框、块内小卡片）
+            ["SurfaceAltBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.86, 0.25), altColor.R, altColor.G, altColor.B)),
+            // 侧栏：比窗口稍实一点，让导航图标清楚
+            ["NavRailBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.62, 0.70), railColor.R, railColor.G, railColor.B)),
+            // 小标签
+            ["ChipBg"] = new SolidColorBrush(Color.FromArgb(AlphaOf(0.70, 0.45), altColor.R, altColor.G, altColor.B)),
+        };
+
+        // 玻璃边缘：比纯色边框更"亮"一点，看起来像玻璃切边
+        var borderColor = app.TryFindResource("BorderColor") is Color bc ? bc : Color.FromRgb(0x2A, 0x30, 0x3B);
+        glass["BorderBrushSoft"] = new SolidColorBrush(Color.FromArgb(
+            (byte)Math.Clamp(borderColor.A * 0.75 + 30, 0, 255),
+            (byte)Math.Min(255, borderColor.R + 26),
+            (byte)Math.Min(255, borderColor.G + 26),
+            (byte)Math.Min(255, borderColor.B + 26)));
+
+        // 玻璃的"高光边"：顶部一条极淡的白线，看起来更像一块玻璃
+        var highlight = Color.FromArgb((byte)(enabled ? 22 : 0), 255, 255, 255);
+        glass["GlassHighlight"] = new SolidColorBrush(highlight);
+
+        // 替换（或追加）到合并字典末尾 —— 末尾优先
+        var existing = app.Resources.MergedDictionaries.FirstOrDefault(d => d.Contains("GlassHighlight"));
+        if (existing is not null) app.Resources.MergedDictionaries.Remove(existing);
+        app.Resources.MergedDictionaries.Add(glass);
+
+        if (app.MainWindow is Window window)
+        {
+            window.Background = Brushes.Transparent;
+
+            var dark = windowColor.R + windowColor.G + windowColor.B < 384;
+            var tint = Color.FromArgb((byte)Math.Clamp((int)(opacity * 210), 0, 255),
+                surfaceColor.R, surfaceColor.G, surfaceColor.B);
+
+            Services.GlassService.Apply(window, enabled, tint, dark);
+        }
     }
 
     /// <summary>

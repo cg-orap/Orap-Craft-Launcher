@@ -7,14 +7,16 @@ namespace Orion.App.Animations;
 /// <summary>
 /// 切换版本（实例）时的过渡动画。
 ///
-/// 只要绑定的值变了就播一次：淡出 → 淡入，同时从下方轻微上浮 + 一点点放大，
-/// 让人看得出"内容换了"，而不是版本名/内存数字瞬间被替换。
+/// 设计原则是"柔和、不闪"：
+/// · 不做明显的变暗再变亮（之前 1 → 0.45 → 1 看起来像闪一下）；
+/// · 只做一次缓慢的淡入 + 轻微上浮 + 极小幅度放大，340ms 走完；
+/// · 缓动统一 ease-out，收尾自然。
 ///
 /// 用法（XAML 一行）：
 ///   &lt;Border anim:InstanceSwitch.Watch="{Binding CurrentInstance}" /&gt;
 ///
-/// 覆盖所有切换入口：首页下拉框、最近游玩、侧栏列表、版本管理页的下拉框 ——
-/// 它们最终都会改 MainViewModel.CurrentInstance，一处绑定全部生效。
+/// 覆盖所有切换入口（首页下拉框 / 最近游玩 / 侧栏列表 / 版本管理页下拉框），
+/// 因为它们最终都会改 MainViewModel.CurrentInstance，一处绑定全部生效。
 /// 只动 Opacity / RenderTransform（不触发重新布局）；ReduceMotion 时整体跳过。
 /// </summary>
 public static class InstanceSwitch
@@ -28,9 +30,9 @@ public static class InstanceSwitch
 
     public static object? GetWatch(DependencyObject element) => element.GetValue(WatchProperty);
 
-    /// <summary>上浮距离（像素）。整块卡片用 8，小控件用 4。</summary>
+    /// <summary>上浮距离（像素）。整块卡片用 10，小控件用 4。</summary>
     public static readonly DependencyProperty OffsetProperty = DependencyProperty.RegisterAttached(
-        "Offset", typeof(double), typeof(InstanceSwitch), new PropertyMetadata(8.0));
+        "Offset", typeof(double), typeof(InstanceSwitch), new PropertyMetadata(10.0));
 
     public static void SetOffset(DependencyObject element, double value) => element.SetValue(OffsetProperty, value);
 
@@ -54,20 +56,16 @@ public static class InstanceSwitch
             ("kind", element.GetType().Name),
             ("id", element.Name is { Length: > 0 } n ? n : "-"));
 
-        var total = TimeSpan.FromMilliseconds(280);
+        // 340ms 一次性淡入：中途不变暗，观感更像"内容轻轻换了一页"
+        var total = TimeSpan.FromMilliseconds(340);
 
-        // ── 透明度：1 → 0.45（70ms）→ 1（剩下的时间）──
-        var opacity = new DoubleAnimationUsingKeyFrames();
-        opacity.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-        opacity.KeyFrames.Add(new EasingDoubleKeyFrame(
-            0.45, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(70)), Motion.Exit));
-        opacity.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(total), Motion.Soft));
+        element.BeginAnimation(UIElement.OpacityProperty,
+            new DoubleAnimation(0.62, 1, total) { EasingFunction = Motion.Soft },
+            HandoffBehavior.SnapshotAndReplace);
 
-        element.BeginAnimation(UIElement.OpacityProperty, opacity, HandoffBehavior.SnapshotAndReplace);
-
-        // ── 变换：位移 + 缩放放在一个 TransformGroup 里（不破坏已有的变换）──
+        // 位移 + 缩放放在一个 TransformGroup 里（不破坏元素已有的变换）
         var translate = new TranslateTransform(0, offset);
-        var scale = new ScaleTransform(0.985, 0.985);
+        var scale = new ScaleTransform(0.994, 0.994);
 
         var group = new TransformGroup();
         group.Children.Add(scale);
@@ -80,14 +78,14 @@ public static class InstanceSwitch
             new DoubleAnimation(offset, 0, total) { EasingFunction = Motion.Soft });
 
         scale.BeginAnimation(ScaleTransform.ScaleXProperty,
-            new DoubleAnimation(0.985, 1, total) { EasingFunction = Motion.Soft });
+            new DoubleAnimation(0.994, 1, total) { EasingFunction = Motion.Soft });
         scale.BeginAnimation(ScaleTransform.ScaleYProperty,
-            new DoubleAnimation(0.985, 1, total) { EasingFunction = Motion.Soft });
+            new DoubleAnimation(0.994, 1, total) { EasingFunction = Motion.Soft });
 
         // 动画结束后把变换归零并摘掉，避免影响后续布局测量
         var timer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = total + TimeSpan.FromMilliseconds(60),
+            Interval = total + TimeSpan.FromMilliseconds(80),
         };
 
         timer.Tick += (_, _) =>

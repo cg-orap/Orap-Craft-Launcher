@@ -41,6 +41,12 @@ public sealed class LauncherSettings
     /// <summary>减少动效：关闭位移/缩放，只保留极短的透明度过渡（无障碍设置）。</summary>
     [JsonPropertyName("reduceMotion")] public bool ReduceMotion { get; set; }
 
+    /// <summary>毛玻璃（系统亚克力）开关；系统不支持时自动降级。</summary>
+    [JsonPropertyName("glassEnabled")] public bool GlassEnabled { get; set; } = true;
+
+    /// <summary>界面不透明度 0.45–1.0：越小越透（玻璃感越强），1.0 = 完全不透明。</summary>
+    [JsonPropertyName("glassOpacity")] public double GlassOpacity { get; set; } = 0.78;
+
     /// <summary>
     /// 下载保存目录。为空表示用默认目录（数据根目录下的 downloads）。
     /// 整合包 zip、手动下载的模组文件等都放这里；游戏本体仍按标准布局放在 libraries/versions。

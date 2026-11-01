@@ -265,6 +265,44 @@ public sealed class SettingsViewModel : ObservableObject
 
     private bool _reduceMotion;
 
+    private bool _glassEnabled = true;
+
+    /// <summary>毛玻璃（系统亚克力）开关：改动立即生效。</summary>
+    public bool GlassEnabled
+    {
+        get => _glassEnabled;
+        set
+        {
+            if (!SetProperty(ref _glassEnabled, value)) return;
+            _main.Context.Settings.GlassEnabled = value;
+            App.ApplyGlass();
+            _ = _main.Context.SettingsStore.SaveAsync(_main.Context.Settings);
+            OnPropertyChanged(nameof(GlassHint));
+        }
+    }
+
+    private double _glassOpacity = 0.78;
+
+    /// <summary>界面不透明度（0.45 最透 → 1 完全不透明）。</summary>
+    public double GlassOpacity
+    {
+        get => _glassOpacity;
+        set
+        {
+            if (!SetProperty(ref _glassOpacity, Math.Clamp(value, 0.45, 1.0))) return;
+            _main.Context.Settings.GlassOpacity = _glassOpacity;
+            App.ApplyGlass();
+            _ = _main.Context.SettingsStore.SaveAsync(_main.Context.Settings);
+            OnPropertyChanged(nameof(GlassOpacityText));
+        }
+    }
+
+    public string GlassOpacityText => $"{GlassOpacity * 100:0} %";
+
+    public string GlassHint => Services.GlassService.IsGlassActive
+        ? "当前系统已启用亚克力毛玻璃；把不透明度调低会看到背后模糊的桌面。"
+        : "当前系统未启用系统级毛玻璃（Win11 22H2+ 支持最佳），界面会退化为半透明纯色。";
+
     public string Theme
     {
         get => _theme;
@@ -349,6 +387,8 @@ public sealed class SettingsViewModel : ObservableObject
         AutoMemory = settings.AutoMemory;
         MemoryMb = settings.MemoryMb;
         _reduceMotion = settings.ReduceMotion;
+        _glassEnabled = _main.Context.Settings.GlassEnabled;
+        _glassOpacity = _main.Context.Settings.GlassOpacity;
         Animations.Motion.ReduceMotion = settings.ReduceMotion;
         MinMemoryMb = settings.MinMemoryMb;
         MaxConcurrency = settings.MaxConcurrency;
