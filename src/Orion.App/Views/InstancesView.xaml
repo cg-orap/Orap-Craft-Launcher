@@ -97,6 +97,7 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+
                             <Button Content="打开游戏目录" Style="{StaticResource GhostButton}"
                                     Command="{Binding OpenFolderCommand}" FontSize="11.5" Padding="12,6" />
                             <Button Content="删除版本" Style="{StaticResource DangerButton}"
@@ -107,9 +108,38 @@
 
                     <Border BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="0,1,0,0"
                             Margin="0,16,0,0" Padding="0,10,0,0">
-                        <controls:SegmentedControl ItemsSource="{Binding DetailTabs}"
-                                                   SelectedIndex="{Binding TabIndex, Mode=TwoWay}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" MinWidth="0" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <controls:SegmentedControl Grid.Column="0" ItemsSource="{Binding DetailTabs}"
+                                                       SelectedIndex="{Binding TabIndex, Mode=TwoWay}"
+                                                       HorizontalAlignment="Left" />
+
+                            <!-- 切换版本：固定在页签行右侧，任何页签都能看到，也不挤压实例名 -->
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding Instances}"
+                                      SelectedItem="{Binding SelectedInstance, Mode=TwoWay}"
+                                      Width="230" Height="28" FontSize="11"
+                                      VerticalAlignment="Center"
+                                      ToolTip="切换版本（左侧列表会同步选中）"
+                                      AutomationProperties.AutomationId="InstancePickerCombo">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            <TextBlock Text="{Binding Subtitle}" FontSize="9"
+                                                       Foreground="{DynamicResource MutedTextBrush}"
+                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
                     </Border>
+
                 </StackPanel>
             </Border>
 
@@ -437,37 +467,10 @@
             <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,14,0,0"
                     Visibility="{Binding IsSettingsTab, Converter={StaticResource BoolToVisibility}}" anim:ContentTransition.Watch="{Binding IsSettingsTab}" anim:ContentTransition.Offset="6">
                 <StackPanel>
-                    <!-- 选择版本：不用退回左侧列表，直接在这里切换要编辑的实例 -->
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="0" />
-                            <ColumnDefinition Width="*" MinWidth="0" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0" Text="版本设置" FontSize="12"
-                                   Foreground="{DynamicResource MutedTextBrush}"
-                                   VerticalAlignment="Center" Margin="0,0,12,0" />
-
-                        <ComboBox Grid.Column="2" ItemsSource="{Binding Instances}"
-                                  SelectedItem="{Binding SelectedInstance, Mode=TwoWay}"
-                                  Width="260" Height="30" FontSize="11.5"
-                                  VerticalAlignment="Center"
-                                  ToolTip="切换要编辑的版本"
-                                  AutomationProperties.AutomationId="SettingsInstancePicker">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Name}" FontSize="11.5"
-                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                        <TextBlock Text="{Binding Subtitle}" FontSize="9.5"
-                                                   Foreground="{DynamicResource MutedTextBrush}"
-                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </Grid>
+                    <!-- 和其他页面一致的页内大标题 -->
+                    <TextBlock Text="版本设置" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="在页面右上角的下拉框里切换要编辑的版本；改完点下面的「保存设置」。所有页签都能看到那个下拉框。"
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,14" />
 
                     <Grid>
                         <Grid.ColumnDefinitions>
