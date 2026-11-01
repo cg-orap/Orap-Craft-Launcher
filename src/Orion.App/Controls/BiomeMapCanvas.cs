@@ -111,8 +111,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
     // 预览层：整屏 1/4 分辨率的粗图，用来在拖动/缩放期间垫底，避免出现空白。
     private readonly BiomeTileLayer _tileLayer = new();
 
-    /// <summary>用瓦片渲染（默认开）：平移只补缺的块，不再整屏重算。</summary>
-    private bool _useTiles = true;
+    /// <summary>
+    /// 用瓦片渲染。
+    /// **默认关闭**：当前版本的瓦片对齐有缺陷（画面会被切成几块互不连续的图），
+    /// 在写好"相邻瓦片边界像素必须连续"的验证之前不放出去。
+    /// 关掉时走原来那套整屏渲染，功能与手感都是已验证过的。
+    /// </summary>
+    private bool _useTiles;
 
     private void InitTileLayer()
     {
