@@ -48,7 +48,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     // 与 cubiomes 的 scale 取值对齐：每格 1/4/16/64 方块
     // 细档位：每档 2 倍。cubiomes 只支持 1/4/16/64 的采样 scale，中间档用"渲染更大再缩小"实现。
     /// <summary>缩放档位（方块/像素）。数组首尾就是上下限：最小 1（看清楚 1 格），最大 64（看大范围）。</summary>
-    private static readonly int[] ZoomSteps = [1, 2, 4, 8, 16, 32, 64];
+    private static readonly int[] ZoomSteps = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
 
     /// <summary>是否已到最大放大倍数（每像素 1 格）。</summary>
     public bool AtMaxZoom => _zoomIndex <= 0;
@@ -365,8 +365,20 @@ public sealed class BiomeMapCanvas : FrameworkElement
     /// 手势期间不渲染：只靠位移把旧图挪过去（O(1)，天然 60fps）。
     /// 停下来 140ms 后再渲染一次，避免"边拖边算"导致的卡顿与请求堆积。
     /// </summary>
+    private bool _renderPendingAfterGesture;
+
     private void ScheduleRenderAfterGesture()
     {
+        // 拖动/惯性期间**不**启动渲染。
+        // 以前每次鼠标停顿 90ms 就会起一次大渲染，把 CPU 占满，
+        // 用户继续拖时新渲染被 _loading 挡住 —— 观感就是"卡住、松手才跳过去"。
+        if (_dragging || _inertiaTimer?.IsEnabled == true)
+        {
+            _renderPendingAfterGesture = true;
+            return;
+        }
+
+        _renderPendingAfterGesture = false;
         _renderDebounce ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
         _renderDebounce.Stop();
         _renderDebounce.Tick -= OnRenderDebounceTick;
@@ -437,7 +449,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var versionIndex = EngineVersionIndex;
         var dimension = _dimension;
         var renderScale = step >= 64 ? 64 : step >= 16 ? 16 : step >= 4 ? 4 : 1;
-        var supersample = Math.Max(1, step / renderScale);
+        var supersample = Math.Clamp(step / renderScale, 1, 2);
         var version = Interlocked.Increment(ref _previewVersion);
         var styled = _styled;
 
@@ -518,7 +530,14 @@ public sealed class BiomeMapCanvas : FrameworkElement
             var showStructures = _showStructures;
             // cubiomes 只吃 1/4/16/64；中间档（2/8/32）用"采样 scale + 2 倍超采样"实现
             var renderScale = step >= 64 ? 64 : step >= 16 ? 16 : step >= 4 ? 4 : 1;
-            var supersample = step / renderScale;      // 1 或 2
+            var supersample = Math.Clamp(step / renderScale, 1, 2);   // 最多 2 倍超采样
+
+            // 像素预算：一张图超过约 160 万像素就放弃超采样，
+            // 否则放大后每次重算都上百万像素，拖动直接卡住。
+            if ((long)width * height * supersample * supersample > 1_600_000)
+            {
+                supersample = 1;
+            }
             var version = ++_bitmapVersion;
 
             Task.Run(() =>
@@ -716,6 +735,18 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 _bitmapWorldWidth / step,
                 _bitmapWorldHeight / step);
 
+            // 兜底：如果这张图比视口小（比如刚切页签时画布还没撑开就渲染了），
+            // 宁可拉伸铺满整屏，也不要让用户看到"中间一小块地图 + 外面一片黑"。
+            var covers = rect.Width >= width - 1 && rect.Height >= height - 1;
+
+            if (!covers)
+            {
+                rect = new Rect(0, 0, width, height);
+
+                // 同时立刻补一次正常渲染，拉伸只是过渡
+                if (!_loading) RequestRender();
+            }
+
             dc.PushOpacity(BitmapOpacity);
             dc.DrawImage(_bitmap, rect);
             dc.Pop();
@@ -852,8 +883,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
         base.OnMouseLeftButtonDown(e);
         _dragging = true;
 
-        // 拖之前先确保底下有一层预览图，否则拖动过程中边缘会是空白
-        if (_previewBitmap is null || Environment.TickCount64 - _previewStartedAt > 1500)
+        // 拖之前先确保底下有一层预览图；已经有了就别再排 ——
+        // 缩放后每张预览也都不便宜，排在拖动路径上会明显掉帧。
+        if (_previewBitmap is null)
         {
             QueuePreviewRender();
         }
@@ -961,7 +993,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
         if (Math.Abs(_inertiaVx) < 0.02 && Math.Abs(_inertiaVy) < 0.02)
         {
             _inertiaTimer?.Stop();
-            RequestRender();
+
+            if (_renderPendingAfterGesture) ScheduleRenderAfterGesture();
+            else RequestRender();
         }
     }
 
@@ -973,6 +1007,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _dragging = false;
         ReleaseMouseCapture();
         Cursor = Cursors.Arrow;
+
+        if (_renderPendingAfterGesture) ScheduleRenderAfterGesture();
 
         // 轻点（没有拖动）命中结构图标 → 交给界面定位
         var release = e.GetPosition(this);
