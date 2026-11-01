@@ -152,20 +152,33 @@ public static class ModConflictScanner
         if (!forgeFamily && !fabricFamily) return;
 
         // 有 Sinytra Connector 的整合包（例如 Better MC 4）是**故意**把 Fabric 模组装进 Forge 的：
-        // Connector 会自己加载这些 jar。再报"装错了"就是纯误报，会把用户吓得去删模组。
+        // Connector 会自己加载这些 jar，属于设计，不该报警。
         var hasConnector = jars.Any(j => j.AllMods.Any(m =>
             m.Id.Equals("connector", StringComparison.OrdinalIgnoreCase)
             || m.Id.Equals("sinytraconnector", StringComparison.OrdinalIgnoreCase)
             || m.Id.Equals("connectorlib", StringComparison.OrdinalIgnoreCase)
             || m.Id.Equals("connectorextras", StringComparison.OrdinalIgnoreCase)));
 
+        // 哪些 modId 真的被别的模组声明为必需依赖
+        var requiredIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var jar in jars)
+        {
+            foreach (var dependency in jar.Dependencies)
+            {
+                if (dependency.Mandatory) requiredIds.Add(dependency.ModId);
+            }
+        }
+
         foreach (var jar in jars)
         {
             if (forgeFamily && jar.HasFabricManifest && !jar.HasForgeManifest)
             {
+                // 关键事实：Forge/NeoForge **不会**因为 mods 目录里有个只有 fabric.mod.json 的 jar 而崩溃，
+                // 它会直接忽略这个文件。只有当"别的模组声明需要它"时才是真问题（缺前置）。
+                var neededByOthers = jar.AllMods.Any(m => requiredIds.Contains(m.Id));
+
                 if (hasConnector)
                 {
-                    // 桥接环境下只需要提示，不需要"必须处理"
                     conflicts.Add(new ModConflict(
                         "C3",
                         ConflictSeverity.Info,
@@ -175,22 +188,39 @@ public static class ModConflictScanner
                     continue;
                 }
 
+                if (!neededByOthers)
+                {
+                    conflicts.Add(new ModConflict(
+                        "C3",
+                        ConflictSeverity.Info,
+                        $"Forge 会忽略这个 Fabric 模组：{jar.FileName}",
+                        [jar.FileName],
+                        "这个 jar 只有 fabric.mod.json。Forge/NeoForge 会直接跳过它（不会加载，也不会因此崩溃），" +
+                        "所以这份整合包能正常启动。想让它在 Forge 下生效才需要 Sinytra Connector 之类的桥接。"));
+                    continue;
+                }
+
                 conflicts.Add(new ModConflict(
                     "C3",
                     ConflictSeverity.Error,
-                    $"Fabric 模组装进了 {loader} 实例：{jar.FileName}",
+                    $"有模组依赖它，但 Forge 加载不了：{jar.FileName}",
                     [jar.FileName],
-                    "这个 jar 只有 fabric.mod.json、没有 mods.toml，Forge/NeoForge 不会加载它。" +
-                    "要么删掉，要么用 Sinytra Connector 之类的桥接（桥接本身也可能引发兼容问题）。"));
+                    "这个 jar 只有 fabric.mod.json，而整合包里别的模组声明需要它 —— " +
+                    "Forge/NeoForge 会跳过它，于是那个依赖它的模组会报缺前置。要么换成 Forge 版，要么用 Sinytra Connector 桥接。"));
             }
             else if (fabricFamily && jar.HasForgeManifest && !jar.HasFabricManifest)
             {
+                var neededByOthers = jar.AllMods.Any(m => requiredIds.Contains(m.Id));
+
                 conflicts.Add(new ModConflict(
                     "C3",
-                    ConflictSeverity.Error,
-                    $"Forge/NeoForge 模组装进了 {loader} 实例：{jar.FileName}",
+                    neededByOthers ? ConflictSeverity.Error : ConflictSeverity.Info,
+                    neededByOthers
+                        ? $"有模组依赖它，但 Fabric 加载不了：{jar.FileName}"
+                        : $"Fabric 会忽略这个 Forge 模组：{jar.FileName}",
                     [jar.FileName],
-                    "这个 jar 只有 mods.toml、没有 fabric.mod.json，Fabric/Quilt 不会加载它。"));
+                    "这个 jar 只有 mods.toml，没有 fabric.mod.json。Fabric/Quilt 不会加载它" +
+                    (neededByOthers ? "，而整合包里别的模组声明需要它（会报缺前置）。" : "（一般也不会因此崩溃）。")));
             }
         }
     }

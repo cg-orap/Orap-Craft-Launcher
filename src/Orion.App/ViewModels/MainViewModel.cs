@@ -99,6 +99,28 @@ public sealed class ActivityCenter : ObservableObject
     private string _status = "就绪";
     private bool _isBusy;
 
+    /// <summary>
+    /// 每 500ms 刷新"进行中"任务的速度文本。
+    /// 之前没有这个计时器：SpeedText 从不重新求值，界面上的速度就一直是空的。
+    /// </summary>
+    public ActivityCenter()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500),
+        };
+
+        timer.Tick += (_, _) =>
+        {
+            foreach (var item in Items)
+            {
+                if (item.IsRunning) item.RefreshSpeed();
+            }
+        };
+
+        timer.Start();
+    }
+
     public ObservableList<ActivityItem> Items { get; } = [];
 
     public string Status { get => _status; set => SetProperty(ref _status, value); }

@@ -73,15 +73,17 @@ public sealed class ModConflictScannerTests
     }
 
     [Fact]
-    public void FabricOnlyJarInNeoForgeInstanceIsAnError()
+    public void FabricOnlyJarNobodyDependsOnIsOnlyInfo()
     {
+        // Forge 不会因为 mods 里有个纯 Fabric 的 jar 就崩，它会直接忽略这个文件。
+        // 只有当别的模组声明"需要它"时才是真问题。
         using var dir = new ModsDir();
         dir.FabricJar("sodium-0.5.jar", "sodium", "0.5");
 
         var conflicts = ModConflictScanner.Scan(dir.Path, LoaderKind.NeoForge, "1.21.1");
 
         var c3 = Assert.Single(conflicts.Where(c => c.Code == "C3"));
-        Assert.Equal(ConflictSeverity.Error, c3.Severity);
+        Assert.Equal(ConflictSeverity.Info, c3.Severity);
         Assert.Contains("sodium-0.5.jar", c3.Files);
     }
 
