@@ -446,8 +446,7 @@ public sealed class InstancesViewModel : ObservableObject
     /// <summary>Installs a Modrinth .mrpack: creates a loader instance and extracts the pack into it.</summary>
     private async Task ImportPackAsync()
     {
-        // 支持主流整合包格式：Modrinth .mrpack、CurseForge 导出的 .zip（manifest.json）、
-        // 以及国内启动器导出的 .minecraft 压缩包。按内容识别，不靠扩展名。
+        // 支持主流整合包格式：Modrinth .mrpack、CurseForge 导出的 .zip、国内启动器的 .minecraft 压缩包。
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = "选择整合包（.mrpack / CurseForge .zip / .minecraft 压缩包）",
@@ -457,56 +456,40 @@ public sealed class InstancesViewModel : ObservableObject
 
         if (dialog.ShowDialog() != true) return;
 
-        IsBusy = true;
-        Status = "正在识别整合包…";
-        var activity = _main.Activities.Begin($"导入整合包 {Path.GetFileName(dialog.FileName)}");
+        // 先识别，识别不出来就别走后面的流程
+        var info = Core.Mods.PackArchiveInstaller.Inspect(dialog.FileName);
+        if (info.Kind == Core.Mods.PackArchiveKind.Unknown)
+        {
+            Status = "无法识别该压缩包：" + (info.Note ?? "缺少 manifest.json / modrinth.index.json / .minecraft");
+            return;
+        }
 
+        // 交给下载中心的那条安装流水线：会弹「实例名称」对话框，并且能真正被取消
+        // （以前这里直接调 InstallAsync，既不问名字，也没有 CancellationToken，
+        //  所以下载管理里点取消对它无效）。
         try
         {
-            var info = Core.Mods.PackArchiveInstaller.Inspect(dialog.FileName);
-            var output = new Progress<string>(line =>
-            {
-                Status = line;
-                _main.Activities.Report(activity, 0.5, line, "");
-            });
-
-            var java = Core.Java.JavaDetector.SelectFor(21, _main.JavaRuntimes) ?? _main.JavaRuntimes.FirstOrDefault();
-
-            Core.Mods.MrPackResult result = info.Kind switch
-            {
-                Core.Mods.PackArchiveKind.CurseForge => await _main.Context.PackArchives
-                    .InstallCurseForgeAsync(dialog.FileName, info.Name, java, output).ConfigureAwait(true),
-
-                Core.Mods.PackArchiveKind.MinecraftZip => await _main.Context.PackArchives
-                    .InstallMinecraftZipAsync(dialog.FileName, info.Name, null, info.MinecraftVersion).ConfigureAwait(true),
-
-                _ => await _main.Context.ModPacks
-                    .InstallAsync(dialog.FileName, null, java, output).ConfigureAwait(true),
-            };
-
-            if (!result.Success)
-            {
-                Status = "整合包导入失败: " + result.Error;
-                _main.Activities.Finish(activity, ActivityState.Failed, result.Error);
-                return;
-            }
-
-            await _main.ReloadInstancesAsync().ConfigureAwait(true);
-            SelectedInstance = _main.Instances.FirstOrDefault(i => i.Id == result.InstanceId);
-
-            Status = $"整合包导入完成：{result.FilesDownloaded} 个文件，{result.OverridesCopied} 个覆盖文件。";
-            _main.Activities.Finish(activity, ActivityState.Completed);
-            _main.LogsPage.AppendSystem(Status);
+            await _main.CatalogPage.HandleDroppedFileAsync(dialog.FileName).ConfigureAwait(true);
+            Status = _main.CatalogPage.Status;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Status = "整合包导入失败: " + ex.Message;
-            _main.Activities.Finish(activity, ActivityState.Failed, ex.Message);
+            Status = "导入整合包失败: " + ex.Message;
+            Orion.Core.Diagnostics.AppLog.Error("instances", "import-pack-failed", ex);
+            return;
         }
-        finally
+
+        await _main.ReloadInstancesAsync().ConfigureAwait(true);
+
+        // 装完直接选中最新那个版本，省得用户自己去列表里找
+        if (_main.Instances.Count > 0)
         {
-            IsBusy = false;
+            SelectedInstance = _main.Instances
+                .OrderByDescending(i => i.CreatedAt)
+                .FirstOrDefault() ?? SelectedInstance;
         }
+
+        _main.LogsPage.AppendSystem("整合包导入：" + Status);
     }
 
     private async Task ExportPackAsync()

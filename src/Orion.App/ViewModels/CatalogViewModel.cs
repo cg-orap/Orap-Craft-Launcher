@@ -1844,13 +1844,17 @@ public sealed class CatalogViewModel : ObservableObject
         }
 
         var activity = _main.Activities.Begin($"导入整合包 {localName}", path);
+        _installActivity = activity;
+        _installCts?.Dispose();
+        _installCts = new CancellationTokenSource();
         Busy = true;
         Status = $"识别到压缩包整合包：{localName}";
 
         try
         {
             var result = await _main.Context.PackArchives
-                .InstallMinecraftZipAsync(path, localName, baseInstance?.VersionId, baseInstance?.GameVersion)
+                .InstallMinecraftZipAsync(path, localName, baseInstance?.VersionId, baseInstance?.GameVersion,
+                    _installCts.Token)
                 .ConfigureAwait(true);
 
             _main.Activities.Finish(activity, result.Success ? ActivityState.Completed : ActivityState.Failed, result.Error);
@@ -1862,6 +1866,12 @@ public sealed class CatalogViewModel : ObservableObject
 
             foreach (var warning in result.Warnings) _main.LogsPage.AppendSystem("整合包提示: " + warning);
             _main.LogsPage.AppendSystem(Status);
+        }
+        catch (OperationCanceledException)
+        {
+            Status = "已取消导入。";
+            _main.Activities.Finish(activity, ActivityState.Cancelled, "已取消");
+            AppLog.Info("catalog", "zip-import-cancelled");
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {

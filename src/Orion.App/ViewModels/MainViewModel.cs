@@ -223,7 +223,7 @@ public sealed class MainViewModel : ObservableObject
         NavItems.AddRange(
         [
             new NavItem("home", "首页", "\uE80F", "游戏"),
-                new NavItem("instances", "版本设置", "\uE81E", "游戏"),   // 层叠图标：和"设置"的齿轮区分
+                new NavItem("instances", "版本管理", "\uE81E", "游戏"),   // 层叠图标：和"设置"的齿轮区分
             new NavItem("catalog", "下载中心", "\uE896", "资源")
             {
                 SubItems =
@@ -657,7 +657,7 @@ public sealed class MainViewModel : ObservableObject
     public void CancelRunningWork() => CatalogPage.CancelOperation();
 
     /// <summary>
-    /// Jumps to 版本设置 with the freshly installed version selected and its name pre-filled, so the
+    /// Jumps to 版本管理 with the freshly installed version selected and its name pre-filled, so the
     /// user can rename it right after the install (installs otherwise keep the pack/file name).
     /// </summary>
     public async Task OpenInstanceForRenameAsync(string? instanceId, string? suggestedName = null)
@@ -688,7 +688,7 @@ public sealed class MainViewModel : ObservableObject
         if (key == "backup") BackupPage.Refresh();
         if (key == "toolbox") ToolboxPage.Refresh();
 
-        // 进"版本设置"时如果还没选版本，自动选第一个，避免看到一个空详情页。
+        // 进"版本管理"时如果还没选版本，自动选第一个，避免看到一个空详情页。
         if (key == "instances" && InstancesPage.SelectedInstance is null)
         {
             InstancesPage.SelectedInstance = Instances.FirstOrDefault();
@@ -723,7 +723,7 @@ public sealed class MainViewModel : ObservableObject
         };
 
         if (key == "catalog") _ = CatalogPage.InitializeAsync();
-        // 版本选择已并入「版本设置」：侧栏点版本即切换当前版本。
+        // 版本选择已并入「版本管理」：侧栏点版本即切换当前版本。
         if (key == "instances") _ = InstancesPage.LoadAsync();
         if (key == "mods") _ = ModsPage.LoadModsAsync();
         if (key is "library" or "content" or "space" or "saves")

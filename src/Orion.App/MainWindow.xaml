@@ -33,7 +33,7 @@
             <Setter Property="ToolTip" Value="{Binding Title}" />
             <Setter Property="ToolTipService.Placement" Value="Right" />
             <Setter Property="ToolTipService.HorizontalOffset" Value="6" />
-            <Setter Property="ToolTipService.InitialShowDelay" Value="250" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="0" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
