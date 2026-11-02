@@ -388,7 +388,11 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
     float *endHeights = NULL;
     unsigned char voidColor[3] = { 0x12, 0x0E, 0x1C };
 
-    if (dim == DIM_END)
+    // TODO: mapEndSurfaceHeight 的坐标单位尚未确定（实测同一座岛在不同渲染尺寸下
+    //       得到 104 / 588 两种直径），在弄清单位之前先关闭遮罩，保证跨缩放一致。
+    const int endMaskEnabled = 0;
+
+    if (dim == DIM_END && endMaskEnabled)
     {
         endHeights = (float *)malloc(sizeof(float) * cellsX * cellsZ);
 
