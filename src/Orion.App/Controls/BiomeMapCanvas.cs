@@ -345,19 +345,18 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _anchorBlockX = anchorBlockX;
         _anchorBlockZ = anchorBlockZ;
 
-        // 过渡倍率 = 旧视野 / 新视野：放大（目标方块/像素更少）时把旧图放大，
-        // 新瓦片到达后归位，观感上就是"平滑推近"。
-        var ratio = ZoomSteps[_zoomIndex] / (double)ZoomSteps[target];
-        var animation = new DoubleAnimation(VisualScale, ratio, new Duration(TimeSpan.FromMilliseconds(ZoomAnimationMs)))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        };
-        BeginAnimation(VisualScaleProperty, animation);
-
-        // 关键：把档位真正切换过去。
-        // 以前只设了 _pendingZoomIndex，_zoomIndex 永远不变 ——
-        // 于是动画结束后重渲的还是旧比例，观感就是"放大一下又弹回原样"。
+        // 档位立刻切换：BlocksPerPixel 变了，画面本身就已经缩放了。
+        //
+        // 以前这里还会再叠一层 VisualScale 动画（ratio = 旧/新），
+        // 于是"档位缩放 + 动画缩放"= **缩放被应用了两次**：
+        // 动画期间画面比目标还大，动画结束归位到 1 时就往回缩一下 —— 这就是回弹。
         _zoomIndex = target;
+
+        // 旧档位的瓦片由 LOD 垫底（按新 step 缩放绘制），
+        // 新档位瓦片随后补上，不需要额外的 VisualScale 动画。
+        BeginAnimation(VisualScaleProperty, null);
+        VisualScale = 1.0;
+
         ScheduleRenderAfterGesture();
 
         _zoomTimer ??= new DispatcherTimer
