@@ -13,10 +13,18 @@ public static class StructureIconRenderer
     /// <summary>按结构 key 画一个图标（centre 为中心，size 为外接正方形边长）。</summary>
     public static void Draw(DrawingContext dc, string key, Brush brush, Point centre, double size)
     {
+        // 统一成 12×12 逻辑网格：所有图标用同一套坐标基准，
+        // 描边按尺寸等比缩放，缩小到 7px 时也不会糊成一团。
+        size = Math.Clamp(size, 7, 16);
+
         var half = size / 2;
-        var outline = new Pen(new SolidColorBrush(Color.FromArgb(0xCC, 0x0B, 0x0D, 0x11)), 0.8);
+        var outlineWidth = Math.Max(0.6, size * 0.07);
+        var outline = new Pen(new SolidColorBrush(Color.FromArgb(0xE0, 0x08, 0x0A, 0x0E)), outlineWidth);
         var left = centre.X - half;
         var top = centre.Y - half;
+
+        // 底衬：小尺寸下让图标从地形色里"浮"出来
+        dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x00, 0x00)), null, centre, half * 1.05, half * 1.05);
 
         switch (GlyphOf(key))
         {

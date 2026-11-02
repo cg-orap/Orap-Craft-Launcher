@@ -117,25 +117,57 @@ public static class BiomeMapStyler
 
                 if (!borders) continue;
 
-                // 群系边界：右邻或下邻基色不同 → 压暗
-                var isEdge = false;
+                // ── 边界与海岸线 ──
+                // 旧做法是"右/下邻不同就压暗到 0.76"，1 像素硬边，缩小时像描了黑线。
+                // 现在按 8 邻域里有多少个不同基色来算强度，压暗带过渡（0.94 → 0.86），
+                // 并额外做海岸线：陆地靠水一侧提亮、水面靠陆一侧压暗，海岸会自己"浮"出来。
+                var neighbours = 0;
+                var sameEdge = false;
+                var touchesWater = false;
+                var selfWater = IsWater(rgba[i], rgba[i + 1], rgba[i + 2]);
 
-                if (x + 1 < width && Pack(rgba[(row + (x + 1) * 4)], rgba[row + (x + 1) * 4 + 1], rgba[row + (x + 1) * 4 + 2]) != color)
+                for (var dy = -1; dy <= 1; dy++)
                 {
-                    isEdge = true;
+                    var ny = y + dy;
+                    if (ny < 0 || ny >= height) continue;
+
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+
+                        var nx = x + dx;
+                        if (nx < 0 || nx >= width) continue;
+
+                        var j = (ny * width + nx) * 4;
+                        var other = Pack(rgba[j], rgba[j + 1], rgba[j + 2]);
+
+                        if (other == color) continue;
+
+                        neighbours++;
+
+                        if (Math.Abs(dx) + Math.Abs(dy) == 1) sameEdge = true;
+
+                        if (IsWater(rgba[j], rgba[j + 1], rgba[j + 2]) != selfWater) touchesWater = true;
+                    }
                 }
-                else if (y + 1 < height)
+
+                if (neighbours > 0)
                 {
-                    var down = ((y + 1) * width + x) * 4;
-                    if (Pack(rgba[down], rgba[down + 1], rgba[down + 2]) != color) isEdge = true;
+                    // 过渡带：直邻差异明显，斜邻轻微
+                    var factor = sameEdge ? 0.86 : 0.94;
+                    rgba[i + 0] = (byte)(rgba[i + 0] * factor);
+                    rgba[i + 1] = (byte)(rgba[i + 1] * factor);
+                    rgba[i + 2] = (byte)(rgba[i + 2] * factor);
                 }
 
-                if (!isEdge) continue;
-
-                // 三个通道等比例压暗：只压某个通道会让水边出现一圈荧光蓝
-                rgba[i + 0] = (byte)(rgba[i + 0] * 0.76);
-                rgba[i + 1] = (byte)(rgba[i + 1] * 0.76);
-                rgba[i + 2] = (byte)(rgba[i + 2] * 0.76);
+                if (touchesWater)
+                {
+                    // 陆地侧提亮（沙滩感），水面侧压暗（深度感）
+                    var coast = selfWater ? 0.92 : 1.10;
+                    rgba[i + 0] = (byte)Math.Clamp(rgba[i + 0] * coast, 0, 255);
+                    rgba[i + 1] = (byte)Math.Clamp(rgba[i + 1] * coast, 0, 255);
+                    rgba[i + 2] = (byte)Math.Clamp(rgba[i + 2] * coast, 0, 255);
+                }
             }
         }
     }
@@ -144,28 +176,40 @@ public static class BiomeMapStyler
     /// 按群系基色猜一个"高度档"（单位：相对格数，用于计算坡度，不是真实海拔）。
     /// 深水最低 → 海洋 → 河流/沙滩 → 平原/森林 → 丘陵/恶地 → 山地/雪峰 最高。
     /// </summary>
+    /// <summary>按颜色判断是不是水域（新配色下海洋系都满足 b 明显大于 r）。</summary>
+    private static bool IsWater(byte r, byte g, byte b) => b > r + 22 && b > g + 12;
+
     private static short ElevationOf(byte r, byte g, byte b, int worldX, int worldZ)
     {
         var brightness = (r * 299 + g * 587 + b * 114) / 1000;
 
         // 水：蓝色占优，越暗越深
-        if (b > r + 18 && b > g + 6)
+        if (IsWater(r, g, b))
         {
-            var depth = Math.Clamp(90 - brightness, 0, 90);
-            return (short)(-depth / 3);
+            var depth = Math.Clamp(120 - brightness, 0, 120);
+            return (short)(-14 - depth / 2);
         }
 
-        // 雪/山地：很亮且偏冷
-        if (brightness > 205 && b >= r) return (short)(70 + (brightness - 205) / 2);
+        // 雪原/雪峰：最亮且偏冷 → 最高
+        if (brightness > 215 && b >= r) return (short)(96 + (brightness - 215));
 
-        // 恶地/沙漠：暖色，偏干
-        if (r > g + 16 && r > b + 30) return (short)(28 + (r - g) / 6);
+        // 山地/石岸：偏灰、中等偏亮
+        if (brightness > 110 && brightness < 190 && Math.Abs(r - g) < 22 && Math.Abs(g - b) < 22)
+        {
+            return (short)(52 + (brightness - 110) / 4);
+        }
 
-        // 森林：绿占优
-        if (g > r + 14 && g > b + 10) return (short)(18 + (g - r) / 5);
+        // 恶地/沙漠：暖色、偏干 → 台地
+        if (r > g + 12 && r > b + 24)
+        {
+            return (short)(34 + (r - g) / 4);
+        }
+
+        // 森林：绿占优 → 中等丘陵
+        if (g > r + 10 && g > b + 6) return (short)(22 + (g - r) / 4);
 
         // 其余（平原、草地、沙滩…）
-        var baseHeight = brightness > 180 ? 14 : 6;
+        var baseHeight = brightness > 180 ? 16 : 6;
 
         // 确定性起伏：让平原也有缓坡，阴影不会一片死平
         var ripple = (int)(Noise((uint)(worldX * 31 + worldZ * 17), 7, 11) & 0x0F);

@@ -943,31 +943,73 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var left = _centerBlockX - (int)(width / 2 * step);
         var top = _centerBlockZ - (int)(height / 2 * step);
 
-        // 网格与坐标：每 16 区块（256 方块）一条主线
+        // 网格与坐标：主网格 512 格（粗线 + 标注），次网格 128 格（细线、无字）
         if (ShowGrid)
         {
-            const int gridBlocks = 256;
-            var cellPixels = gridBlocks / (double)step;
-            if (cellPixels >= 18)
+            const int majorBlocks = 512;
+            const int minorBlocks = 128;
+
+            var majorPixels = majorBlocks / step;
+            var minorPixels = minorBlocks / step;
+
+            var majorPen = new Pen(GridBrush, 1);
+            var minorPen = new Pen(new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF)), 0.6);
+
+            // 次网格：只在像素间距够大时才画，避免缩小时糊成灰罩
+            if (minorPixels >= 14)
             {
-                var startX = (int)Math.Floor(left / (double)gridBlocks) * gridBlocks;
-                for (var bx = startX; bx <= left + width * step; bx += gridBlocks)
+                var startX = (int)Math.Floor(left / (double)minorBlocks) * minorBlocks;
+                for (var bx = startX; bx <= left + width * step; bx += minorBlocks)
                 {
-                    var x = (bx - left) / (double)step;
-                    dc.DrawLine(new Pen(bx == 0 ? AxisBrush : GridBrush, 1), new Point(x, 0), new Point(x, height));
-                    var label = new FormattedText($"{bx}", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                        MonoFace, 10, TextBrush, dpi);
-                    if (x > 26) dc.DrawText(label, new Point(x + 3, 3));
+                    if (bx % majorBlocks == 0) continue;
+                    var x = (bx - left) / step;
+                    dc.DrawLine(minorPen, new Point(x, 0), new Point(x, height));
                 }
 
-                var startZ = (int)Math.Floor(top / (double)gridBlocks) * gridBlocks;
-                for (var bz = startZ; bz <= top + height * step; bz += gridBlocks)
+                var startZ = (int)Math.Floor(top / (double)minorBlocks) * minorBlocks;
+                for (var bz = startZ; bz <= top + height * step; bz += minorBlocks)
                 {
-                    var y = (bz - top) / (double)step;
-                    dc.DrawLine(new Pen(bz == 0 ? AxisBrush : GridBrush, 1), new Point(0, y), new Point(width, y));
+                    if (bz % majorBlocks == 0) continue;
+                    var y = (bz - top) / step;
+                    dc.DrawLine(minorPen, new Point(0, y), new Point(width, y));
+                }
+            }
+
+            if (majorPixels >= 26)
+            {
+                var startX = (int)Math.Floor(left / (double)majorBlocks) * majorBlocks;
+                for (var bx = startX; bx <= left + width * step; bx += majorBlocks)
+                {
+                    var x = (bx - left) / step;
+                    dc.DrawLine(new Pen(bx == 0 ? AxisBrush : GridBrush, bx == 0 ? 1.4 : 1), new Point(x, 0), new Point(x, height));
+
+                    // 标注贴顶，并在下方加一条浅色描边底衬，压在地形上也能看清
+                    var label = new FormattedText($"{bx}", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                        MonoFace, 10, TextBrush, dpi);
+
+                    if (x > 30)
+                    {
+                        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x66, 0x0B, 0x0D, 0x11)), null,
+                            new Rect(x + 2, 2, label.Width + 2, label.Height));
+                        dc.DrawText(label, new Point(x + 3, 3));
+                    }
+                }
+
+                var startZ = (int)Math.Floor(top / (double)majorBlocks) * majorBlocks;
+                for (var bz = startZ; bz <= top + height * step; bz += majorBlocks)
+                {
+                    var y = (bz - top) / step;
+                    dc.DrawLine(new Pen(bz == 0 ? AxisBrush : GridBrush, bz == 0 ? 1.4 : 1), new Point(0, y), new Point(width, y));
+
                     var label = new FormattedText($"{bz}", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                         MonoFace, 10, TextBrush, dpi);
-                    if (y > 14) dc.DrawText(label, new Point(3, y + 2));
+
+                    if (y > 16)
+                    {
+                        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x66, 0x0B, 0x0D, 0x11)), null,
+                            new Rect(2, y + 1, label.Width + 2, label.Height));
+                        dc.DrawText(label, new Point(3, y + 2));
+                    }
                 }
             }
         }
