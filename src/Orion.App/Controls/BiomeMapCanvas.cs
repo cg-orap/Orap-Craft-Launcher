@@ -1063,7 +1063,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 // 图标随缩放变大变小：缩得很远时不至于糊成一片
                 // 图标要"看得见"：以前缩得很远时会掉到 7px，贴在花花绿绿的地形上根本认不出。
                 // 现在按档位给 13–20px，缩小视图时反而更大一点（信息密度低于放大时，能用空间换可读性）。
-                var iconSize = step >= 48 ? 14.0 : step >= 16 ? 16.0 : 20.0;
+                var iconSize = step >= 48 ? 16.0 : step >= 16 ? 20.0 : 24.0;
                 if (marker.IsStronghold) iconSize += 2;
 
                 StructureIconRenderer.Draw(dc, marker.Key, StructureLabels.BrushFor(marker.Key),

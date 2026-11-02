@@ -270,7 +270,11 @@ public sealed class ToolboxViewModel : ObservableObject
             if (!SetProperty(ref _dimensionIndex, Math.Clamp(value, 0, 2))) return;
             OnPropertyChanged(nameof(DimensionHint));
             DimensionChanged?.Invoke(_dimensionIndex);
-            RebuildOptionsForDimension();
+
+            // 延迟到绑定/布局这一轮结束后再重建，避免 Clear 撞上 WPF 正在枚举
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+                new Action(RebuildOptionsForDimension),
+                System.Windows.Threading.DispatcherPriority.Background);
         }
     }
 
@@ -771,6 +775,18 @@ public sealed class ToolboxViewModel : ObservableObject
     /// 下界里不该出现海洋和村庄，末地里不该出现下界要塞 —— 列一堆点不出结果最烦人。
     /// </summary>
     private void RebuildOptionsForDimension()
+    {
+        try
+        {
+            RebuildOptionsForDimensionCore();
+        }
+        catch (Exception ex)
+        {
+            Orion.Core.Diagnostics.AppLog.Warn("toolbox", "options-rebuild-failed", ("error", ex.Message));
+        }
+    }
+
+    private void RebuildOptionsForDimensionCore()
     {
         bool keep(string name) => DimensionFilter.IsBiomeInDimension(name, _dimensionIndex);
 

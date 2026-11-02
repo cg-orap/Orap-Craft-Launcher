@@ -285,7 +285,8 @@ public static class PixelIcons
         if (!Sprites.TryGetValue(key, out var rows)) rows = Spire;
 
         // 尺寸对齐到整数倍，像素图在任何缩放档位都不会出现半像素模糊
-        var block = Math.Max(1.0, Math.Round(size / Grid));
+        // 每格至少 2px：低于这个尺寸 16×16 的细节全丢，图标就变成一块色斑
+        var block = Math.Max(2.0, Math.Round(size / Grid));
         var left = centre.X - block * Grid / 2;
         var top = centre.Y - block * Grid / 2;
 
@@ -319,9 +320,9 @@ public static class PixelIcons
         // 外框描边：像素图整体加 1px 轮廓，缩小时也不会糊进地形色里
         // 阴影 + 光晕：地形颜色复杂时，图标靠这两层仍然清楚
         var pad = block * Grid;
-        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x55, 0x00, 0x00, 0x00)), null,
+        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x80, 0x00, 0x00, 0x00)), null,
             new Rect(left - 2, top - 2, pad + 4, pad + 4));
-        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x50, 0xFF, 0xFF, 0xFF)), 1),
+        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF)), 1.2),
             new Rect(left - 1, top - 1, pad + 2, pad + 2));
 
         dc.DrawRectangle(null, new Pen(outline, 1.4), new Rect(left, top, pad, pad));
