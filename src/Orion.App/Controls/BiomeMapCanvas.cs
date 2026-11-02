@@ -234,6 +234,16 @@ public sealed class BiomeMapCanvas : FrameworkElement
             _dimension = value;
             _structures.Clear();
             _spawn = null;
+
+            // 换维度必须把旧维度的瓦片/预览/整屏图全部作废，
+            // 否则新维度的图会和旧维度的残影拼在一起（画面上会出现 L 形色带）。
+            _tileLayer.Clear();
+            _previewBitmap = null;
+            _previewVersion++;
+            _bitmap = null;
+            _bitmapVersion++;
+            _bitmapWorldWidth = 0;
+
             RequestRender();
         }
     }
@@ -1036,7 +1046,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var blockZ = top + (int)(position.Y * step);
 
         var nativeId = CubiomesNative.Available
-            ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, CubiomesNative.DimOverworld, step, blockX, 63, blockZ)
+            ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, _dimension, step, blockX, 63, blockZ)
             : -1;
 
         // 命中附近的结构（12px 内取最近的一个）

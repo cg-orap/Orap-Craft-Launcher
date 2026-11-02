@@ -18,6 +18,13 @@
 #include "biomes.h"
 #include "util.h"
 
+static void apply_color_overrides(unsigned char colors[256][3])
+{
+    colors[14][0] = 0xA8; colors[14][1] = 0x8C; colors[14][2] = 0x9E;   // 蘑菇岛：灰紫
+    colors[15][0] = 0xB8; colors[15][1] = 0xA1; colors[15][2] = 0xAC;   // 蘑菇岛岸：浅灰紫
+}
+
+
 #if defined(_WIN32)
 #define ORAP_API __declspec(dllexport)
 #else
@@ -357,6 +364,7 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
 
     unsigned char colors[256][3];
     initBiomeColors(colors);
+    apply_color_overrides(colors);
 
     for (int py = 0; py < height; py++)
     {
@@ -401,6 +409,12 @@ ORAP_API int orap_biome_at(uint64_t seed, int version_index, int dim, int scale,
     return getBiomeAt(&g, 4, x >> 2, y >> 2, z >> 2);
 }
 
+/**
+ * 调色板覆盖：cubiomes 沿用 AMIDST 的传统配色，
+ * 其中 mushroom_fields(14) / mushroom_field_shore(15) 是纯品红 0xFF00FF，
+ * 容易被当成"渲染出错"。这里换成更符合直觉的蘑菇色（灰紫 / 灰米）。
+ */
+
 /** 群系 id → 调色板颜色（和渲染用的是同一张表，供测试核对"颜色与名字一致"） */
 ORAP_API int orap_biome_color(int id, int *outRgb)
 {
@@ -409,6 +423,7 @@ ORAP_API int orap_biome_color(int id, int *outRgb)
 
     unsigned char colors[256][3];
     initBiomeColors(colors);
+    apply_color_overrides(colors);
 
     outRgb[0] = colors[id][0];
     outRgb[1] = colors[id][1];
