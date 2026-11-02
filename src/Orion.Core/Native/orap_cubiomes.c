@@ -381,14 +381,39 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
 }
 
 /** 单点群系 id（scale 与上面一致；y 是方块高度，scale>1 时按 1:4 解释） */
+/**
+ * 单点群系查询。
+ * x/y/z 一律传**方块坐标**；内部换算成 getBiomeAt 需要的单位：
+ *   · getBiomeAt 的 scale 只接受 1 或 4（cubiomes 文档明确要求）
+ *   · scale=4 时 x/z/y 都是 1:4 坐标，所以要 >>2
+ * 以前直接把"每像素方块数(16/32/64)"当 scale 传进去，
+ * 结果悬停显示的名字和地图颜色完全对不上。
+ */
 ORAP_API int orap_biome_at(uint64_t seed, int version_index, int dim, int scale, int x, int y, int z)
 {
-    if (scale != 1 && scale != 4 && scale != 16 && scale != 64 && scale != 256) scale = 4;
-
     Generator g;
     memset(&g, 0, sizeof(g));
     if (run_generator(&g, version_index, 0, dim, seed) != 0) return -1;
-    return getBiomeAt(&g, scale, x, y, z);
+
+    if (scale <= 1)
+        return getBiomeAt(&g, 1, x, y, z);
+
+    return getBiomeAt(&g, 4, x >> 2, y >> 2, z >> 2);
+}
+
+/** 群系 id → 调色板颜色（和渲染用的是同一张表，供测试核对"颜色与名字一致"） */
+ORAP_API int orap_biome_color(int id, int *outRgb)
+{
+    if (!outRgb) return -2;
+    if (id < 0 || id > 255) return -1;
+
+    unsigned char colors[256][3];
+    initBiomeColors(colors);
+
+    outRgb[0] = colors[id][0];
+    outRgb[1] = colors[id][1];
+    outRgb[2] = colors[id][2];
+    return 0;
 }
 
 /** 群系 id → 英文名（用于悬停提示；静态字符串） */

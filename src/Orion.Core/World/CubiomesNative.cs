@@ -262,6 +262,24 @@ public static class CubiomesNative
         }
     }
 
+    /// <summary>群系 id → 调色板颜色（渲染用的同一张表）。</summary>
+    public static (int R, int G, int B)? BiomeColor(int id)
+    {
+        EnsureProbed();
+        if (!_available || id < 0 || id > 255) return null;
+
+        var rgb = new int[3];
+
+        try
+        {
+            return orap_biome_color(id, rgb) == 0 ? (rgb[0], rgb[1], rgb[2]) : null;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>诊断用：最近一次渲染实际使用的区间 (x, z, sx, sz, scale, y)。</summary>
     public static int[]? DebugLastRange()
     {
@@ -465,6 +483,9 @@ public static class CubiomesNative
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int orap_biome_at(ulong seed, int versionIndex, int dim, int scale, int x, int y, int z);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_biome_color(int id, int[] outRgb);
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr orap_biome_name(int versionIndex, int id);
