@@ -389,6 +389,26 @@ public sealed class BiomeMapCanvas : FrameworkElement
    // 视觉倍率保持动画终值，等新图到达后在回调里归位
     }
 
+    /// <summary>
+    /// 缩放动画结束后把视觉倍率平滑归位到 1。
+    /// 以前是直接置 1，动画被打断时会"往回弹一下"。
+    /// </summary>
+    private void SettleZoom()
+    {
+        if (Math.Abs(VisualScale - 1.0) < 0.001)
+        {
+            BeginAnimation(VisualScaleProperty, null);
+            VisualScale = 1.0;
+            return;
+        }
+
+        BeginAnimation(VisualScaleProperty, new DoubleAnimation(VisualScale, 1.0,
+            new Duration(TimeSpan.FromMilliseconds(150)))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        });
+    }
+
     private DispatcherTimer? _zoomWatchdog;
 
     private void OnZoomWatchdogTick(object? sender, EventArgs e)
@@ -702,6 +722,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (version != _bitmapVersion) return;    // 已被更新的请求取代
+                    SettleZoom();
                     if (_useTiles)
                     {
                         // 瓦片模式：整屏只负责结构与出生点，像素交给瓦片层
@@ -710,8 +731,6 @@ public sealed class BiomeMapCanvas : FrameworkElement
                         _spawn = spawn;
                         _loading = false;
                         _pendingZoomIndex = null;
-                        BeginAnimation(VisualScaleProperty, null);
-                        VisualScale = 1.0;
                         InvalidateVisual();
                         PlanTiles();
                         return;

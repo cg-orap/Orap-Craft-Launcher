@@ -42,7 +42,8 @@ public static class BiomeMapStyler
         if (!textures && !borders && !hillshade) return;
 
         // 纹理在世界里的格子大小：放大视图时纹理粗一点，缩小时细一点
-        var tileWorld = Math.Max(4, blocksPerPixel * 2);
+        // 纹理斑点的世界尺度：按 1 像素取，放大时更细，缩小时不会变成大色块
+        var tileWorld = Math.Max(2, blocksPerPixel);
 
         // 近似高程：cubiomes 没有暴露地表高度，这里按群系类别给一个"高度档"，
         // 再加一点确定性起伏，用来做方向光阴影。**这是近似值**，界面上也要这么说。
