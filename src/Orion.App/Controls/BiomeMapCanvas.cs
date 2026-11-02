@@ -507,6 +507,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
         var width = Math.Max(8, (int)Math.Round(ActualWidth) / 4);
         var height = Math.Max(8, (int)Math.Round(ActualHeight) / 4);
+
+        // 覆盖范围按**画布尺寸**算。以前用降采样后的像素数乘 step，
+        // 结果预览只覆盖 1/4 的画布，其余地方就是"空洞"。
+        var viewWidth = Math.Max(8, (int)Math.Round(ActualWidth));
+        var viewHeight = Math.Max(8, (int)Math.Round(ActualHeight));
         var centerX = _centerBlockX;
         var centerZ = _centerBlockZ;
         var step = BlocksPerPixel;
@@ -532,8 +537,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
                 if (styled)
                 {
-                    var worldLeft = centerX - (int)(width * supersample / 2.0 * step);
-                    var worldTop = centerZ - (int)(height * supersample / 2.0 * step);
+                    var worldLeft = centerX - (int)(viewWidth / 2.0 * step);
+                    var worldTop = centerZ - (int)(viewHeight / 2.0 * step);
                     BiomeMapStyler.Stylize(pixels, pixelWidth, pixelHeight, worldLeft, worldTop,
                         Math.Max(1, step / supersample), textures: false, borders: false, hillshade: true);
                 }
@@ -552,8 +557,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _previewCenterZ = centerZ;
                     _previewStep = step;
 
-                    _previewWorldWidth = width * (double)step;
-                    _previewWorldHeight = height * (double)step;
+                    _previewWorldWidth = viewWidth * (double)step;
+                    _previewWorldHeight = viewHeight * (double)step;
                     _previewWorldLeft = centerX - _previewWorldWidth / 2;
                     _previewWorldTop = centerZ - _previewWorldHeight / 2;
                     InvalidateVisual();
@@ -600,6 +605,10 @@ public sealed class BiomeMapCanvas : FrameworkElement
             var downscale = BlocksPerPixel >= 8 ? 2 : 1;
             var width = Math.Max(2, (int)Math.Round(ActualWidth) / downscale);
             var height = Math.Max(2, (int)Math.Round(ActualHeight) / downscale);
+
+            // 同上：覆盖范围要用画布尺寸，而不是降采样后的像素数
+            var viewWidth = Math.Max(2, (int)Math.Round(ActualWidth));
+            var viewHeight = Math.Max(2, (int)Math.Round(ActualHeight));
             var seed = _seed;
             var centerX = _centerBlockX;
             var centerZ = _centerBlockZ;
@@ -643,8 +652,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 // 质感：给纯色群系图加程序化贴图 + 群系描边（纯计算，不依赖额外原生接口）
                 if (!_useTiles && _styled)
                 {
-                    var worldLeft = centerX - (int)(width * supersample / 2.0 * step);
-                    var worldTop = centerZ - (int)(height * supersample / 2.0 * step);
+                    var worldLeft = centerX - (int)(viewWidth / 2.0 * step);
+                    var worldTop = centerZ - (int)(viewHeight / 2.0 * step);
 
                     BiomeMapStyler.Stylize(pixels, pixelWidth, pixelHeight,
                         worldLeft, worldTop, Math.Max(1, step / Math.Max(1, supersample)),
@@ -722,8 +731,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     _bitmapStep = step;
 
                     // 注意：这里的 width/height 是位图像素数，乘 step 得到覆盖的方块范围
-                    _bitmapWorldWidth = width * (double)step;
-                    _bitmapWorldHeight = height * (double)step;
+                    _bitmapWorldWidth = viewWidth * (double)step;
+                    _bitmapWorldHeight = viewHeight * (double)step;
                     _bitmapWorldLeft = centerX - _bitmapWorldWidth / 2;
                     _bitmapWorldTop = centerZ - _bitmapWorldHeight / 2;
                     _loading = false;
