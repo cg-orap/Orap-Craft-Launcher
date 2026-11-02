@@ -179,6 +179,54 @@ public static class CubiomesNative
         }
     }
 
+    /// <summary>
+    /// 诊断用：同时返回 genBiomes 数组与 getBiomeAt 逐点真值。
+    /// </summary>
+    /// <summary>最近一次诊断调用的返回码（0 = 成功）。</summary>
+    public static int LastDebugRc { get; private set; }
+
+    public static (int[] Ids, int[] Probe)? DebugIdsAndProbe(long seed, int versionIndex, int dimension,
+        int centerBlockX, int centerBlockZ, int scale, int width, int height)
+    {
+        EnsureProbed();
+        if (!_available || width <= 0 || height <= 0) return null;
+
+        var ids = new int[width * height];
+        var probe = new int[width * height];
+
+        try
+        {
+            var rc = orap_debug_ids_and_probe(unchecked((ulong)seed), versionIndex, 0, dimension,
+                centerBlockX, centerBlockZ, scale, width, height, ids, probe);
+
+            LastDebugRc = rc;
+            return rc == 0 ? (ids, probe) : null;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            LastDebugRc = -999;
+            return null;
+        }
+    }
+
+    /// <summary>诊断用：最近一次渲染实际使用的区间 (x, z, sx, sz, scale, y)。</summary>
+    public static int[]? DebugLastRange()
+    {
+        EnsureProbed();
+        if (!_available) return null;
+
+        var range = new int[6];
+
+        try
+        {
+            return orap_debug_last_range(range, range.Length) == 0 ? range : null;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>单点群系 id；scale 同上。</summary>
     public static int BiomeAt(long seed, int versionIndex, int dimension, int scale, int blockX, int y, int blockZ)
     {
@@ -331,6 +379,15 @@ public static class CubiomesNative
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr orap_version_key(int index);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_debug_ids_and_probe(
+        ulong seed, int versionIndex, int largeBiomes, int dimension,
+        int centerX, int centerZ, int scale, int width, int height,
+        int[] outIds, int[] outProbe);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_debug_last_range(int[] outRange, int capacity);
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int orap_debug_ids(

@@ -101,6 +101,70 @@ static int run_generator(Generator *g, int version_index, int large_biomes, int 
  * 诊断用：和 orap_render_biomes 完全相同的区间计算，但输出**群系 id**而不是颜色。
  * 用来在 C# 侧逐格比对"两个不同起点的渲染是否错位"，并确定错位量。
  */
+static int g_dbg_range[8];
+
+/** 诊断用：取最近一次 render/debug 调用里实际传给 genBiomes 的 r 值。 */
+ORAP_API int orap_debug_last_range(int *out, int capacity)
+{
+    if (!out || capacity < 6) return -2;
+    for (int i = 0; i < 6; i++) out[i] = g_dbg_range[i];
+    return 0;
+}
+
+ORAP_API int orap_debug_ids_and_probe(uint64_t seed, int version_index, int large_biomes, int dim,
+                                      int centerX, int centerZ, int scale,
+                                      int width, int height,
+                                      int *outIds, int *outProbe)
+{
+    if (!outIds || !outProbe || width <= 0 || height <= 0) return -2;
+    if (scale != 1 && scale != 4 && scale != 16 && scale != 64 && scale != 256) scale = 4;
+
+    Range r;
+    r.scale = scale;
+    r.x = centerX - (width / 2) * scale;
+    r.z = centerZ - (height / 2) * scale;
+    r.sx = width;
+    r.sz = height;
+    r.y = (scale == 1) ? 63 : 15;
+    r.sy = 1;
+
+    g_dbg_range[0] = r.x;
+    g_dbg_range[1] = r.z;
+    g_dbg_range[2] = r.sx;
+    g_dbg_range[3] = r.sz;
+    g_dbg_range[4] = r.scale;
+    g_dbg_range[5] = r.y;
+
+    Generator g;
+    memset(&g, 0, sizeof(g));
+    if (run_generator(&g, version_index, large_biomes, dim, seed) != 0) return -3;
+
+    int *ids = allocCache(&g, r);
+    if (!ids) return -4;
+
+    int err = genBiomes(&g, ids, r);
+    if (err) { free(ids); return err; }
+
+    for (int z = 0; z < height; z++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            outIds[z * width + x] = ids[z * r.sx + x];
+
+            int blockX = r.x + x * scale;
+            int blockZ = r.z + z * scale;
+
+            if (scale == 1)
+                outProbe[z * width + x] = getBiomeAt(&g, 1, blockX, 63, blockZ);
+            else
+                outProbe[z * width + x] = getBiomeAt(&g, 4, blockX / 4, 15, blockZ / 4);
+        }
+    }
+
+    free(ids);
+    return 0;
+}
+
 ORAP_API int orap_debug_ids(uint64_t seed, int version_index, int large_biomes, int dim,
                             int centerX, int centerZ, int scale,
                             int width, int height, int *outIds)
@@ -155,6 +219,13 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
     // 地表取样高度：scale=1 时是方块坐标，否则是 1:4 的生物群系坐标
     r.y = (scale == 1) ? 63 : 15;
     r.sy = 1;
+
+    g_dbg_range[0] = r.x;
+    g_dbg_range[1] = r.z;
+    g_dbg_range[2] = r.sx;
+    g_dbg_range[3] = r.sz;
+    g_dbg_range[4] = r.scale;
+    g_dbg_range[5] = r.y;
 
     Generator g;
     memset(&g, 0, sizeof(g));
