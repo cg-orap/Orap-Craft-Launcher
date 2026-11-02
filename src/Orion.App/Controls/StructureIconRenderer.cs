@@ -52,6 +52,37 @@ public static class StructureIconRenderer
                 dc.DrawLine(new Pen(brush, 1.2), new Point(centre.X, top), new Point(centre.X, top + size * 0.55));
                 break;
 
+            case Glyph.Villager:
+            {
+                // 村民头像：方脑袋 + 眉 + 大鼻子（参考 MC 里的村民脸）
+                dc.DrawRectangle(brush, outline,
+                    new Rect(left + size * 0.08, top + size * 0.08, size * 0.84, size * 0.84));
+
+                var dark = new SolidColorBrush(Color.FromArgb(0xDD, 0x1A, 0x1D, 0x24));
+                var brow = new Pen(dark, Math.Max(0.7, size * 0.07));
+
+                dc.DrawLine(brow, new Point(left + size * 0.24, top + size * 0.36),
+                    new Point(left + size * 0.44, top + size * 0.4));
+                dc.DrawLine(brow, new Point(left + size * 0.56, top + size * 0.4),
+                    new Point(left + size * 0.76, top + size * 0.36));
+
+                dc.DrawRectangle(dark, null,
+                    new Rect(centre.X - size * 0.1, top + size * 0.44, size * 0.2, size * 0.34));
+                break;
+            }
+
+            case Glyph.Elytra:
+            {
+                // 鞘翅：两片对称的翅膀
+                dc.DrawGeometry(brush, outline, Geometry.Parse(
+                    $"M {centre.X},{top + size * 0.12} L {left + size * 0.04},{top + size * 0.5} " +
+                    $"L {centre.X - size * 0.04},{top + size} L {centre.X},{top + size * 0.55} Z"));
+                dc.DrawGeometry(brush, outline, Geometry.Parse(
+                    $"M {centre.X},{top + size * 0.12} L {left + size * 0.96},{top + size * 0.5} " +
+                    $"L {centre.X + size * 0.04},{top + size} L {centre.X},{top + size * 0.55} Z"));
+                break;
+            }
+
             case Glyph.Chest:
                 dc.DrawRectangle(brush, outline, new Rect(left + size * 0.1, top + size * 0.35, size * 0.8, size * 0.6));
                 dc.DrawLine(new Pen(outline.Brush, 0.8), new Point(left + size * 0.1, top + size * 0.55),
@@ -107,6 +138,8 @@ public static class StructureIconRenderer
         Pyramid,
         Boat,
         Chest,
+        Villager,
+        Elytra,
         Columns,
         Arch,
         Spire,
@@ -116,7 +149,7 @@ public static class StructureIconRenderer
 
     private static Glyph GlyphOf(string key) => key switch
     {
-        "village" => Glyph.House,
+        "village" => Glyph.Villager,
         "outpost" => Glyph.Tower,
         "monument" or "mansion" => Glyph.Roof,
         "desert_pyramid" or "jungle_temple" or "igloo" or "swamp_hut"
@@ -128,7 +161,7 @@ public static class StructureIconRenderer
         "fortress" or "bastion" => Glyph.Tower,
         "end_city" => Glyph.Spire,          // 末地城：塔
         "end_gateway" => Glyph.Arch,        // 末地折跃门：门框
-        "end_ship" => Glyph.Boat,           // 末地船：船（和末地城分开）
+        "end_ship" => Glyph.Elytra,         // 末地船：鞘翅（和末地城分开）
         "stronghold" => Glyph.Eye,
         "spawn" => Glyph.Cross,
         _ => Glyph.Dot,

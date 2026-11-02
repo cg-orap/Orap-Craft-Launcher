@@ -85,9 +85,10 @@ public static class BiomeMapStyler
                     var hDown = y + 1 < height ? heights[(y + 1) * width + x] : h;
                     var slope = (hRight - h) + (hDown - h);
 
-                    // slope 每单位约 1 格；缩放后适当放大，避免高差太小看不出来
-                    var strength = blocksPerPixel >= 16 ? 2.2 : 3.2;
-                    shade = (int)Math.Round(128 + slope * strength);
+                    // 关键：坡度按"每方块"归一化，而不是按"每像素"。
+                    // 否则放大/缩小时同一个群系的阴影强弱会变，看起来像换了颜色。
+                    var strength = 1.6 / Math.Max(1, blocksPerPixel);
+                    shade = (int)Math.Round(128 + slope * strength * 4.0);
                     shade = Math.Clamp(shade, 92, 164);
                 }
 
