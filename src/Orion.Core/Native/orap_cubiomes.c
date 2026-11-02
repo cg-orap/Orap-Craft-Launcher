@@ -27,6 +27,39 @@ static void apply_color_overrides(unsigned char colors[256][3])
     // 画出来就是一块"像洞一样的黑区"。换成深空紫，和真正的空地能区分开。
     colors[127][0] = 0x1A; colors[127][1] = 0x14; colors[127][2] = 0x28;
 
+    // ── 主世界精修配色 ──
+    // cubiomes 沿用的是 AMIDST 的高饱和配色：海洋是纯深蓝、森林是荧光绿，
+    // 整张图看久了刺眼、层次也乱。这里换一套明度更统一、饱和度更低的配色，
+    // 让"海/陆/雪/沙"四类能一眼分开，细节色又不会互相打架。
+    // id 见 cubiomes biome id（与 MC 一致）。
+    colors[0][0]=0x1E,  colors[0][1]=0x2A,  colors[0][2]=0x4A;   // ocean 深海蓝
+    colors[1][0]=0x8F,  colors[1][1]=0xAE,  colors[1][2]=0x6E;   // plains 柔绿
+    colors[2][0]=0xD9,  colors[2][1]=0xC0,  colors[2][2]=0x7A;   // desert 沙
+    colors[3][0]=0x4E,  colors[3][1]=0x6E,  colors[3][2]=0x55;   // mountains 山岩
+    colors[4][0]=0x3D,  colors[4][1]=0x63,  colors[4][2]=0x45;   // forest 林绿
+    colors[5][0]=0x33,  colors[5][1]=0x5B,  colors[5][2]=0x55;   // taiga 针叶
+    colors[6][0]=0x3E,  colors[6][1]=0x5A,  colors[6][2]=0x7A;   // swamp 沼泽
+    colors[7][0]=0x3A,  colors[7][1]=0x62,  colors[7][2]=0x5C;   // river 河
+    colors[8][0]=0x2F,  colors[8][1]=0x3F,  colors[8][2]=0x66;   // nether_wastes
+    colors[10][0]=0xEA, colors[10][1]=0xF1, colors[10][2]=0xF4;  // frozen_ocean 冰面
+    colors[11][0]=0xEB, colors[11][1]=0xF2, colors[11][2]=0xF5;  // frozen_river
+    colors[12][0]=0xE6, colors[12][1]=0xEF, colors[12][2]=0xF2;  // snowy_tundra 雪
+    colors[13][0]=0xE2, colors[13][1]=0xEC, colors[13][2]=0xF0;  // snowy_mountains
+    colors[16][0]=0xD8, colors[16][1]=0xC9, colors[16][2]=0x9C;  // beach 沙滩
+    colors[21][0]=0x4A, colors[21][1]=0x6A, colors[21][2]=0x4E;  // jungle 丛林
+    colors[27][0]=0x66, colors[27][1]=0x85, colors[27][2]=0x5C;  // birch_forest
+    colors[29][0]=0x36, colors[29][1]=0x52, colors[29][2]=0x3E;  // dark_forest
+    colors[30][0]=0xE4, colors[30][1]=0xEE, colors[30][2]=0xF2;  // snowy_taiga
+    colors[32][0]=0x6F, colors[32][1]=0x7E, colors[32][2]=0x5E;  // giant_tree_taiga
+    colors[35][0]=0x9A, colors[35][1]=0x86, colors[35][2]=0x5E;  // wooded_badlands 疏林恶地
+    colors[37][0]=0xA8, colors[37][1]=0x8A, colors[37][2]=0x78;  // badlands_plateau
+    colors[39][0]=0xC9, colors[39][1]=0x9A, colors[39][2]=0x62;  // badlands 恶地（陶土）
+    colors[45][0]=0x52, colors[45][1]=0x74, colors[45][2]=0x80;  // lukewarm_ocean
+    colors[46][0]=0x40,  colors[46][1]=0x60, colors[46][2]=0x76;  // cold_ocean
+    colors[47][0]=0x3A, colors[47][1]=0x55, colors[47][2]=0x6E;  // deep_cold_ocean
+    colors[48][0]=0x2C, colors[48][1]=0x44, colors[48][2]=0x60;  // deep_frozen_ocean
+    colors[49][0]=0x35, colors[49][1]=0x50, colors[49][2]=0x6C;  // deep_lukewarm_ocean
+    colors[50][0]=0x25, colors[50][1]=0x38, colors[50][2]=0x58;  // deep_ocean
     // ── 末地：按"看得懂"的方式重上色 ──
     // 原来的问题是：the_end(9) 是 0x8080FF 浅紫，跟外岛的黄绿完全不同，
     // 主岛看起来就像一块"空洞"；而 small_end_islands(40) 是 0x4B4BAB 深紫，
