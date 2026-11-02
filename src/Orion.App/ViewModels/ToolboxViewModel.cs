@@ -270,6 +270,7 @@ public sealed class ToolboxViewModel : ObservableObject
             if (!SetProperty(ref _dimensionIndex, Math.Clamp(value, 0, 2))) return;
             OnPropertyChanged(nameof(DimensionHint));
             DimensionChanged?.Invoke(_dimensionIndex);
+            RebuildOptionsForDimension();
         }
     }
 
@@ -729,6 +730,12 @@ public sealed class ToolboxViewModel : ObservableObject
     // ── 定位生物群系（像 cubiomes-viewer 的 biome finder）──────
     public ObservableList<BiomeOption> BiomeOptions { get; } = [];
 
+    /// <summary>全部群系（不过滤维度），切换维度时从这里筛选。</summary>
+    private readonly List<BiomeOption> _allBiomeOptions = [];
+
+    /// <summary>全部结构类型（不过滤维度）。</summary>
+    private readonly List<StructureFilterOption> AllStructureFilterOptions = [];
+
     private BiomeOption? _selectedBiome;
     private string _biomeSearchStatus = "选一个群系，从这里向外找一个最近的实例。";
 
@@ -746,23 +753,89 @@ public sealed class ToolboxViewModel : ObservableObject
 
     public ICommand FindBiomeCommand { get; }
 
-    private void LoadBiomeOptions()
+    /// <summary>
+    /// 按当前维度过滤"定位群系"和"定位结构"的候选列表。
+    /// 下界里不该出现海洋和村庄，末地里不该出现下界要塞 —— 列一堆点不出结果最烦人。
+    /// </summary>
+    private void RebuildOptionsForDimension()
     {
-        if (BiomeOptions.Count > 0) return;
+        var keep = _dimensionIndex switch
+        {
+            1 => (Func<string, bool>)(name =>
+                name.Contains("wastes") || name.Contains("soul") || name.Contains("crimson") ||
+                name.Contains("warped") || name.Contains("basalt") || name.Contains("nether") ||
+                name.Contains("hell")),
+            2 => name => name.Contains("end") || name.Contains("void"),
+            _ => name => true,
+        };
+
+        var biome = BiomeOptions.FirstOrDefault(o => o.Name == _selectedBiome?.Name);
+
+        BiomeOptions.Clear();
+        _allBiomeOptions.Clear();
+
+        foreach (var option in LoadAllBiomes())
+        {
+            if (keep(option.Key)) _allBiomeOptions.Add(option);
+        }
+
+        foreach (var option in _allBiomeOptions) BiomeOptions.Add(option);
+
+        SelectedBiome = BiomeOptions.FirstOrDefault(o => o.Name == biome?.Name) ?? BiomeOptions.FirstOrDefault();
+
+        // 结构同理：下界只看要塞/堡垒/废弃传送门，末地只看末地城/折跃门/末地船
+        foreach (var option in StructureFilterOptions) StructureFilterOptions.Remove(option);
+
+        foreach (var option in AllStructureFilterOptions)
+        {
+            var key = option.Group;
+
+            var inDimension = _dimensionIndex switch
+            {
+                1 => key is "fortress" or "bastion" or "ruined_portal_nether",
+                2 => key is "end_city" or "end_gateway" or "end_ship",
+                _ => key is not ("fortress" or "bastion" or "ruined_portal_nether" or "end_city" or "end_gateway" or "end_ship"),
+            };
+
+            if (inDimension) StructureFilterOptions.Add(option);
+        }
+
+        OnPropertyChanged(nameof(StructureFilterOptions));
+    }
+
+    private IReadOnlyList<BiomeOption> LoadAllBiomes()
+    {
+        if (_allBiomeOptions.Count > 0) return _allBiomeOptions;
 
         var version = CubiomesNative.VersionIndexFor(SeedVersion);
-        var list = new List<BiomeOption>();
 
         // cubiomes 的群系 id 有固定范围，逐个数比较慢，但只在第一次打开时做一次
         for (var id = 0; id < 200; id++)
         {
             var name = CubiomesNative.BiomeName(version, id);
             if (string.IsNullOrWhiteSpace(name)) continue;
-            list.Add(new BiomeOption(id, BiomeCatalog.FromCubiomesName(name) ?? name));
+
+            // 记住 cubiomes 原始英文名（用于按维度过滤），显示用中文
+            _allBiomeOptions.Add(new BiomeOption(id, BiomeCatalog.FromCubiomesName(name) ?? name, name));
         }
 
-        BiomeOptions.Replace(list.OrderBy(b => b.Name, StringComparer.CurrentCulture));
+        return _allBiomeOptions;
+    }
+
+    private void LoadBiomeOptions()
+    {
+        if (BiomeOptions.Count > 0) return;
+
+        var all = LoadAllBiomes().OrderBy(b => b.Name, StringComparer.CurrentCulture).ToList();
+
+        BiomeOptions.Replace(all);
         SelectedBiome = BiomeOptions.FirstOrDefault(b => b.Name.Contains("平原")) ?? BiomeOptions.FirstOrDefault();
+
+        // 结构选项第一次也复制一份完整列表，供按维度筛选
+        if (AllStructureFilterOptions.Count == 0)
+        {
+            foreach (var option in StructureFilterOptions) AllStructureFilterOptions.Add(option);
+        }
     }
 
     /// <summary>
@@ -1222,10 +1295,13 @@ public sealed class NearbyStructure
 }
 
 /// <summary>群系下拉项：cubiomes 的 id + 中文名。</summary>
-public sealed class BiomeOption(int id, string name)
+public sealed class BiomeOption(int id, string name, string? key = null)
 {
     public int Id { get; } = id;
     public string Name { get; } = name;
+
+    /// <summary>cubiomes 原始英文名（按维度过滤用）。</summary>
+    public string Key { get; } = key ?? name;
 
     public override string ToString() => Name;
 }
