@@ -277,6 +277,12 @@ public static class PixelIcons
         ["end_ship"] = Elytra,
     };
 
+    /// <summary>把颜色向白色混合，提高亮度但保留色相。</summary>
+    private static Color Lighten(Color color, double amount) => Color.FromRgb(
+        (byte)Math.Clamp(color.R + (255 - color.R) * amount, 0, 255),
+        (byte)Math.Clamp(color.G + (255 - color.G) * amount, 0, 255),
+        (byte)Math.Clamp(color.B + (255 - color.B) * amount, 0, 255));
+
     public static bool Has(string key) => Sprites.ContainsKey(key);
 
     /// <summary>把像素图画在 centre 为中心的 size×size 方框里。</summary>
@@ -290,14 +296,16 @@ public static class PixelIcons
         var left = centre.X - block * Grid / 2;
         var top = centre.Y - block * Grid / 2;
 
-        var outline = new SolidColorBrush(Color.FromArgb(0xE6, 0x05, 0x07, 0x0A));
+        var outline = new SolidColorBrush(Color.FromArgb(0xE6, 0x3C, 0x34, 0x2C));
         var brushes = new Dictionary<char, SolidColorBrush>();
 
         SolidColorBrush BrushOf(char c)
         {
             if (brushes.TryGetValue(c, out var cached)) return cached;
 
-            var brush = Palette.TryGetValue(c, out var color) ? new SolidColorBrush(color) : new SolidColorBrush(Colors.Magenta);
+            // 整体提亮：原调色板偏暗，压在浅色底板上会显成一块黑
+            var baseColor = Palette.TryGetValue(c, out var color) ? color : Colors.Magenta;
+            var brush = new SolidColorBrush(Lighten(baseColor, 0.34));
             brush.Freeze();
             brushes[c] = brush;
             return brush;

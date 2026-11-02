@@ -106,6 +106,39 @@ public partial class MainWindow : Window
         Height = h;
     }
 
+    private bool _isFullscreen;
+    private WindowState _stateBeforeFullscreen = WindowState.Normal;
+    private WindowStyle _styleBeforeFullscreen = WindowStyle.SingleBorderWindow;
+
+    /// <summary>全屏切换：隐藏自绘标题栏、铺满屏幕（F11 或右上角按钮）。</summary>
+    private void OnToggleFullscreen(object sender, System.Windows.RoutedEventArgs e) => ToggleFullscreen();
+
+    private void ToggleFullscreen()
+    {
+        if (!_isFullscreen)
+        {
+            _stateBeforeFullscreen = WindowState;
+            _styleBeforeFullscreen = WindowStyle;
+
+            TitleBar.Visibility = System.Windows.Visibility.Collapsed;
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Normal;
+            WindowState = WindowState.Maximized;
+
+            _isFullscreen = true;
+        }
+        else
+        {
+            TitleBar.Visibility = System.Windows.Visibility.Visible;
+            WindowStyle = _styleBeforeFullscreen;
+            ResizeMode = ResizeMode.CanResize;
+            WindowState = _stateBeforeFullscreen;
+
+            _isFullscreen = false;
+        }
+    }
+
     private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)
         => WindowState = WindowState.Minimized;
 
