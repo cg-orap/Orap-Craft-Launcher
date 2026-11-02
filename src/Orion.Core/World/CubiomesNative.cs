@@ -209,6 +209,34 @@ public static class CubiomesNative
         }
     }
 
+    /// <summary>
+    /// 诊断用：原样取出 genBiomes 的缓存（真实长度由 getMinCacheSize 给出），
+    /// 附带 getBiomeAt 逐点真值，供上层搜索真实布局。
+    /// </summary>
+    public static (int[] Raw, int Length, int[] Info, int[] Probe)? DebugRawCache(long seed, int versionIndex,
+        int dimension, int centerX, int centerZ, int scale, int width, int height)
+    {
+        EnsureProbed();
+        if (!_available || width <= 0 || height <= 0) return null;
+
+        const int capacity = 1 << 18;
+        var raw = new int[capacity];
+        var info = new int[8];
+        var probe = new int[width * height];
+
+        try
+        {
+            var n = orap_debug_raw_cache(unchecked((ulong)seed), versionIndex, 0, dimension,
+                centerX, centerZ, scale, width, height, raw, capacity, info, probe);
+
+            return n >= 0 ? (raw, n, info, probe) : null;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>诊断用：最近一次渲染实际使用的区间 (x, z, sx, sz, scale, y)。</summary>
     public static int[]? DebugLastRange()
     {
@@ -379,6 +407,12 @@ public static class CubiomesNative
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr orap_version_key(int index);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_debug_raw_cache(
+        ulong seed, int versionIndex, int largeBiomes, int dimension,
+        int centerX, int centerZ, int scale, int width, int height,
+        int[] outRaw, int rawCapacity, int[] outInfo, int[] outProbe);
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int orap_debug_ids_and_probe(

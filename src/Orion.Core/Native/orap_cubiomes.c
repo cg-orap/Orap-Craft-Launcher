@@ -111,6 +111,66 @@ ORAP_API int orap_debug_last_range(int *out, int capacity)
     return 0;
 }
 
+/**
+ * 诊断用：把 genBiomes 填好的缓存原样拷出来（含 getMinCacheSize 得到的真实长度），
+ * 同时给出 getBiomeAt 的逐点真值。C# 侧用它在各种 stride 下搜索真实布局。
+ */
+ORAP_API int orap_debug_raw_cache(uint64_t seed, int version_index, int large_biomes, int dim,
+                                  int centerX, int centerZ, int scale,
+                                  int width, int height,
+                                  int *outRaw, int rawCapacity, int *outInfo,
+                                  int *outProbe)
+{
+    if (!outRaw || !outInfo || !outProbe) return -2;
+    if (width <= 0 || height <= 0) return -2;
+    if (scale != 1 && scale != 4 && scale != 16 && scale != 64 && scale != 256) scale = 4;
+
+    Range r;
+    r.scale = scale;
+    r.x = centerX - (width / 2) * scale;
+    r.z = centerZ - (height / 2) * scale;
+    r.sx = width;
+    r.sz = height;
+    r.y = (scale == 1) ? 63 : 15;
+    r.sy = 1;
+
+    Generator g;
+    memset(&g, 0, sizeof(g));
+    if (run_generator(&g, version_index, large_biomes, dim, seed) != 0) return -3;
+
+    int minSize = getMinCacheSize(&g, scale, r.sx, r.sy, r.sz);
+
+    int *ids = allocCache(&g, r);
+    if (!ids) return -4;
+
+    int err = genBiomes(&g, ids, r);
+    if (err) { free(ids); return err; }
+
+    int copy = minSize < rawCapacity ? minSize : rawCapacity;
+    for (int i = 0; i < copy; i++) outRaw[i] = ids[i];
+
+    for (int z = 0; z < height; z++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            int blockX = r.x + x * scale;
+            int blockZ = r.z + z * scale;
+
+            outProbe[z * width + x] = (scale == 1)
+                ? getBiomeAt(&g, 1, blockX, 63, blockZ)
+                : getBiomeAt(&g, 4, blockX / 4, 15, blockZ / 4);
+        }
+    }
+
+    outInfo[0] = minSize;      // 真实缓存长度
+    outInfo[1] = r.x;
+    outInfo[2] = r.z;
+    outInfo[3] = scale * 4;    // 参考
+
+    free(ids);
+    return copy;
+}
+
 ORAP_API int orap_debug_ids_and_probe(uint64_t seed, int version_index, int large_biomes, int dim,
                                       int centerX, int centerZ, int scale,
                                       int width, int height,
