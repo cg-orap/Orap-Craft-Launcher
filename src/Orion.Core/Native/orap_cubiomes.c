@@ -381,6 +381,35 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
     initBiomeColors(colors);
     apply_color_overrides(colors);
 
+    // ── 末地：真实的"岛屿轮廓" ──
+    // 群系 the_end 覆盖半径 1024 格，但真正的地形只有中间约 100 格半径的岛，
+    // 所以只按群系上色会得到"直径 2000 格的大圆盘"，和游戏里完全不像。
+    // 这里用 cubiomes 的末地地表高度把"没有岛的地方"标成虚空。
+    float *endHeights = NULL;
+    unsigned char voidColor[3] = { 0x12, 0x0E, 0x1C };
+
+    if (dim == DIM_END)
+    {
+        endHeights = (float *)malloc(sizeof(float) * cellsX * cellsZ);
+
+        if (endHeights)
+        {
+            EndNoise en;
+            setEndSeed(&en, orap_mc_from_index(version_index), seed);
+
+            SurfaceNoise sn;
+            initSurfaceNoise(&sn, DIM_END, seed);
+
+            if (mapEndSurfaceHeight(endHeights, &en, &sn,
+                                    r.x * scale, r.z * scale,
+                                    cellsX, cellsZ, scale, 0) != 0)
+            {
+                free(endHeights);
+                endHeights = NULL;
+            }
+        }
+    }
+
     for (int py = 0; py < height; py++)
     {
         int cz = py / pixPerCell;
@@ -393,6 +422,16 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
             int id = ids[cz * r.sx + cx];
             if (id < 0 || id > 255) id = 1;
             unsigned char *dst = outRgb + 3 * (py * width + px);
+
+            // 末地：地表高度 <= 0 说明这里是虚空（没有岛）
+            if (endHeights && endHeights[cz * cellsX + cx] <= 0.0f)
+            {
+                dst[0] = voidColor[0];
+                dst[1] = voidColor[1];
+                dst[2] = voidColor[2];
+                continue;
+            }
+
             dst[0] = colors[id][0];
             dst[1] = colors[id][1];
             dst[2] = colors[id][2];
