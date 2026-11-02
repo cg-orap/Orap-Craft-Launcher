@@ -217,6 +217,19 @@ public sealed class BiomeMapCanvas : FrameworkElement
         {
             if (_seed == value) return;
             _seed = value;
+
+            // 换种子必须把瓦片缓存/预览作废：
+            // 瓦片缓存的 key 只含 (档位, tileX, tileZ)，不含种子，
+            // 不清的话新种子会直接命中旧种子的瓦片 —— 表现就是"换种子地图不变"。
+            _tileLayer.Clear();
+            _previewBitmap = null;
+            _previewVersion++;
+            _bitmap = null;
+            _bitmapVersion++;
+            _bitmapWorldWidth = 0;
+            _structures.Clear();
+            _spawn = null;
+
             RequestRender();
         }
     }

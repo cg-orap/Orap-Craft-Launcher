@@ -784,7 +784,12 @@ public sealed class ToolboxViewModel : ObservableObject
         SelectedBiome = BiomeOptions.FirstOrDefault(o => o.Name == biome?.Name) ?? BiomeOptions.FirstOrDefault();
 
         // 结构同理：下界只看要塞/堡垒/废弃传送门，末地只看末地城/折跃门/末地船
-        foreach (var option in StructureFilterOptions) StructureFilterOptions.Remove(option);
+        StructureFilterOptions.Clear();
+
+        if (AllStructureFilterOptions.Count == 0)
+        {
+            foreach (var option in StructureFilterOptions) AllStructureFilterOptions.Add(option);
+        }
 
         foreach (var option in AllStructureFilterOptions)
         {
