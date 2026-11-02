@@ -22,6 +22,10 @@ static void apply_color_overrides(unsigned char colors[256][3])
 {
     colors[14][0] = 0xA8; colors[14][1] = 0x8C; colors[14][2] = 0x9E;   // 蘑菇岛：灰紫
     colors[15][0] = 0xB8; colors[15][1] = 0xA1; colors[15][2] = 0xAC;   // 蘑菇岛岸：浅灰紫
+
+    // the_void(127) 在 cubiomes 里是纯黑 0x000000，
+    // 画出来就是一块"像洞一样的黑区"。换成深空紫，和真正的空地能区分开。
+    colors[127][0] = 0x1A; colors[127][1] = 0x14; colors[127][2] = 0x28;
 }
 
 
