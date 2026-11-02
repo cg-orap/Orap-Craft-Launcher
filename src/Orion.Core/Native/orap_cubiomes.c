@@ -115,6 +115,57 @@ ORAP_API int orap_debug_last_range(int *out, int capacity)
  * 诊断用：把 genBiomes 填好的缓存原样拷出来（含 getMinCacheSize 得到的真实长度），
  * 同时给出 getBiomeAt 的逐点真值。C# 侧用它在各种 stride 下搜索真实布局。
  */
+/**
+ * 验证"Range.x/z 是 **scale 单位**"的假设（finders.c:678 里就是 (x-radius)>>2）。
+ * 这里按 scale 单位算起点，再逐格用 getBiomeAt 对照。
+ */
+ORAP_API int orap_debug_ids_scaled(uint64_t seed, int version_index, int large_biomes, int dim,
+                                   int centerX, int centerZ, int scale,
+                                   int width, int height,
+                                   int *outIds, int *outProbe)
+{
+    if (!outIds || !outProbe || width <= 0 || height <= 0) return -2;
+    if (scale != 1 && scale != 4 && scale != 16 && scale != 64 && scale != 256) scale = 4;
+
+    Range r;
+    r.scale = scale;
+    // 关键差异：起点用 scale 单位（方块坐标 / scale）
+    r.x = centerX / scale - width / 2;
+    r.z = centerZ / scale - height / 2;
+    r.sx = width;
+    r.sz = height;
+    r.y = (scale == 1) ? 63 : 15;
+    r.sy = 1;
+
+    Generator g;
+    memset(&g, 0, sizeof(g));
+    if (run_generator(&g, version_index, large_biomes, dim, seed) != 0) return -3;
+
+    int *ids = allocCache(&g, r);
+    if (!ids) return -4;
+
+    int err = genBiomes(&g, ids, r);
+    if (err) { free(ids); return err; }
+
+    for (int z = 0; z < height; z++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            outIds[z * width + x] = ids[z * r.sx + x];
+
+            int blockX = (r.x + x) * scale;
+            int blockZ = (r.z + z) * scale;
+
+            outProbe[z * width + x] = (scale == 1)
+                ? getBiomeAt(&g, 1, blockX, 63, blockZ)
+                : getBiomeAt(&g, 4, blockX / 4, 15, blockZ / 4);
+        }
+    }
+
+    free(ids);
+    return 0;
+}
+
 ORAP_API int orap_debug_raw_cache(uint64_t seed, int version_index, int large_biomes, int dim,
                                   int centerX, int centerZ, int scale,
                                   int width, int height,
@@ -127,8 +178,8 @@ ORAP_API int orap_debug_raw_cache(uint64_t seed, int version_index, int large_bi
 
     Range r;
     r.scale = scale;
-    r.x = centerX - (width / 2) * scale;
-    r.z = centerZ - (height / 2) * scale;
+    r.x = centerX / scale - width / 2;
+    r.z = centerZ / scale - height / 2;
     r.sx = width;
     r.sz = height;
     r.y = (scale == 1) ? 63 : 15;
@@ -153,8 +204,8 @@ ORAP_API int orap_debug_raw_cache(uint64_t seed, int version_index, int large_bi
     {
         for (int x = 0; x < width; x++)
         {
-            int blockX = r.x + x * scale;
-            int blockZ = r.z + z * scale;
+            int blockX = (r.x + x) * scale;
+            int blockZ = (r.z + z) * scale;
 
             outProbe[z * width + x] = (scale == 1)
                 ? getBiomeAt(&g, 1, blockX, 63, blockZ)
@@ -181,8 +232,8 @@ ORAP_API int orap_debug_ids_and_probe(uint64_t seed, int version_index, int larg
 
     Range r;
     r.scale = scale;
-    r.x = centerX - (width / 2) * scale;
-    r.z = centerZ - (height / 2) * scale;
+    r.x = centerX / scale - width / 2;
+    r.z = centerZ / scale - height / 2;
     r.sx = width;
     r.sz = height;
     r.y = (scale == 1) ? 63 : 15;
@@ -211,8 +262,8 @@ ORAP_API int orap_debug_ids_and_probe(uint64_t seed, int version_index, int larg
         {
             outIds[z * width + x] = ids[z * r.sx + x];
 
-            int blockX = r.x + x * scale;
-            int blockZ = r.z + z * scale;
+            int blockX = (r.x + x) * scale;
+            int blockZ = (r.z + z) * scale;
 
             if (scale == 1)
                 outProbe[z * width + x] = getBiomeAt(&g, 1, blockX, 63, blockZ);
@@ -234,8 +285,8 @@ ORAP_API int orap_debug_ids(uint64_t seed, int version_index, int large_biomes, 
 
     Range r;
     r.scale = scale;
-    r.x = centerX - (width / 2) * scale;
-    r.z = centerZ - (height / 2) * scale;
+    r.x = centerX / scale - width / 2;
+    r.z = centerZ / scale - height / 2;
     r.sx = width;
     r.sz = height;
     r.y = (scale == 1) ? 63 : 15;
@@ -272,8 +323,11 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
 
     Range r;
     r.scale = scale;
-    r.x = centerX - (cellsX / 2) * scale;
-    r.z = centerZ - (cellsZ / 2) * scale;
+    // Range.x/z 的单位是 **scale 单位**（cubiomes 自己也是这么用的：
+    // finders.c 里 int x1 = (x-radius) >> 2; Range r = {4, x1, z1, ...}）。
+    // 以前这里直接放了方块坐标，等于把窗口扔到了 scale 倍远的地方。
+    r.x = centerX / scale - cellsX / 2;
+    r.z = centerZ / scale - cellsZ / 2;
     r.sx = cellsX;
     r.sz = cellsZ;
     // 地表取样高度：scale=1 时是方块坐标，否则是 1:4 的生物群系坐标

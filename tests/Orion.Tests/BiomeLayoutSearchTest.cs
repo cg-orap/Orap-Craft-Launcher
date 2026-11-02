@@ -89,4 +89,43 @@ public sealed class BiomeLayoutSearchTest(ITestOutputHelper output)
 
         Assert.Equal(width * height, best.matches);
     }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    [InlineData(16)]
+    [InlineData(64)]
+    public void ScaleUnitsConventionMatchesPointQueries(int scale)
+    {
+        if (!CubiomesNative.Available) return;
+
+        var version = CubiomesNative.VersionIndexFor("1.21.1");
+        const int width = 16;
+        const int height = 4;
+
+        var result = CubiomesNative.DebugIdsScaled(Seed, version, CubiomesNative.DimOverworld,
+            0, 0, scale, width, height);
+
+        Assert.NotNull(result);
+
+        var (ids, probe) = result!.Value;
+        var mismatch = 0;
+
+        for (var i = 0; i < ids.Length; i++) if (ids[i] != probe[i]) mismatch++;
+
+        output.WriteLine($"scale={scale}（Range.x 用 scale 单位）：数组 vs 逐点 不一致 {mismatch}/{ids.Length}");
+
+        // scale 1/4 是逐格采样，必须完全一致；
+        // scale 16/64 时 cubiomes 是在 1:4 网格上放大出来的，
+        // 边界格与"直接点查询"本来就会有个别差异（cubiomes-viewer 同理），
+        // 所以这里只要求绝大多数一致。
+        if (scale <= 4)
+        {
+            Assert.Equal(0, mismatch);
+        }
+        else
+        {
+            Assert.True(mismatch <= ids.Length / 3, $"scale={scale} 不一致 {mismatch}/{ids.Length}，超出放大误差范围");
+        }
+    }
 }

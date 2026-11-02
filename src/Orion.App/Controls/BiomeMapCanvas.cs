@@ -112,12 +112,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private readonly BiomeTileLayer _tileLayer = new();
 
     /// <summary>
-    /// 用瓦片渲染。
-    /// **默认关闭**：当前版本的瓦片对齐有缺陷（画面会被切成几块互不连续的图），
-    /// 在写好"相邻瓦片边界像素必须连续"的验证之前不放出去。
-    /// 关掉时走原来那套整屏渲染，功能与手感都是已验证过的。
+    /// 用瓦片渲染（默认开）。
+    /// 前提已满足：原生 Range.x/z 的单位修正后，
+    /// BiomeTileAlignmentTests 的"相邻瓦片边界像素必须连续"在 scale=1/4/16/64 全部通过。
     /// </summary>
-    private bool _useTiles;
+    private bool _useTiles = true;
 
     private void InitTileLayer()
     {

@@ -110,7 +110,7 @@ public sealed class BiomeTileOffsetTest(ITestOutputHelper output)
         Assert.Equal(0, mismatches);
     }
 
-    [Fact(Skip = "已知问题：渲染数组与 orap_biome_at 单点查询不一致")]
+    [Fact]
     public void SinglePointMatchesRenderedCell()
     {
         if (!CubiomesNative.Available) return;

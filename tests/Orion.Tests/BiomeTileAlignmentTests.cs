@@ -15,7 +15,7 @@ public sealed class BiomeTileAlignmentTests(ITestOutputHelper output)
 {
     private const long Seed = 123456789L;
 
-    [Theory(Skip = "已知问题：原生按瓦片分别渲染与整条宽图渲染结果不一致，瓦片方案暂不启用")]
+    [Theory]
     [InlineData(1)]
     [InlineData(4)]
     [InlineData(16)]
