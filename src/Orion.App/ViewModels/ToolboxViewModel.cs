@@ -730,8 +730,8 @@ public sealed class ToolboxViewModel : ObservableObject
     // ── 定位生物群系（像 cubiomes-viewer 的 biome finder）──────
     public ObservableList<BiomeOption> BiomeOptions { get; } = [];
 
-    /// <summary>全部群系（不过滤维度），切换维度时从这里筛选。</summary>
-    private readonly List<BiomeOption> _allBiomeOptions = [];
+    /// <summary>全部群系（不过滤维度）的母表，永不修改，切换维度时从这里筛选。</summary>
+    private readonly List<BiomeOption> _masterBiomes = [];
 
     /// <summary>全部结构类型（不过滤维度）。</summary>
     private readonly List<StructureFilterOption> AllStructureFilterOptions = [];
@@ -759,27 +759,16 @@ public sealed class ToolboxViewModel : ObservableObject
     /// </summary>
     private void RebuildOptionsForDimension()
     {
-        var keep = _dimensionIndex switch
-        {
-            1 => (Func<string, bool>)(name =>
-                name.Contains("wastes") || name.Contains("soul") || name.Contains("crimson") ||
-                name.Contains("warped") || name.Contains("basalt") || name.Contains("nether") ||
-                name.Contains("hell")),
-            2 => name => name.Contains("end") || name.Contains("void"),
-            _ => name => true,
-        };
+        bool keep(string name) => DimensionFilter.IsBiomeInDimension(name, _dimensionIndex);
 
         var biome = BiomeOptions.FirstOrDefault(o => o.Name == _selectedBiome?.Name);
 
         BiomeOptions.Clear();
-        _allBiomeOptions.Clear();
 
         foreach (var option in LoadAllBiomes())
         {
-            if (keep(option.Key)) _allBiomeOptions.Add(option);
+            if (keep(option.Key)) BiomeOptions.Add(option);
         }
-
-        foreach (var option in _allBiomeOptions) BiomeOptions.Add(option);
 
         SelectedBiome = BiomeOptions.FirstOrDefault(o => o.Name == biome?.Name) ?? BiomeOptions.FirstOrDefault();
 
@@ -793,16 +782,10 @@ public sealed class ToolboxViewModel : ObservableObject
 
         foreach (var option in AllStructureFilterOptions)
         {
-            var key = option.Group;
-
-            var inDimension = _dimensionIndex switch
+            if (DimensionFilter.IsStructureInDimension(option.Group, _dimensionIndex))
             {
-                1 => key is "fortress" or "bastion" or "ruined_portal_nether",
-                2 => key is "end_city" or "end_gateway" or "end_ship",
-                _ => key is not ("fortress" or "bastion" or "ruined_portal_nether" or "end_city" or "end_gateway" or "end_ship"),
-            };
-
-            if (inDimension) StructureFilterOptions.Add(option);
+                StructureFilterOptions.Add(option);
+            }
         }
 
         OnPropertyChanged(nameof(StructureFilterOptions));
@@ -810,7 +793,7 @@ public sealed class ToolboxViewModel : ObservableObject
 
     private IReadOnlyList<BiomeOption> LoadAllBiomes()
     {
-        if (_allBiomeOptions.Count > 0) return _allBiomeOptions;
+        if (_masterBiomes.Count > 0) return _masterBiomes;
 
         var version = CubiomesNative.VersionIndexFor(SeedVersion);
 
@@ -821,10 +804,10 @@ public sealed class ToolboxViewModel : ObservableObject
             if (string.IsNullOrWhiteSpace(name)) continue;
 
             // 记住 cubiomes 原始英文名（用于按维度过滤），显示用中文
-            _allBiomeOptions.Add(new BiomeOption(id, BiomeCatalog.FromCubiomesName(name) ?? name, name));
+            _masterBiomes.Add(new BiomeOption(id, BiomeCatalog.FromCubiomesName(name) ?? name, name));
         }
 
-        return _allBiomeOptions;
+        return _masterBiomes;
     }
 
     private void LoadBiomeOptions()
@@ -841,6 +824,8 @@ public sealed class ToolboxViewModel : ObservableObject
         {
             foreach (var option in StructureFilterOptions) AllStructureFilterOptions.Add(option);
         }
+
+        RebuildOptionsForDimension();
     }
 
     /// <summary>
