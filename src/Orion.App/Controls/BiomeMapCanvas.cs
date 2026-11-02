@@ -57,7 +57,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     public bool AtMinZoom => _zoomIndex >= ZoomSteps.Length - 1;
 
     /// <summary>当前缩放档位的说明文字。</summary>
-    public string ZoomText => $"{BlocksPerPixel} 格 / 像素" + (AtMaxZoom ? "（已到上限）" : AtMinZoom ? "（已到下限）" : "");
+    public string ZoomText => AtMaxZoom ? $"{BlocksPerPixel} 格/像素 ▲" : AtMinZoom ? $"{BlocksPerPixel} 格/像素 ▼" : $"{BlocksPerPixel} 格/像素";
 
     // 一次点击只走一档，视觉上先缩放旧图（220ms 缓出），新图到达后再归位，避免生硬跳变。
     private const int ZoomAnimationMs = 220;
@@ -345,18 +345,14 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _anchorBlockX = anchorBlockX;
         _anchorBlockZ = anchorBlockZ;
 
-        // 档位立刻切换：BlocksPerPixel 变了，画面本身就已经缩放了。
-        //
-        // 以前这里还会再叠一层 VisualScale 动画（ratio = 旧/新），
-        // 于是"档位缩放 + 动画缩放"= **缩放被应用了两次**：
-        // 动画期间画面比目标还大，动画结束归位到 1 时就往回缩一下 —— 这就是回弹。
+        var previousIndex = _zoomIndex;
+
+        // 只做"绘制步长插值"这一层动画（200ms ease-out），
+        // 档位本身已经切换，不存在第二层倍率，所以不会回弹。
+        var fromStep = (double)ZoomSteps[previousIndex];
         _zoomIndex = target;
 
-        // 旧档位的瓦片由 LOD 垫底（按新 step 缩放绘制），
-        // 新档位瓦片随后补上，不需要额外的 VisualScale 动画。
-        BeginAnimation(VisualScaleProperty, null);
-        VisualScale = 1.0;
-
+        StartZoomAnimation(fromStep, ZoomSteps[target]);
         ScheduleRenderAfterGesture();
 
         _zoomTimer ??= new DispatcherTimer
@@ -406,6 +402,50 @@ public sealed class BiomeMapCanvas : FrameworkElement
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
         });
+    }
+
+    private double _animStep;
+    private double _animFromStep;
+    private double _animToStep;
+    private long _animStartedAt;
+    private DispatcherTimer? _zoomAnimTimer;
+
+    /// <summary>绘制用的连续步长：缩放动画期间在旧档位与新档位之间插值。</summary>
+    private double RenderStep => _zoomAnimTimer?.IsEnabled == true ? _animStep : BlocksPerPixel;
+
+    /// <summary>
+    /// 平滑缩放：把"绘制步长"从旧值插值到新值。
+    /// 只作用在绘制换算上（瓦片仍按档位渲染），所以不存在"档位缩放 + 动画缩放"叠加，
+    /// 也就不回弹。
+    /// </summary>
+    private void StartZoomAnimation(double from, double to)
+    {
+        _zoomAnimTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _zoomAnimTimer.Tick -= OnZoomAnimTick;
+        _zoomAnimTimer.Tick += OnZoomAnimTick;
+
+        _animFromStep = from;
+        _animToStep = to;
+        _animStep = from;
+        _animStartedAt = Environment.TickCount64;
+        _zoomAnimTimer.Start();
+    }
+
+    private void OnZoomAnimTick(object? sender, EventArgs e)
+    {
+        const double durationMs = 200;
+
+        var t = Math.Clamp((Environment.TickCount64 - _animStartedAt) / durationMs, 0, 1);
+        var eased = 1 - Math.Pow(1 - t, 3);      // ease-out cubic
+
+        _animStep = _animFromStep + (_animToStep - _animFromStep) * eased;
+        InvalidateVisual();
+
+        if (t < 1) return;
+
+        _zoomAnimTimer?.Stop();
+        _animStep = _animToStep;
+        InvalidateVisual();
     }
 
     private DispatcherTimer? _zoomWatchdog;
@@ -533,6 +573,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var viewHeight = Math.Max(8, (int)Math.Round(ActualHeight));
         var centerX = _centerBlockX;
         var centerZ = _centerBlockZ;
+
+        // 渲染请求按整数档位，动画只影响绘制
         var step = BlocksPerPixel;
         var seed = _seed;
         var versionIndex = EngineVersionIndex;
@@ -684,11 +726,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 (int X, int Z)? spawn = null;
                 if (showStructures && CubiomesNative.Available)
                 {
-                    var step = BlocksPerPixel;
-                    var leftChunk = (centerX - width / 2 * step) >> 4;
-                    var rightChunk = (centerX + width / 2 * step) >> 4;
-                    var topChunk = (centerZ - height / 2 * step) >> 4;
-                    var bottomChunk = (centerZ + height / 2 * step) >> 4;
+                    var step = RenderStep;
+                    var leftChunk = (centerX - width / 2 * BlocksPerPixel) >> 4;
+                    var rightChunk = (centerX + width / 2 * BlocksPerPixel) >> 4;
+                    var topChunk = (centerZ - height / 2 * BlocksPerPixel) >> 4;
+                    var bottomChunk = (centerZ + height / 2 * BlocksPerPixel) >> 4;
 
                     foreach (var (key, x, z) in CubiomesNative.FindStructures(seed, versionIndex, dimension,
                                  leftChunk, topChunk, rightChunk, bottomChunk))
@@ -830,7 +872,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
             dc.PushTransform(new ScaleTransform(VisualScale, VisualScale, _zoomAnchor.X, _zoomAnchor.Y));
         }
 
-        var step = BlocksPerPixel;
+        var step = RenderStep;
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
         // 当前视口左上角对应的世界方块
@@ -853,7 +895,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
         if (_useTiles)
         {
-            var tiles = _tileLayer.Visible(step, viewLeft, viewTop, width * step, height * step);
+            var tiles = _tileLayer.Visible((int)Math.Round(step), viewLeft, viewTop, width * step, height * step);
 
             foreach (var (bitmap, worldLeft, worldTop, spanBlocks) in tiles)
             {
@@ -1052,7 +1094,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         base.OnMouseMove(e);
         if (Math.Abs(VisualScale - 1.0) > 0.001) return;   // 缩放过渡中不做悬停换算
         var position = e.GetPosition(this);
-        var step = BlocksPerPixel;
+        var step = RenderStep;
 
         if (_dragging)
         {
@@ -1067,7 +1109,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
             // 中心实时跟随指针：地图"跟手"，未加载区域在拖动过程中持续流式补齐
             var (centerX, centerZ) = MapViewportMath.DraggedCenter(_dragCenterX, _dragCenterZ,
-                position.X - _dragStart.X, position.Y - _dragStart.Y, step);
+                position.X - _dragStart.X, position.Y - _dragStart.Y, (int)Math.Round(step));
             _centerBlockX = centerX;
             _centerBlockZ = centerZ;
 
@@ -1086,7 +1128,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var blockZ = top + (int)(position.Y * step);
 
         var nativeId = CubiomesNative.Available
-            ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, _dimension, step, blockX, 63, blockZ)
+            ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, _dimension, (int)Math.Round(step), blockX, 63, blockZ)
             : -1;
 
         // 命中附近的结构（12px 内取最近的一个）
@@ -1126,7 +1168,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var dt = Math.Max(1, now - _lastInertiaTick);
         _lastInertiaTick = now;
 
-        var step = BlocksPerPixel;
+        var step = RenderStep;
         _centerBlockX -= (int)Math.Round(_inertiaVx * dt * step);
         _centerBlockZ -= (int)Math.Round(_inertiaVy * dt * step);
 
@@ -1160,7 +1202,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var release = e.GetPosition(this);
         if (Math.Abs(release.X - _dragStart.X) < 4 && Math.Abs(release.Y - _dragStart.Y) < 4)
         {
-            var step = BlocksPerPixel;
+            var step = RenderStep;
             var left = _centerBlockX - (int)(ActualWidth / 2 * step);
             var top = _centerBlockZ - (int)(ActualHeight / 2 * step);
 

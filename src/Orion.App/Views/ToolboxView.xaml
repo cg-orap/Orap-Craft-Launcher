@@ -287,7 +287,9 @@
                         <Button Content="回到原点" Style="{StaticResource GhostButton}" Margin="6,0,0,0"
                                 Click="OnCenterOrigin" />
                         <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="8,3"
-                                Margin="6,0,0,0" VerticalAlignment="Center">
+                                Margin="6,0,0,0" VerticalAlignment="Center" Width="112">
+                            <!-- 固定宽度：档位文字加"（已到上限）"时不会把左边按钮挤走 -->
+
                             <TextBlock Text="{Binding ZoomHint}" FontFamily="Consolas" FontSize="10"
                                        Foreground="{DynamicResource MutedTextBrush}"
                                        AutomationProperties.AutomationId="ZoomHintText" />
