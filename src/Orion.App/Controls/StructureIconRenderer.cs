@@ -13,6 +13,13 @@ public static class StructureIconRenderer
     /// <summary>按结构 key 画一个图标（centre 为中心，size 为外接正方形边长）。</summary>
     public static void Draw(DrawingContext dc, string key, Brush brush, Point centre, double size)
     {
+        // 优先用 16×16 像素风图标（自己画的像素图，观感接近游戏里的物品图标）
+        if (PixelIcons.Has(key))
+        {
+            PixelIcons.Draw(dc, key, brush, centre, Math.Clamp(size, 8, 20));
+            return;
+        }
+
         // 统一成 12×12 逻辑网格：所有图标用同一套坐标基准，
         // 描边按尺寸等比缩放，缩小到 7px 时也不会糊成一团。
         size = Math.Clamp(size, 7, 16);
