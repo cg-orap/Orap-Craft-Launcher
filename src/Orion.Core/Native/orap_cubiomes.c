@@ -97,6 +97,42 @@ static int run_generator(Generator *g, int version_index, int large_biomes, int 
  *
  * 返回 0 成功，负数失败。
  */
+/**
+ * 诊断用：和 orap_render_biomes 完全相同的区间计算，但输出**群系 id**而不是颜色。
+ * 用来在 C# 侧逐格比对"两个不同起点的渲染是否错位"，并确定错位量。
+ */
+ORAP_API int orap_debug_ids(uint64_t seed, int version_index, int large_biomes, int dim,
+                            int centerX, int centerZ, int scale,
+                            int width, int height, int *outIds)
+{
+    if (!outIds || width <= 0 || height <= 0) return -2;
+    if (scale != 1 && scale != 4 && scale != 16 && scale != 64 && scale != 256) scale = 4;
+
+    Range r;
+    r.scale = scale;
+    r.x = centerX - (width / 2) * scale;
+    r.z = centerZ - (height / 2) * scale;
+    r.sx = width;
+    r.sz = height;
+    r.y = (scale == 1) ? 63 : 15;
+    r.sy = 1;
+
+    Generator g;
+    memset(&g, 0, sizeof(g));
+    if (run_generator(&g, version_index, large_biomes, dim, seed) != 0) return -3;
+
+    int *ids = allocCache(&g, r);
+    if (!ids) return -4;
+
+    int err = genBiomes(&g, ids, r);
+    if (err) { free(ids); return err; }
+
+    for (int i = 0; i < width * height; i++) outIds[i] = ids[i];
+
+    free(ids);
+    return 0;
+}
+
 ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biomes, int dim,
                                 int centerX, int centerZ, int scale,
                                 int width, int height, int pixPerCell,

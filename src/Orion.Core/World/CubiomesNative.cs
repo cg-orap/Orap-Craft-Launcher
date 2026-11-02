@@ -154,6 +154,31 @@ public static class CubiomesNative
         return rgba;
     }
 
+    /// <summary>
+    /// 诊断用：按"中心 + 尺寸"取群系 id 数组（和 RenderRgba 同一套区间计算）。
+    /// 用来验证两个不同起点的渲染是否错位、错位多少。
+    /// </summary>
+    public static int[]? DebugBiomeIds(long seed, int versionIndex, int dimension,
+        int centerBlockX, int centerBlockZ, int scale, int width, int height)
+    {
+        EnsureProbed();
+        if (!_available || width <= 0 || height <= 0) return null;
+
+        var ids = new int[width * height];
+
+        try
+        {
+            var rc = orap_debug_ids(unchecked((ulong)seed), versionIndex, 0, dimension,
+                centerBlockX, centerBlockZ, scale, width, height, ids);
+
+            return rc == 0 ? ids : null;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>单点群系 id；scale 同上。</summary>
     public static int BiomeAt(long seed, int versionIndex, int dimension, int scale, int blockX, int y, int blockZ)
     {
@@ -306,6 +331,11 @@ public static class CubiomesNative
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr orap_version_key(int index);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_debug_ids(
+        ulong seed, int versionIndex, int largeBiomes, int dimension,
+        int centerX, int centerZ, int scale, int width, int height, int[] outIds);
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int orap_render_biomes(ulong seed, int versionIndex, int largeBiomes, int dim,
