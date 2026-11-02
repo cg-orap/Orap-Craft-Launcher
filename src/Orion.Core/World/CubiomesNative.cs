@@ -280,6 +280,28 @@ public static class CubiomesNative
         }
     }
 
+    /// <summary>诊断用：末地地表高度（unitMode 用于试探坐标单位）。</summary>
+    public static float[]? DebugEndHeights(long seed, int versionIndex, int centerX, int centerZ,
+        int scale, int width, int height, int unitMode)
+    {
+        EnsureProbed();
+        if (!_available || width <= 0 || height <= 0) return null;
+
+        var heights = new float[width * height];
+
+        try
+        {
+            var rc = orap_debug_end_heights(unchecked((ulong)seed), versionIndex, centerX, centerZ,
+                scale, width, height, unitMode, heights);
+
+            return rc == 0 ? heights : null;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>诊断用：最近一次渲染实际使用的区间 (x, z, sx, sz, scale, y)。</summary>
     public static int[]? DebugLastRange()
     {
@@ -456,6 +478,11 @@ public static class CubiomesNative
         ulong seed, int versionIndex, int largeBiomes, int dimension,
         int centerX, int centerZ, int scale, int width, int height,
         int[] outIds, int[] outProbe);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int orap_debug_end_heights(
+        ulong seed, int versionIndex, int centerX, int centerZ, int scale,
+        int width, int height, int unitMode, float[] outHeights);
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int orap_debug_raw_cache(

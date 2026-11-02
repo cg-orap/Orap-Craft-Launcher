@@ -14,7 +14,7 @@ public sealed class EndIslandShapeTests(ITestOutputHelper output)
 {
     private const long Seed = 1;
 
-    [Fact(Skip = "已知问题：末地遮罩的坐标单位未定，暂时关闭")]
+    [Fact]
     public void CentralIslandIsAboutTwoHundredBlocksAcross()
     {
         if (!CubiomesNative.Available) return;
@@ -57,7 +57,7 @@ public sealed class EndIslandShapeTests(ITestOutputHelper output)
         Assert.InRange(diameterBlocks, 80, 400);
     }
 
-    [Fact(Skip = "已知问题：同上")]
+    [Fact]
     public void FarAwayIsVoid()
     {
         if (!CubiomesNative.Available) return;
@@ -75,7 +75,7 @@ public sealed class EndIslandShapeTests(ITestOutputHelper output)
         Assert.True(isVoid, "主岛外 300 格应当已经是虚空");
     }
 
-    [Fact(Skip = "已知问题：同一座岛在 128px/256px 下测出 104/588，说明单位不对")]
+    [Fact]
     public void TileSizedRenderAlsoHasSmallIsland()
     {
         if (!CubiomesNative.Available) return;
@@ -104,5 +104,41 @@ public sealed class EndIslandShapeTests(ITestOutputHelper output)
         output.WriteLine($"瓦片尺寸渲染（256px, scale=4）主岛直径 = {diameter} 方块");
 
         Assert.InRange(diameter, 80, 400);
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(16)]
+    [InlineData(64)]
+    public void IslandDiameterIsStableAcrossZoomScales(int scale)
+    {
+        if (!CubiomesNative.Available) return;
+
+        var version = CubiomesNative.VersionIndexFor("1.21.1");
+
+        // 视野统一取 512 方块，避免"视野比岛小"造成的截断
+        var size = 512 / scale;
+
+        var rgba = CubiomesNative.RenderRgba(Seed, version, CubiomesNative.DimEnd, 0, 0, scale, size, size);
+        Assert.NotNull(rgba);
+
+        var row = size / 2;
+        var first = -1;
+        var last = -1;
+
+        for (var x = 0; x < size; x++)
+        {
+            var i = (row * size + x) * 4;
+            var isVoid = rgba![i] < 0x40 && rgba[i + 1] < 0x40 && rgba[i + 2] < 0x40;
+            if (isVoid) continue;
+
+            if (first < 0) first = x;
+            last = x;
+        }
+
+        var diameter = first < 0 ? 0 : (last - first + 1) * scale;
+        output.WriteLine($"scale={scale}（视野 512 方块）→ 主岛直径 {diameter} 方块");
+
+        Assert.InRange(diameter, 120, 400);
     }
 }

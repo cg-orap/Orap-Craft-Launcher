@@ -124,6 +124,8 @@ static int run_generator(Generator *g, int version_index, int large_biomes, int 
  * 用来在 C# 侧逐格比对"两个不同起点的渲染是否错位"，并确定错位量。
  */
 static int g_dbg_range[8];
+static int g_endMaskW;
+static int g_endMaskH;
 
 /** 诊断用：取最近一次 render/debug 调用里实际传给 genBiomes 的 r 值。 */
 ORAP_API int orap_debug_last_range(int *out, int capacity)
@@ -298,6 +300,49 @@ ORAP_API int orap_debug_ids_and_probe(uint64_t seed, int version_index, int larg
     return 0;
 }
 
+/**
+ * 诊断用：末地地表高度，unitMode 用来试探 mapEndSurfaceHeight 的坐标单位
+ *   0 = 方块坐标          1 = scale 单位（方块/scale）     2 = 1:4 坐标（方块>>2）
+ */
+ORAP_API int orap_debug_end_heights(uint64_t seed, int version_index,
+                                    int centerX, int centerZ, int scale,
+                                    int width, int height, int unitMode,
+                                    float *outHeights)
+{
+    if (!outHeights || width <= 0 || height <= 0) return -2;
+    if (scale != 1 && scale != 4 && scale != 16 && scale != 64 && scale != 256) scale = 4;
+
+    int mc = orap_mc_from_index(version_index);
+
+    int ox, oz;
+    int blockLeft = centerX - (width / 2) * scale;
+    int blockTop = centerZ - (height / 2) * scale;
+
+    if (unitMode == 1)
+    {
+        ox = centerX / scale - width / 2;
+        oz = centerZ / scale - height / 2;
+    }
+    else if (unitMode == 2)
+    {
+        ox = blockLeft >> 2;
+        oz = blockTop >> 2;
+    }
+    else
+    {
+        ox = blockLeft;
+        oz = blockTop;
+    }
+
+    EndNoise en;
+    setEndSeed(&en, mc, seed);
+
+    SurfaceNoise sn;
+    initSurfaceNoise(&sn, DIM_END, seed);
+
+    return mapEndSurfaceHeight(outHeights, &en, &sn, ox, oz, width, height, scale, 0);
+}
+
 ORAP_API int orap_debug_ids(uint64_t seed, int version_index, int large_biomes, int dim,
                             int centerX, int centerZ, int scale,
                             int width, int height, int *outIds)
@@ -388,9 +433,10 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
     float *endHeights = NULL;
     unsigned char voidColor[3] = { 0x12, 0x0E, 0x1C };
 
-    // TODO: mapEndSurfaceHeight 的坐标单位尚未确定（实测同一座岛在不同渲染尺寸下
-    //       得到 104 / 588 两种直径），在弄清单位之前先关闭遮罩，保证跨缩放一致。
-    const int endMaskEnabled = 0;
+    // mapEndSurfaceHeight 的 x/z 是 **scale 单位**（不是方块坐标）：
+    // 用方块坐标会偏 4 倍（实测同一座岛量出 0 / 0 / 104），
+    // 用 scale 单位则稳定在约 232 方块。
+    const int endMaskEnabled = 1;
 
     if (dim == DIM_END && endMaskEnabled)
     {
@@ -398,19 +444,29 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
 
         if (endHeights)
         {
-            EndNoise en;
-            setEndSeed(&en, orap_mc_from_index(version_index), seed);
+            // mapEndSurfaceHeight 在 scale>4 时结果不可靠（实测 scale=16/64 整条都是陆地），
+            // 所以改成"按格心逐点取 getEndSurfaceHeight"，并把采样网格上限压到 64×64，
+            // 保证任何缩放档位都是同一套判据、且单块瓦片的开销有上界。
+            int mc = orap_mc_from_index(version_index);
 
-            SurfaceNoise sn;
-            initSurfaceNoise(&sn, DIM_END, seed);
+            int maskW = cellsX <= 64 ? cellsX : 64;
+            int maskH = cellsZ <= 64 ? cellsZ : 64;
 
-            if (mapEndSurfaceHeight(endHeights, &en, &sn,
-                                    r.x * scale, r.z * scale,
-                                    cellsX, cellsZ, scale, 0) != 0)
+            for (int j = 0; j < maskH; j++)
             {
-                free(endHeights);
-                endHeights = NULL;
+                int cz = (int)((long)j * cellsZ / maskH);
+                for (int i = 0; i < maskW; i++)
+                {
+                    int cx = (int)((long)i * cellsX / maskW);
+                    int bx = (r.x + cx) * scale;
+                    int bz = (r.z + cz) * scale;
+
+                    endHeights[j * maskW + i] = (float)getEndSurfaceHeight(mc, seed, bx, bz);
+                }
             }
+
+            g_endMaskW = maskW;
+            g_endMaskH = maskH;
         }
     }
 
@@ -428,7 +484,9 @@ ORAP_API int orap_render_biomes(uint64_t seed, int version_index, int large_biom
             unsigned char *dst = outRgb + 3 * (py * width + px);
 
             // 末地：地表高度 <= 0 说明这里是虚空（没有岛）
-            if (endHeights && endHeights[cz * cellsX + cx] <= 0.0f)
+            if (endHeights &&
+                endHeights[(int)((long)cz * g_endMaskH / cellsZ) * g_endMaskW +
+                           (int)((long)cx * g_endMaskW / cellsX)] <= 0.0f)
             {
                 dst[0] = voidColor[0];
                 dst[1] = voidColor[1];

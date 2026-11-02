@@ -736,6 +736,19 @@ public sealed class ToolboxViewModel : ObservableObject
     /// <summary>全部结构类型（不过滤维度）。</summary>
     private readonly List<StructureFilterOption> AllStructureFilterOptions = [];
 
+    /// <summary>结构选项的静态定义（顺序即显示顺序），供按维度重建使用。</summary>
+    private static readonly (string Group, string Label)[] StructureOptionDefinitions =
+    [
+        ("village", "村庄"), ("outpost", "掠夺者前哨站"), ("monument", "海底神殿"),
+        ("mansion", "林地府邸"), ("desert_pyramid", "沙漠神殿"), ("jungle_temple", "丛林神庙"),
+        ("swamp_hut", "女巫小屋"), ("igloo", "雪屋"), ("ocean_ruin", "海底废墟"),
+        ("shipwreck", "沉船"), ("treasure", "埋藏的宝藏"), ("ruined_portal", "废弃传送门"),
+        ("ruined_portal_nether", "下界废弃传送门"), ("ancient_city", "远古城市"),
+        ("trail_ruins", "古迹废墟"), ("trial_chambers", "试炼密室"), ("stronghold", "要塞"),
+        ("fortress", "下界要塞"), ("bastion", "堡垒遗迹"), ("end_city", "末地城"),
+        ("end_gateway", "末地折跃门"), ("end_ship", "末地船"),
+    ];
+
     private BiomeOption? _selectedBiome;
     private string _biomeSearchStatus = "选一个群系，从这里向外找一个最近的实例。";
 
@@ -763,9 +776,12 @@ public sealed class ToolboxViewModel : ObservableObject
 
         var biome = BiomeOptions.FirstOrDefault(o => o.Name == _selectedBiome?.Name);
 
+        // 快照母表：避免在枚举过程中被别处修改（C# 会抛 Collection was modified）
+        var allBiomes = LoadAllBiomes().ToArray();
+
         BiomeOptions.Clear();
 
-        foreach (var option in LoadAllBiomes())
+        foreach (var option in allBiomes)
         {
             if (keep(option.Key)) BiomeOptions.Add(option);
         }
@@ -773,14 +789,20 @@ public sealed class ToolboxViewModel : ObservableObject
         SelectedBiome = BiomeOptions.FirstOrDefault(o => o.Name == biome?.Name) ?? BiomeOptions.FirstOrDefault();
 
         // 结构同理：下界只看要塞/堡垒/废弃传送门，末地只看末地城/折跃门/末地船
-        StructureFilterOptions.Clear();
-
         if (AllStructureFilterOptions.Count == 0)
         {
-            foreach (var option in StructureFilterOptions) AllStructureFilterOptions.Add(option);
+            // 从静态定义重建母表（绝不枚举正在显示、可能正被 UI 枚举的列表）
+            foreach (var (group, label) in ToolboxViewModel.StructureOptionDefinitions)
+            {
+                AllStructureFilterOptions.Add(new StructureFilterOption(group, label));
+            }
         }
 
-        foreach (var option in AllStructureFilterOptions)
+        var allStructures = AllStructureFilterOptions.ToArray();
+
+        StructureFilterOptions.Clear();
+
+        foreach (var option in allStructures)
         {
             if (DimensionFilter.IsStructureInDimension(option.Group, _dimensionIndex))
             {
