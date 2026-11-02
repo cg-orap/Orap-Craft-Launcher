@@ -26,6 +26,17 @@ static void apply_color_overrides(unsigned char colors[256][3])
     // the_void(127) 在 cubiomes 里是纯黑 0x000000，
     // 画出来就是一块"像洞一样的黑区"。换成深空紫，和真正的空地能区分开。
     colors[127][0] = 0x1A; colors[127][1] = 0x14; colors[127][2] = 0x28;
+
+    // ── 末地：按"看得懂"的方式重上色 ──
+    // 原来的问题是：the_end(9) 是 0x8080FF 浅紫，跟外岛的黄绿完全不同，
+    // 主岛看起来就像一块"空洞"；而 small_end_islands(40) 是 0x4B4BAB 深紫，
+    // 把主岛和外岛之间全填满，看起来像一圈围栏。
+    // 现在：主岛 = 末地石浅黄；虚空 = 深色；外岛保持黄绿（= 末地石小岛）。
+    colors[9][0]  = 0xD9; colors[9][1]  = 0xD2; colors[9][2]  = 0xA2;   // the_end：末地石
+    colors[40][0] = 0x12; colors[40][1] = 0x0E; colors[40][2] = 0x1C;   // small_end_islands：虚空
+    colors[43][0] = 0xC9; colors[43][1] = 0xC0; colors[43][2] = 0x8A;   // end_barrens：末地石偏灰
+    colors[41][0] = 0xB9; colors[41][1] = 0xB0; colors[41][2] = 0x62;   // end_midlands：外岛
+    colors[42][0] = 0xA8; colors[42][1] = 0xA0; colors[42][2] = 0x58;   // end_highlands：外岛
 }
 
 
