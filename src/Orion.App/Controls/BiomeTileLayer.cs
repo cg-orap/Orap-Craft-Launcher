@@ -179,33 +179,40 @@ public sealed class BiomeTileLayer
     /// <summary>由画布注入：给定 (renderStep, centerX, centerZ) 生成一个原生渲染请求。</summary>
     public Func<int, int, int, TileRequest>? RequestFactory { get; set; }
 
-    /// <summary>取出当前视口内所有可画的瓦片（世界坐标 + 位图）。</summary>
+    /// <summary>
+    /// 取出当前视口内所有可画的瓦片（世界坐标 + 位图）。
+    ///
+    /// **渐进式 LOD**：除了当前档位的瓦片，也把其它档位的瓦片一起返回，
+    /// 只是排在后面（后画的在上层）。这样刚切换缩放、新档位还没补齐时，
+    /// 画面用的是"旧档位放大后的图"，而不是一片空白 —— 缩放时不会闪、不会卡。
+    /// </summary>
     public IEnumerable<(BitmapSource Bitmap, double WorldLeft, double WorldTop, double SpanBlocks)> Visible(
         int step, double viewLeft, double viewTop, double viewWidth, double viewHeight)
     {
         var (renderStep, _, _) = Resolve(step);
-        var span = TileSpan(renderStep);
-
-        var minTileX = (int)Math.Floor(viewLeft / span) - 1;
-        var maxTileX = (int)Math.Floor((viewLeft + viewWidth) / span) + 1;
-        var minTileZ = (int)Math.Floor(viewTop / span) - 1;
-        var maxTileZ = (int)Math.Floor((viewTop + viewHeight) / span) + 1;
-
         var now = Environment.TickCount64;
-        var result = new List<(BitmapSource, double, double, double)>();
 
-        for (var tz = minTileZ; tz <= maxTileZ; tz++)
+        var current = new List<(BitmapSource, double, double, double)>();
+        var fallback = new List<(BitmapSource, double, double, double)>();
+
+        foreach (var tile in _tiles.Values)
         {
-            for (var tx = minTileX; tx <= maxTileX; tx++)
-            {
-                if (!_tiles.TryGetValue(Key(renderStep, tx, tz), out var tile)) continue;
+            if (tile.WorldLeft + tile.SpanBlocks <= viewLeft) continue;
+            if (tile.WorldTop + tile.SpanBlocks <= viewTop) continue;
+            if (tile.WorldLeft >= viewLeft + viewWidth) continue;
+            if (tile.WorldTop >= viewTop + viewHeight) continue;
 
-                tile.LastUsed = now;
-                result.Add((tile.Bitmap, tile.WorldLeft, tile.WorldTop, tile.SpanBlocks));
-            }
+            tile.LastUsed = now;
+
+            var entry = (tile.Bitmap, (double)tile.WorldLeft, (double)tile.WorldTop, (double)tile.SpanBlocks);
+
+            if (tile.RenderStep == renderStep) current.Add(entry);
+            else fallback.Add(entry);
         }
 
-        return result;
+        // 旧档位的图先画（当底），当前档位后画（盖在上面）
+        fallback.AddRange(current);
+        return fallback;
     }
 
     /// <summary>换种子/换维度/改样式时清空。</summary>
