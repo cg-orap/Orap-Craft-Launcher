@@ -497,6 +497,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     /// 停下来 140ms 后再渲染一次，避免"边拖边算"导致的卡顿与请求堆积。
     /// </summary>
     private bool _renderPendingAfterGesture;
+    private long _lastDragPreviewTicks;
 
     private void ScheduleRenderAfterGesture()
     {
@@ -1152,7 +1153,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (Math.Abs(VisualScale - 1.0) > 0.001) return;   // 缩放过渡中不做悬停换算
+        // 注意：这里**不能**因为 VisualScale != 1 就整体 return。
+        // 那会把拖动、PlanTiles、InvalidateVisual 一起挡掉，
+        // 表现就是"拖不动、松手才刷新"。缩放过渡只影响悬停换算，下面单独处理。
         var position = e.GetPosition(this);
         var step = RenderStep;
 
@@ -1177,6 +1180,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
             // 以前这里只改了中心、只排了"稍后渲染"，画面要等新像素回来才动 ——
             // 于是拖的时候地图不动，松手才跳到新位置。
             // 现在先让旧图跟着指针平移（O(1)），新图随后补上。
+            // 拖动中每 120ms 刷新一次预览层：新露出的区域先有粗图，不出现空白/黑边
+            if (now - _lastDragPreviewTicks > 120)
+            {
+                _lastDragPreviewTicks = now;
+                QueuePreviewRender();
+            }
+
             InvalidateVisual();
             ScheduleRenderAfterGesture();
             return;
