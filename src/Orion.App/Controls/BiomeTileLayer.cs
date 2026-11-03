@@ -213,13 +213,11 @@ public sealed class BiomeTileLayer
 
             var entry = (tile.Bitmap, (double)tile.WorldLeft, (double)tile.WorldTop, (double)tile.SpanBlocks);
 
+            // 只保留当前档位：混合档位会让相邻区域清晰度/色调不一致（观感就是错乱）
             if (tile.RenderStep == renderStep) current.Add(entry);
-            else fallback.Add(entry);
         }
 
-        // 旧档位的图先画（当底），当前档位后画（盖在上面）
-        fallback.AddRange(current);
-        return fallback;
+        return current;
     }
 
     /// <summary>换种子/换维度/改样式时清空。</summary>
