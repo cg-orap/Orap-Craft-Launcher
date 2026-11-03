@@ -132,6 +132,7 @@ public partial class MainWindow : Window
 
             WindowState = WindowState.Maximized;
             _isFullscreen = true;
+            LogFrameGeometry("fullscreen-enter");
             return;
         }
 
@@ -144,6 +145,34 @@ public partial class MainWindow : Window
 
         WindowState = _stateBeforeFullscreen;
         _isFullscreen = false;
+        LogFrameGeometry("fullscreen-exit");
+    }
+
+    /// <summary>
+    /// 把窗口几何/DPI 打到日志里。
+    /// 全屏"铺不满"排查了多轮都靠猜，这次直接记录真实数值。
+    /// </summary>
+    private void LogFrameGeometry(string tag)
+    {
+        try
+        {
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+            var work = System.Windows.SystemParameters.WorkArea;
+
+            Orion.Core.Diagnostics.AppLog.Info("window", "frame-geometry",
+                ("tag", tag),
+                ("state", WindowState.ToString()),
+                ("left", Left), ("top", Top), ("width", Width), ("height", Height),
+                ("actualWidth", ActualWidth), ("actualHeight", ActualHeight),
+                ("screenW", System.Windows.SystemParameters.PrimaryScreenWidth),
+                ("screenH", System.Windows.SystemParameters.PrimaryScreenHeight),
+                ("workW", work.Width), ("workH", work.Height),
+                ("dpiScaleX", dpi.DpiScaleX), ("dpiScaleY", dpi.DpiScaleY));
+        }
+        catch
+        {
+            // 日志失败不影响功能
+        }
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
