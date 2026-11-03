@@ -147,7 +147,6 @@ public partial class MainWindow : Window
             Height = work.Height;
 
             _isFullscreen = true;
-            PlayExpandAnimation();
             LogFrameGeometry("fullscreen-enter");
             return;
         }
@@ -161,31 +160,9 @@ public partial class MainWindow : Window
         Height = _boundsBeforeFullscreen.Height;
 
         _isFullscreen = false;
-        PlayExpandAnimation();
         LogFrameGeometry("fullscreen-exit");
     }
 
-    /// <summary>内容从 0.96 展开到 1.0，弥补没有系统动画的观感。</summary>
-    private void PlayExpandAnimation()
-    {
-        if (Content is not System.Windows.FrameworkElement content) return;
-
-        var scale = new System.Windows.Media.ScaleTransform(0.96, 0.96);
-        content.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
-        content.RenderTransform = scale;
-
-        var ease = new System.Windows.Media.Animation.QuinticEase
-        {
-            EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
-        };
-
-        var duration = new System.Windows.Duration(TimeSpan.FromMilliseconds(320));
-
-        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(0.96, 1.0, duration) { EasingFunction = ease });
-        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(0.96, 1.0, duration) { EasingFunction = ease });
-    }
 
     /// <summary>
     /// 把窗口几何/DPI 打到日志里。
