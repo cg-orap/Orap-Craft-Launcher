@@ -127,21 +127,19 @@ public sealed class BiomeMapCanvas : FrameworkElement
     {
         _tileLayer.Renderer = request => Task.Run<byte[]?>(() =>
         {
-            var pixels = request.Pixels;
-
             var rgba = CubiomesNative.RenderRgba(request.Seed, request.VersionIndex, request.Dimension,
-                request.CenterX, request.CenterZ, request.RenderStep, pixels, pixels)
+                request.CenterX, request.CenterZ, request.RenderStep, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels)
                 ?? SimplifiedBiomeMap.RenderRgba(request.Seed, request.CenterX, request.CenterZ,
-                    request.RenderStep, pixels, pixels);
+                    request.RenderStep, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels);
 
             if (rgba is null) return null;
 
             if (_styled)
             {
-                var span = pixels * request.RenderStep;
-                BiomeMapStyler.Stylize(rgba, pixels, pixels,
+                var span = BiomeTileLayer.TilePixels * request.RenderStep;
+                BiomeMapStyler.Stylize(rgba, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels,
                     request.CenterX - span / 2, request.CenterZ - span / 2,
-                    Math.Max(1, request.RenderStep), textures: true, borders: true, hillshade: true);
+                    Math.Max(1, request.RenderStep), textures: true, borders: false, hillshade: false);
             }
 
             return ToBgra(rgba);

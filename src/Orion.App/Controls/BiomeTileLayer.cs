@@ -19,12 +19,6 @@ public sealed class BiomeTileLayer
     /// <summary>每块瓦片的像素边长。</summary>
     public const int TilePixels = 256;
 
-    /// <summary>渲染时四周多出的像素（提供真实邻居像素，消除拼接色块）。</summary>
-    public const int TilePadding = 2;
-
-    /// <summary>实际渲染的像素边长（含 padding）。</summary>
-    public const int RenderPixels = TilePixels + TilePadding * 2;
-
     /// <summary>缓存上限（块）。48 × 256² × 4B ≈ 12 MB。</summary>
     private const int MaxTiles = 48;
 
@@ -143,13 +137,8 @@ public sealed class BiomeTileLayer
             var pixels = await renderer(request).ConfigureAwait(false);
             if (pixels is null) return;
 
-            // 先建整张（含 padding），再裁成绘制用的 256×256
-            var full = BitmapSource.Create(RenderPixels, RenderPixels, 96, 96,
-                System.Windows.Media.PixelFormats.Bgra32, null, pixels, RenderPixels * 4);
-            full.Freeze();
-
-            var bitmap = new CroppedBitmap(full, new System.Windows.Int32Rect(
-                TilePadding, TilePadding, TilePixels, TilePixels));
+            var bitmap = BitmapSource.Create(TilePixels, TilePixels, 96, 96,
+                System.Windows.Media.PixelFormats.Bgra32, null, pixels, TilePixels * 4);
             bitmap.Freeze();
 
             lock (_gate)
