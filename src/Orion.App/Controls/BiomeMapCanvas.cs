@@ -496,6 +496,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     /// </summary>
     private bool _renderPendingAfterGesture;
     private long _lastDragPreviewTicks;
+    private long _lastHoverLogTicks;
 
     private DispatcherTimer? _redrawTimer;
 
@@ -1250,6 +1251,32 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     bestDistance = distance;
                     nearStructure = marker.Label;
                 }
+            }
+        }
+
+        // 诊断日志：每次悬停记录"鼠标换算出的方块坐标 / 查到的群系 / 档位 / 视口中心"。
+        // 颜色与名字对不上时，靠这些数据定位是哪一环错（坐标 or 查询 or 配色）。
+        var nowTicks = Environment.TickCount64;
+
+        if (nowTicks - _lastHoverLogTicks > 250)
+        {
+            _lastHoverLogTicks = nowTicks;
+
+            try
+            {
+                Orion.Core.Diagnostics.AppLog.Info("seedmap", "hover",
+                    ("blockX", blockX),
+                    ("blockZ", blockZ),
+                    ("id", nativeId),
+                    ("name", nativeId >= 0 ? CubiomesNative.BiomeName(EngineVersionIndex, nativeId) : "-"),
+                    ("step", BlocksPerPixel),
+                    ("renderStep", RenderStep),
+                    ("centerX", _centerBlockX),
+                    ("centerZ", _centerBlockZ));
+            }
+            catch
+            {
+                // 日志失败不影响功能
             }
         }
 
