@@ -101,6 +101,7 @@ public static class Dialogs
 
         dialog.ExtraContent = panel;
         dialog.GlyphText = "↓";
+        FocusInput(dialog, nameBox);
 
         Orion.Core.Diagnostics.AppLog.Info("dialog", "local-pack-install-shown",
             ("zip", System.IO.Path.GetFileName(zipPath)));
@@ -166,6 +167,7 @@ public static class Dialogs
 
         dialog.ExtraContent = panel;
         dialog.GlyphText = "↓";
+        FocusInput(dialog, nameBox);
 
         Orion.Core.Diagnostics.AppLog.Info("dialog", "pack-install-shown", ("pack", packTitle));
         dialog.ShowDialog();
@@ -180,6 +182,22 @@ public static class Dialogs
         var name = string.IsNullOrWhiteSpace(nameBox.Text) ? suggestedName : nameBox.Text.Trim();
 
         return new PackInstallRequest(versions[index].Id, name);
+    }
+
+
+    /// <summary>
+    /// 透明无边框对话框有时拿不到键盘焦点（点了输入框却打不出字）。
+    /// 载入后强制激活窗口并把焦点交给输入框，并全选默认名字方便直接覆盖。
+    /// </summary>
+    private static void FocusInput(ModalDialog dialog, System.Windows.Controls.TextBox box)
+    {
+        dialog.Loaded += (_, _) =>
+        {
+            dialog.Activate();
+            box.Focus();
+            System.Windows.Input.Keyboard.Focus(box);
+            box.SelectAll();
+        };
     }
 
     private static ModalDialog Create(string header, string message, string detail, bool danger,
