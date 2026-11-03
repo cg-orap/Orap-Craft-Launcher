@@ -506,6 +506,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
         if (_dragging || _inertiaTimer?.IsEnabled == true)
         {
             _renderPendingAfterGesture = true;
+
+            // 拖动期间仍然**排瓦片**：瓦片渲染在后台线程，
+            // UI 线程只做"把已有瓦片按新位置画出来"，所以既跟手又能持续补新区域。
+            PlanTiles();
+            InvalidateVisual();
             return;
         }
 
