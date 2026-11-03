@@ -1231,7 +1231,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var blockZ = top + (int)(position.Y * step);
 
         var nativeId = CubiomesNative.Available
-            ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, _dimension, BlocksPerPixel <= 2 ? 1 : 4, blockX, 63, blockZ)
+            ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, _dimension, (int)Math.Round(step), blockX, 63, blockZ)
             : -1;
 
         // 命中附近的结构（12px 内取最近的一个）
