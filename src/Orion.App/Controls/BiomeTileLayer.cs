@@ -151,6 +151,25 @@ public sealed class BiomeTileLayer
                     {
                         _failures[retryKey] = fails;
                         _queue.Enqueue(job);
+
+                        Orion.Core.Diagnostics.AppLog.Warn("seedmap", "tile-retry",
+                            ("tile", tileX + "," + tileZ),
+                            ("renderStep", renderStep),
+                            ("center", request.CenterX + "," + request.CenterZ),
+                            ("pixels", request.Pixels),
+                            ("fails", fails));
+                    }
+                    else
+                    {
+                        Orion.Core.Diagnostics.AppLog.Warn("seedmap", "tile-failed",
+                            ("tile", tileX + "," + tileZ),
+                            ("renderStep", renderStep),
+                            ("center", request.CenterX + "," + request.CenterZ),
+                            ("pixels", request.Pixels),
+                            ("seed", request.Seed),
+                            ("dim", request.Dimension),
+                            ("version", request.VersionIndex),
+                            ("fails", fails));
                     }
                 }
 
