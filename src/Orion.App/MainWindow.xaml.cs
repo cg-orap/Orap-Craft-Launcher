@@ -160,32 +160,28 @@ public partial class MainWindow : Window
             _isFullscreen = false;
         }
 
-        // 切换动画：整窗淡入 + 内容轻微放大，380ms 缓出 —— 比之前 180ms 更容易看清
-        var ease = new System.Windows.Media.Animation.QuinticEase
-        {
-            EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
-        };
-
-        BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0.6, 1.0,
-            new System.Windows.Duration(TimeSpan.FromMilliseconds(380)))
-        {
-            EasingFunction = ease,
-        });
+        // 切换动画：**向外扩展**（不是淡入闪烁）。
+        // 内容从 0.94 倍放大到 1.0，420ms 缓出；不透明度保持 1，避免"闪一下"。
+        var expand = new System.Windows.Media.ScaleTransform(0.94, 0.94);
 
         if (Content is System.Windows.FrameworkElement content)
         {
-            var scale = new System.Windows.Media.ScaleTransform(0.985, 0.985);
-
             content.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
-            content.RenderTransform = scale;
+            content.RenderTransform = expand;
 
-            scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(0.985, 1.0,
-                    new System.Windows.Duration(TimeSpan.FromMilliseconds(380))) { EasingFunction = ease });
-            scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(0.985, 1.0,
-                    new System.Windows.Duration(TimeSpan.FromMilliseconds(380))) { EasingFunction = ease });
+            var ease = new System.Windows.Media.Animation.QuinticEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
+            };
+
+            var duration = new System.Windows.Duration(TimeSpan.FromMilliseconds(420));
+
+            expand.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease });
+            expand.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease });
         }
+
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
