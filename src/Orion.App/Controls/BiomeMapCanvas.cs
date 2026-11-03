@@ -1225,10 +1225,12 @@ public sealed class BiomeMapCanvas : FrameworkElement
             return;
         }
 
-        var left = _centerBlockX - (int)(ActualWidth / 2 * step);
-        var top = _centerBlockZ - (int)(ActualHeight / 2 * step);
-        var blockX = left + (int)(position.X * step);
-        var blockZ = top + (int)(position.Y * step);
+        // 用与绘制一致的整数档位（BlocksPerPixel），不要用 RenderStep
+        var hoverStep = BlocksPerPixel;
+        var left = _centerBlockX - (int)(ActualWidth / 2 * (double)hoverStep);
+        var top = _centerBlockZ - (int)(ActualHeight / 2 * (double)hoverStep);
+        var blockX = left + (int)(position.X * hoverStep);
+        var blockZ = top + (int)(position.Y * hoverStep);
 
         var nativeId = CubiomesNative.Available
             ? CubiomesNative.BiomeAt(_seed, EngineVersionIndex, _dimension, (int)Math.Round(step), blockX, 63, blockZ)
