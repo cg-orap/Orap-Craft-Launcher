@@ -110,6 +110,7 @@ public partial class MainWindow : Window
     private WindowState _stateBeforeFullscreen = WindowState.Normal;
     private System.Windows.Shell.WindowChrome? _chromeBeforeFullscreen;
     private System.Windows.Rect _boundsBeforeFullscreen;
+    private int _styleBeforeFullscreen;
 
 
     /// <summary>全屏切换：隐藏自绘标题栏、铺满屏幕（F11 或右上角按钮）。</summary>
@@ -117,38 +118,62 @@ public partial class MainWindow : Window
 
     private void ToggleFullscreen()
     {
-        // 用系统默认的"最大化/还原"来切换：
-        // Windows 会自己播那段惯性的放大/缩回动画（DWM），
-        // 前提是**不要去动 WindowStyle / WindowChrome / SetWindowPos** ——
-        // 之前几版正是因为手动改这些，把系统动画吃掉了，只能自己补一段假的。
+        // 用 Win32 把窗口切成 WS_POPUP 并直接钉到"工作区矩形"：
+        // · 不再依赖 WindowState=Maximized（在自绘标题栏 + WindowChrome 下，
+        //   最大化后的可见区域常常比屏幕小一圈 —— 之前几次"四周露桌面"就是这个）
+        // · 目标矩形取 SPI_GETWORKAREA，所以任务栏不会被遮住
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+
         if (!_isFullscreen)
         {
             _stateBeforeFullscreen = WindowState;
             _boundsBeforeFullscreen = new System.Windows.Rect(Left, Top, Width, Height);
             _chromeBeforeFullscreen = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
+            _styleBeforeFullscreen = GetWindowLong(handle, GwlStyle);
 
-            WindowState = WindowState.Maximized;
+            // WS_POPUP 会去掉系统边框；保留 WS_VISIBLE
+            SetWindowLong(handle, GwlStyle, WsPopup | WsVisible);
+
+            var work = new Rect();
+            const uint SpiGetWorkArea = 0x0030;
+
+            if (SystemParametersInfo(SpiGetWorkArea, 0, ref work, 0))
+            {
+                SetWindowPos(handle, IntPtr.Zero, work.Left, work.Top,
+                    work.Right - work.Left, work.Bottom - work.Top,
+                    SwpFramechanged | SwpShowwindow);
+            }
+
             _isFullscreen = true;
         }
         else
         {
-            WindowState = WindowState.Normal;
+            SetWindowLong(handle, GwlStyle, _styleBeforeFullscreen);
+            SetWindowPos(handle, IntPtr.Zero,
+                (int)_boundsBeforeFullscreen.Left, (int)_boundsBeforeFullscreen.Top,
+                (int)_boundsBeforeFullscreen.Width, (int)_boundsBeforeFullscreen.Height,
+                SwpFramechanged | SwpShowwindow);
 
-            if (_stateBeforeFullscreen == WindowState.Maximized)
+            if (_chromeBeforeFullscreen is not null)
             {
-                WindowState = WindowState.Maximized;
-            }
-            else
-            {
-                Left = _boundsBeforeFullscreen.Left;
-                Top = _boundsBeforeFullscreen.Top;
-                Width = _boundsBeforeFullscreen.Width;
-                Height = _boundsBeforeFullscreen.Height;
+                System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeBeforeFullscreen);
             }
 
+            WindowState = _stateBeforeFullscreen;
             _isFullscreen = false;
         }
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int index);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
+
+    private const int GwlStyle = -16;
+    private const int WsPopup = unchecked((int)0x80000000);
+    private const int WsVisible = 0x10000000;
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
