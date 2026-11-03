@@ -108,46 +108,57 @@ public partial class MainWindow : Window
 
     private bool _isFullscreen;
     private WindowState _stateBeforeFullscreen = WindowState.Normal;
-    private WindowStyle _styleBeforeFullscreen = WindowStyle.SingleBorderWindow;
+    private System.Windows.Shell.WindowChrome? _chromeBeforeFullscreen;
+
 
     /// <summary>全屏切换：隐藏自绘标题栏、铺满屏幕（F11 或右上角按钮）。</summary>
     private void OnToggleFullscreen(object sender, System.Windows.RoutedEventArgs e) => ToggleFullscreen();
 
     private void ToggleFullscreen()
     {
+        // 不再切 WindowStyle（那样会在部分机器上留下白边/不铺满）。
+        // 改为把 WindowChrome 的边框/标题高度归零，再显式铺满工作区。
+        var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
+
         if (!_isFullscreen)
         {
+            _chromeBeforeFullscreen = chrome;
             _stateBeforeFullscreen = WindowState;
-            _styleBeforeFullscreen = WindowStyle;
 
             TitleBar.Visibility = System.Windows.Visibility.Collapsed;
 
-            // 先还原成 Normal 再改样式，否则 WPF 会保留旧的可视区域（表现为白边、不铺满）
+            System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new System.Windows.Thickness(0),
+                GlassFrameThickness = new System.Windows.Thickness(0),
+                CornerRadius = new System.Windows.CornerRadius(0),
+                UseAeroCaptionButtons = false,
+            });
+
             WindowState = WindowState.Normal;
-            WindowStyle = WindowStyle.None;
-            ResizeMode = ResizeMode.NoResize;
 
-            var screen = SystemParameters.PrimaryScreenWidth;
-            var screenHeight = SystemParameters.PrimaryScreenHeight;
-            Left = 0;
-            Top = 0;
-            Width = screen;
-            Height = screenHeight;
-
-            WindowState = WindowState.Maximized;
+            var area = SystemParameters.WorkArea;
+            Left = area.Left;
+            Top = area.Top;
+            Width = area.Width;
+            Height = area.Height;
 
             _isFullscreen = true;
         }
         else
         {
             TitleBar.Visibility = System.Windows.Visibility.Visible;
-            WindowStyle = _styleBeforeFullscreen;
-            ResizeMode = ResizeMode.CanResize;
             WindowState = WindowState.Normal;
             Width = 1280;
             Height = 820;
-            WindowState = _stateBeforeFullscreen;
 
+            if (_chromeBeforeFullscreen is not null)
+            {
+                System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeBeforeFullscreen);
+            }
+
+            WindowState = _stateBeforeFullscreen;
             _isFullscreen = false;
         }
     }

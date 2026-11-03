@@ -280,10 +280,32 @@
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="10">
-                        <Button Content="放大" Style="{StaticResource SecondaryButton}" Padding="12,5"
-                                Click="OnZoomIn" ToolTip="放大一档：看清更小的范围" />
-                        <Button Content="缩小" Style="{StaticResource SecondaryButton}" Padding="12,5"
-                                Margin="6,0,0,0" Click="OnZoomOut" ToolTip="缩小一档：看到更大的范围" />
+                        <Button Style="{StaticResource SecondaryButton}" Width="34" Height="28" Padding="0"
+                                Click="OnZoomIn" ToolTip="放大一档（滚轮向上）"
+                                AutomationProperties.AutomationId="ZoomInButton">
+                            <Grid Width="16" Height="16">
+                                <Ellipse Width="12" Height="12" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                         Stroke="{DynamicResource TextBrush}" StrokeThickness="1.4" />
+                                <Path Data="M 11,11 L 15,15" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Path Data="M 3.4,6 L 8.6,6 M 6,3.4 L 6,8.6"
+                                      Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Grid>
+                        </Button>
+                        <Button Style="{StaticResource SecondaryButton}" Width="34" Height="28" Padding="0"
+                                Margin="6,0,0,0" Click="OnZoomOut" ToolTip="缩小一档（滚轮向下）"
+                                AutomationProperties.AutomationId="ZoomOutButton">
+                            <Grid Width="16" Height="16">
+                                <Ellipse Width="12" Height="12" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                         Stroke="{DynamicResource TextBrush}" StrokeThickness="1.4" />
+                                <Path Data="M 11,11 L 15,15" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Path Data="M 3.4,6 L 8.6,6"
+                                      Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Grid>
+                        </Button>
                         <Button Content="回到原点" Style="{StaticResource GhostButton}" Margin="6,0,0,0"
                                 Click="OnCenterOrigin" />
                         <Border Background="{DynamicResource SurfaceAltBg}" CornerRadius="4" Padding="8,3"
