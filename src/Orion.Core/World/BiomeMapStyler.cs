@@ -35,7 +35,7 @@ public static class BiomeMapStyler
     /// <param name="borders">是否画群系边界。</param>
     public static void Stylize(byte[] rgba, int width, int height,
         int worldLeft, int worldTop, int blocksPerPixel,
-        bool textures = true, bool borders = true, bool hillshade = true)
+        bool textures = true, bool borders = true, bool hillshade = true, int edgeMargin = 0)
     {
         if (rgba is null || width <= 1 || height <= 1) return;
         if (rgba.Length < width * height * 4) return;
@@ -116,6 +116,14 @@ public static class BiomeMapStyler
                 }
 
                 if (!borders) continue;
+
+                // 瓦片边缘：邻居采样只在本块内，算出来的"边界/坡度"是假的，
+                // 跳过这些像素，拼接后就不会出现格子状色差。
+                if (edgeMargin > 0 &&
+                    (x < edgeMargin || y < edgeMargin || x >= width - edgeMargin || y >= height - edgeMargin))
+                {
+                    continue;
+                }
 
                 // ── 边界与海岸线 ──
                 // 旧做法是"右/下邻不同就压暗到 0.76"，1 像素硬边，缩小时像描了黑线。

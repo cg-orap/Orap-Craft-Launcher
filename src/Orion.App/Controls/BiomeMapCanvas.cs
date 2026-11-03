@@ -139,7 +139,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 var span = BiomeTileLayer.TilePixels * request.RenderStep;
                 BiomeMapStyler.Stylize(rgba, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels,
                     request.CenterX - span / 2, request.CenterZ - span / 2,
-                    Math.Max(1, request.RenderStep), textures: true, borders: true, hillshade: true);
+                    Math.Max(1, request.RenderStep), textures: true, borders: true, hillshade: true,
+                    edgeMargin: 2);
             }
 
             return ToBgra(rgba);
