@@ -305,7 +305,7 @@ public static class PixelIcons
 
             // 整体提亮：原调色板偏暗，压在浅色底板上会显成一块黑
             var baseColor = Palette.TryGetValue(c, out var color) ? color : Colors.Magenta;
-            var brush = new SolidColorBrush(Lighten(baseColor, 0.55));
+            var brush = new SolidColorBrush(baseColor);
             brush.Freeze();
             brushes[c] = brush;
             return brush;
@@ -325,14 +325,15 @@ public static class PixelIcons
             }
         }
 
-        // 外框描边：像素图整体加 1px 轮廓，缩小时也不会糊进地形色里
-        // 阴影 + 光晕：地形颜色复杂时，图标靠这两层仍然清楚
+        // 白色外圈 + 细灰描边。
+        // 这里原来画了一个 50% 黑的阴影矩形，而且是在**画完像素图之后**画的，
+        // 等于给每个图标盖了一层黑纱 —— 图标一直显黑就是这个原因。
         var pad = block * Grid;
-        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x80, 0x00, 0x00, 0x00)), null,
-            new Rect(left - 2, top - 2, pad + 4, pad + 4));
-        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF)), 1.2),
-            new Rect(left - 1, top - 1, pad + 2, pad + 2));
 
-        dc.DrawRectangle(null, new Pen(outline, 1.4), new Rect(left, top, pad, pad));
+        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)), 3),
+            new Rect(left - 1.5, top - 1.5, pad + 3, pad + 3));
+
+        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0xFF, 0x92, 0x9A, 0xA2)), 1),
+            new Rect(left - 0.5, top - 0.5, pad + 1, pad + 1));
     }
 }
