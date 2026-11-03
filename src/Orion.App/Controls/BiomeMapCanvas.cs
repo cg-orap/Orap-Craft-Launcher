@@ -634,8 +634,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 {
                     var worldLeft = centerX - (int)(viewWidth / 2.0 * step);
                     var worldTop = centerZ - (int)(viewHeight / 2.0 * step);
+
+                    // 与瓦片使用同一套规则：远距（step > 8）不加纹理，
+                    // 否则预览层有斑点、瓦片是平的，拼接处会出现明显色差。
+                    var previewTexture = step <= 8;
+
                     BiomeMapStyler.Stylize(pixels, pixelWidth, pixelHeight, worldLeft, worldTop,
-                        Math.Max(1, step / supersample), textures: true, borders: false, hillshade: true);
+                        Math.Max(1, step / supersample), textures: previewTexture, borders: false, hillshade: true);
                 }
 
                 Dispatcher.BeginInvoke(new Action(() =>
