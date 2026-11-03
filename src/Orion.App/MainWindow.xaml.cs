@@ -117,71 +117,37 @@ public partial class MainWindow : Window
 
     private void ToggleFullscreen()
     {
-        // 不再手动算 WorkArea 尺寸（DIP/像素混用会让窗口"变小一截"），
-        // 改成：进入用 Maximized + 边框归零；退出恢复到进入前的窗口位置与大小。
-        var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
-
+        // 用系统默认的"最大化/还原"来切换：
+        // Windows 会自己播那段惯性的放大/缩回动画（DWM），
+        // 前提是**不要去动 WindowStyle / WindowChrome / SetWindowPos** ——
+        // 之前几版正是因为手动改这些，把系统动画吃掉了，只能自己补一段假的。
         if (!_isFullscreen)
         {
-            _chromeBeforeFullscreen = chrome;
             _stateBeforeFullscreen = WindowState;
             _boundsBeforeFullscreen = new System.Windows.Rect(Left, Top, Width, Height);
+            _chromeBeforeFullscreen = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
 
-            System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
-            {
-                CaptionHeight = 0,
-                ResizeBorderThickness = new System.Windows.Thickness(0),
-                GlassFrameThickness = new System.Windows.Thickness(0),
-                CornerRadius = new System.Windows.CornerRadius(0),
-                UseAeroCaptionButtons = false,
-            });
-
-            WindowState = WindowState.Normal;
-            ResizeMode = ResizeMode.NoResize;
-            FillPrimaryScreen();
+            WindowState = WindowState.Maximized;
             _isFullscreen = true;
         }
         else
         {
-            ResizeMode = ResizeMode.CanResize;
+            WindowState = WindowState.Normal;
 
-            if (_chromeBeforeFullscreen is not null)
+            if (_stateBeforeFullscreen == WindowState.Maximized)
             {
-                System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeBeforeFullscreen);
+                WindowState = WindowState.Maximized;
+            }
+            else
+            {
+                Left = _boundsBeforeFullscreen.Left;
+                Top = _boundsBeforeFullscreen.Top;
+                Width = _boundsBeforeFullscreen.Width;
+                Height = _boundsBeforeFullscreen.Height;
             }
 
-            // 先回 Normal 再套用旧尺寸，否则 WPF 会用最大化尺寸覆盖
-            Left = _boundsBeforeFullscreen.Left;
-            Top = _boundsBeforeFullscreen.Top;
-            Width = _boundsBeforeFullscreen.Width;
-            Height = _boundsBeforeFullscreen.Height;
-
-            WindowState = _stateBeforeFullscreen;
             _isFullscreen = false;
         }
-
-        // 切换动画：**向外扩展**（不是淡入闪烁）。
-        // 内容从 0.94 倍放大到 1.0，420ms 缓出；不透明度保持 1，避免"闪一下"。
-        var expand = new System.Windows.Media.ScaleTransform(0.94, 0.94);
-
-        if (Content is System.Windows.FrameworkElement content)
-        {
-            content.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
-            content.RenderTransform = expand;
-
-            var ease = new System.Windows.Media.Animation.QuinticEase
-            {
-                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
-            };
-
-            var duration = new System.Windows.Duration(TimeSpan.FromMilliseconds(420));
-
-            expand.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease });
-            expand.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
-                new System.Windows.Media.Animation.DoubleAnimation(0.94, 1.0, duration) { EasingFunction = ease });
-        }
-
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
