@@ -20,7 +20,8 @@ public sealed class BiomeTileLayer
     public const int TilePixels = 256;
 
     /// <summary>缓存上限（块）。48 × 256² × 4B ≈ 12 MB。</summary>
-    private const int MaxTiles = 48;
+    // 最大化时一屏可能需要 40-60 块，缓存太小会"边画边淘汰" → 缺块、闪块
+    private const int MaxTiles = 160;
 
     private sealed class Tile
     {
@@ -65,7 +66,7 @@ public sealed class BiomeTileLayer
 
     /// <summary>排入"当前视口需要的瓦片"，多余/过期的直接丢弃。</summary>
     public void Plan(int step, double viewLeft, double viewTop, double viewWidth, double viewHeight,
-        int maxConcurrent = 4)
+        int maxConcurrent = 6)
     {
         var (renderStep, _, _) = Resolve(step);
         var span = TileSpan(renderStep);
@@ -95,14 +96,23 @@ public sealed class BiomeTileLayer
 
         lock (_gate)
         {
-            _queue.Clear();
-            foreach (var (tx, tz, _) in wanted.OrderBy(w => w.Distance)) _queue.Enqueue((renderStep, tx, tz));
+            // 合并而不是清空：保留仍在排队但尚未开始的块，只在前方插入更近的
+            var pending = new HashSet<(int, int, int)>(_queue);
+
+            foreach (var (tx, tz, _) in wanted.OrderBy(w => w.Distance))
+            {
+                if (pending.Contains((renderStep, tx, tz))) continue;
+                _queue.Enqueue((renderStep, tx, tz));
+            }
+
+            // 队列过长时截断尾部（最远的），避免无限增长
+            while (_queue.Count > 240) _queue.Dequeue();
         }
 
         Pump(maxConcurrent);
     }
 
-    private void Pump(int maxConcurrent = 4)
+    private void Pump(int maxConcurrent = 6)
     {
         while (true)
         {
