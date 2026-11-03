@@ -111,17 +111,23 @@ public partial class MainWindow : Window
     private System.Windows.Shell.WindowChrome? _chromeBeforeFullscreen;
     private System.Windows.Rect _boundsBeforeFullscreen;
     private int _styleBeforeFullscreen;
+    private ResizeMode _resizeModeBeforeFullscreen = ResizeMode.CanResize;
 
 
     /// <summary>全屏切换：隐藏自绘标题栏、铺满屏幕（F11 或右上角按钮）。</summary>
     private void OnToggleFullscreen(object sender, System.Windows.RoutedEventArgs e) => ToggleFullscreen();
 
     /// <summary>
-    /// 全屏切换：只做 WindowState 最大/还原，不碰窗口样式、不做 Win32 调用。
+    /// 全屏切换：**不做最大化**，直接把窗口设为工作区大小（DIP 单位）。
     ///
-    /// 说明：前面试过 SetWindowPos / WS_POPUP / WindowChrome 归零等方案，
-    /// 结果要么铺不满、要么直接抛 OverflowException（异常弹窗）。
-    /// 这里退回到最稳的做法 —— 交给 WPF/Windows 自己处理最大化与还原动画。
+    /// 为什么不用 WindowState=Maximized：
+    /// 日志实测在 125% 缩放下，最大化后窗口恒为 1550.4×830.4，
+    /// 而工作区只有 1536×816 —— WindowChrome 会把 ResizeBorderThickness 计进去，
+    /// 我加的 WM_GETMINMAXINFO 也被它覆盖，怎么调都多出 14.4。
+    ///
+    /// 所以绕开最大化：WindowState 保持 Normal，直接设 Left/Top/Width/Height
+    /// 到工作区（1536×816 DIP），几何是**精确**的。
+    /// 代价：没有系统那段最大化动画（改用内容扩展动画顶上）。
     /// </summary>
     private void ToggleFullscreen()
     {
@@ -129,23 +135,56 @@ public partial class MainWindow : Window
         {
             _stateBeforeFullscreen = WindowState;
             _boundsBeforeFullscreen = new System.Windows.Rect(Left, Top, Width, Height);
+            _resizeModeBeforeFullscreen = ResizeMode;
 
-            WindowState = WindowState.Maximized;
+            WindowState = WindowState.Normal;
+            ResizeMode = ResizeMode.NoResize;
+
+            var work = System.Windows.SystemParameters.WorkArea;
+            Left = work.Left;
+            Top = work.Top;
+            Width = work.Width;
+            Height = work.Height;
+
             _isFullscreen = true;
+            PlayExpandAnimation();
             LogFrameGeometry("fullscreen-enter");
             return;
         }
 
         WindowState = WindowState.Normal;
+        ResizeMode = _resizeModeBeforeFullscreen;
 
         Left = _boundsBeforeFullscreen.Left;
         Top = _boundsBeforeFullscreen.Top;
         Width = _boundsBeforeFullscreen.Width;
         Height = _boundsBeforeFullscreen.Height;
 
-        WindowState = _stateBeforeFullscreen;
         _isFullscreen = false;
+        PlayExpandAnimation();
         LogFrameGeometry("fullscreen-exit");
+    }
+
+    /// <summary>内容从 0.96 展开到 1.0，弥补没有系统动画的观感。</summary>
+    private void PlayExpandAnimation()
+    {
+        if (Content is not System.Windows.FrameworkElement content) return;
+
+        var scale = new System.Windows.Media.ScaleTransform(0.96, 0.96);
+        content.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
+        content.RenderTransform = scale;
+
+        var ease = new System.Windows.Media.Animation.QuinticEase
+        {
+            EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
+        };
+
+        var duration = new System.Windows.Duration(TimeSpan.FromMilliseconds(320));
+
+        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0.96, 1.0, duration) { EasingFunction = ease });
+        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0.96, 1.0, duration) { EasingFunction = ease });
     }
 
     /// <summary>
