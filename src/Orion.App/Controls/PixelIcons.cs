@@ -4,29 +4,29 @@ using System.Windows.Media;
 namespace Orion.App.Controls;
 
 /// <summary>
-/// 结构图标：参考 Axolotl 种子地图的做法 —— 不画结构本体，改用**代表性方块/物品**。
-/// 方块统一画成等轴测立方体（顶亮、左中、右暗），一眼就是"MC 里的那种方块"；
-/// 少数结构用物品形状（末影之眼、箱子、船、鞘翅、铁轨、弩）。
-/// 全部代码绘制，不使用 Minecraft 的任何图像资源。
+/// 结构图标（矢量绘制，不用像素网格、不使用 Minecraft 图像资源）。
+///
+/// 变更原因：16×16 字符网格能表达的形状太有限，村民脸、鞘翅这类细节画不出来。
+/// 现在改成用 Path/几何图形直接画轮廓 —— 任意尺寸都清晰，形状可以画准。
+///
+/// 图标构成：
+///  · 立体卡片：投影 → 渐变底板 → 内容 → 内斜角 → 渐变外框
+///  · 内容：宝箱/船/眼/翅膀/村民脸用矢量轮廓；其余结构用"代表性材质的等轴测方块"
 /// </summary>
 public static class PixelIcons
 {
-    private const int Grid = 16;
-    private static readonly Color Outline = Color.FromRgb(0x24, 0x1C, 0x16);
+    private static readonly Color Ink = Color.FromRgb(0x2A, 0x22, 0x1C);
 
     private readonly record struct Block(Color Top, Color Left, Color Right);
 
     private static readonly Dictionary<string, Block> Blocks = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["village"] = new(Color.FromRgb(0x7C,0xD8,0x6A), Color.FromRgb(0x3E,0xA8,0x52), Color.FromRgb(0x2C,0x84,0x40)),
         ["mansion"] = new(Color.FromRgb(0x6E,0x4A,0x2E), Color.FromRgb(0x4A,0x2E,0x1C), Color.FromRgb(0x35,0x1F,0x12)),
         ["monument"] = new(Color.FromRgb(0x8C,0xF0,0xE8), Color.FromRgb(0x3E,0xC8,0xC0), Color.FromRgb(0x22,0x96,0x96)),
         ["ocean_ruin"] = new(Color.FromRgb(0xA8,0xE8,0xE0), Color.FromRgb(0x62,0xB8,0xB0), Color.FromRgb(0x3E,0x8C,0x88)),
         ["desert_pyramid"] = new(Color.FromRgb(0xF2,0xD8,0x92), Color.FromRgb(0xD8,0xB4,0x62), Color.FromRgb(0xB0,0x8C,0x42)),
-        ["desert_well"] = new(Color.FromRgb(0xE8,0xCC,0x84), Color.FromRgb(0xC8,0xA4,0x56), Color.FromRgb(0x9E,0x7C,0x36)),
         ["jungle_temple"] = new(Color.FromRgb(0x8A,0xB0,0x6E), Color.FromRgb(0x5E,0x82,0x4A), Color.FromRgb(0x40,0x5E,0x32)),
         ["trail_ruins"] = new(Color.FromRgb(0xD8,0xA8,0x7C), Color.FromRgb(0xB0,0x82,0x58), Color.FromRgb(0x84,0x5E,0x3C)),
-        ["swamp_hut"] = new(Color.FromRgb(0x7A,0x8A,0x4E), Color.FromRgb(0x54,0x62,0x32), Color.FromRgb(0x3C,0x46,0x22)),
         ["igloo"] = new(Color.FromRgb(0xFF,0xFF,0xFF), Color.FromRgb(0xDC,0xE8,0xF0), Color.FromRgb(0xB4,0xC4,0xD0)),
         ["ancient_city"] = new(Color.FromRgb(0x4E,0xD8,0xC8), Color.FromRgb(0x22,0x8C,0x88), Color.FromRgb(0x14,0x5E,0x60)),
         ["trial_chambers"] = new(Color.FromRgb(0xF0,0xA8,0x62), Color.FromRgb(0xC8,0x7C,0x3C), Color.FromRgb(0x96,0x58,0x26)),
@@ -38,88 +38,46 @@ public static class PixelIcons
         ["end_gateway"] = new(Color.FromRgb(0xE8,0xE8,0xD0), Color.FromRgb(0xB8,0xB8,0x9E), Color.FromRgb(0x8A,0x8A,0x74)),
     };
 
-    /// <summary>村民头像：方脑袋 + 粗眉 + 大鼻子（村庄最直白的图标）。</summary>
-    private const string VillagerRows =
-        "................|" +
-        "...oooooooooo...|" +
-        "..oaassssssaao..|" +
-        "..osssssssssso..|" +
-        "..osssssssssso..|" +
-        "..osooooooosso..|" +
-        "..osssoossssso..|" +
-        "..osssoossssso..|" +
-        "..osssssssssso..|" +
-        "..ossSssssSsso..|" +
-        "..osssssssssso..|" +
-        "..osssooooosso..|" +
-        "..ossssoosssso..|" +
-        "..osssssssssso..|" +
-        "...oooooooooo...|" +
-        "................";
-
-    /// <summary>炼药锅（女巫小屋）。</summary>
-    private const string CauldronRows =
-        "................|" +
-        "................|" +
-        "..oooooooooooo..|" +
-        "..oKKKKKKKKKKo..|" +
-        "..oKggggggggKo..|" +
-        "..oKggggggggKo..|" +
-        "..oKKKKKKKKKKo..|" +
-        "...oKKKKKKKKo...|" +
-        "...oKKKKKKKKo...|" +
-        "...oKKKKKKKKo...|" +
-        "....oooooooo....|" +
-        "................|" +
-        "................|" +
-        "................|" +
-        "................|" +
-        "................";
-
-    private const string EyeRows = "................|....oooooooo....|..oowwwwwwwwoo..|.owwwwwwwwwwwwo.|.owwwggggggwwwo.|.owwggoggggogwo.|owwggogggggogwo.|owwggoogggoggwo.|owwggggggggggwo.|owwggggggggggwo.|.owwggggggggwwo.|.owwwggggggwwwo.|..oowwwwwwwwoo..|....oooooooo....|................|................";
-    private const string ChestRows = "................|...oooooooooo...|..oaaaaaaaaaao..|..oaaaaaaaaaao..|..oooooooooooo..|..oaaayyyyaaao..|..oaaayyyyaaao..|..oaaaaaaaaaao..|..oaaayyyyaaao..|..oaaaaaaaaaao..|..oaaaaaaaaaao..|..oooooooooooo..|................|................|................|................";
-    private const string BoatRows = "................|................|................|.......ao.......|.......ao.......|..oooooooooooo..|..oaaaaaaaaaao..|.oaaaaaaaaaaaao.|.oAAAaaaaaaAAAo.|..oAAAAAAAAAAo..|...oooooooooo...|................|................|................|................|................";
-    private const string ElytraRows = "................|..vv........vv..|.ovvvo....ovvvo.|.ovvvvo..ovvvvo.|.ovvvvvoovvvvvo.|.ovvvvvvvvvvvvo.|..oVVvvvvvvVVo..|...oVVvvvvVVo...|...oVVVvvVVVo...|....oVVVVVVo....|....oVVVVVVo....|.....oVVVVo.....|......oooo......|................|................|................";
-    private const string RailRows = "................|................|..o..........o..|..oooooooooooo..|..o..........o..|..o..........o..|..oooooooooooo..|..o..........o..|..o..........o..|..oooooooooooo..|..o..........o..|................|................|................|................|................";
-    private const string CrossbowRows = "................|....oooooooo....|...oaaaaaaaa o..|..oaa......aao..|..oa........ao..|.oaa...oo...aao.|.oa...oaa o..ao.|.oa..oa..ao..ao.|.oa..oa..ao..ao.|.oa..oa..ao..ao.|.oa...oaa o..ao.|.oaa...oo...aao.|..oa........ao..|..oaa......aao..|...oooooooooo...|................";
-
-    public static bool Has(string key) => Blocks.ContainsKey(key) ||
-        key is "stronghold" or "treasure" or "shipwreck" or "end_ship" or "mineshaft" or "outpost"
-            or "village" or "swamp_hut";
+    public static bool Has(string key) => key is "village" or "outpost" or "stronghold" or "treasure"
+        or "shipwreck" or "end_ship" or "mineshaft" or "swamp_hut" || Blocks.ContainsKey(key);
 
     public static void Draw(DrawingContext dc, string key, Brush tint, Point centre, double size)
     {
-        var block = Math.Max(2.0, Math.Round(size / Grid));
-        var span = block * Grid;
+        var span = Math.Max(13.0, Math.Round(size));
         var left = centre.X - span / 2;
         var top = centre.Y - span / 2;
+        var box = new Rect(left, top, span, span);
 
+        // 卡片：投影 → 渐变底板
         dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x66, 0x00, 0x00, 0x00)), null,
             new Rect(left + 1.5, top + 2, span, span));
 
         var plate = new LinearGradientBrush(Color.FromRgb(0xFF, 0xFF, 0xFF), Color.FromRgb(0xDF, 0xE6, 0xEC),
             new Point(0, 0), new Point(0, 1));
         plate.Freeze();
-        dc.DrawRectangle(plate, null, new Rect(left, top, span, span));
+        dc.DrawRectangle(plate, null, box);
 
-        // 优先用"物品/生物"图标（玩家一眼能认），其余用代表性方块
-        var item = key switch
+        // 内容：留 12% 内边距
+        var inner = new Rect(left + span * 0.12, top + span * 0.12, span * 0.76, span * 0.76);
+
+        switch (key)
         {
-            "village" => VillagerRows,
-            "outpost" => CrossbowRows,
-            "stronghold" => EyeRows,
-            "treasure" => ChestRows,
-            "shipwreck" => BoatRows,
-            "end_ship" => ElytraRows,
-            "mineshaft" => RailRows,
-            "swamp_hut" => CauldronRows,
-            _ => null,
-        };
+            case "village": DrawVillager(dc, inner); break;
+            case "stronghold":
+            case "end_gateway": DrawEye(dc, inner); break;
+            case "end_ship": DrawElytra(dc, inner); break;
+            case "treasure": DrawChest(dc, inner); break;
+            case "shipwreck": DrawBoat(dc, inner); break;
+            case "outpost": DrawCrossbow(dc, inner); break;
+            case "mineshaft": DrawRail(dc, inner); break;
+            case "swamp_hut": DrawCauldron(dc, inner); break;
+            default:
+                if (Blocks.TryGetValue(key, out var colors)) DrawIsoCube(dc, colors, inner);
+                else DrawIsoCube(dc, new Block(Color.FromRgb(0xC8, 0xC8, 0xC8), Color.FromRgb(0x9E, 0x9E, 0x9E), Color.FromRgb(0x76, 0x76, 0x76)), inner);
+                break;
+        }
 
-        if (item is not null) DrawPixels(dc, item, left, top, block);
-        else if (Blocks.TryGetValue(key, out var colors)) DrawIsoCube(dc, colors, left, top, block);
-        else DrawPixels(dc, ChestRows, left, top, block);
-
+        // 内斜角 + 渐变外框
         var light = new SolidColorBrush(Color.FromArgb(0x88, 0xFF, 0xFF, 0xFF));
         var dark = new SolidColorBrush(Color.FromArgb(0x55, 0x30, 0x38, 0x40));
 
@@ -134,21 +92,183 @@ public static class PixelIcons
         dc.DrawRectangle(null, new Pen(bezel, 1.2), new Rect(left - 0.6, top - 0.6, span + 1.2, span + 1.2));
     }
 
-    private static void DrawIsoCube(DrawingContext dc, Block colors, double left, double top, double block)
+    /// <summary>村民头像：方脸 + 粗眉 + 大鼻子 + 深色头发边。</summary>
+    private static void DrawVillager(DrawingContext dc, Rect r)
     {
-        var pen = new Pen(new SolidColorBrush(Outline), 1);
-        var topVertex = new Point(left + 8 * block, top + 2 * block);
-        var rightVertex = new Point(left + 14 * block, top + 6 * block);
-        var bottomVertex = new Point(left + 8 * block, top + 14 * block);
-        var leftVertex = new Point(left + 2 * block, top + 6 * block);
-        var centreVertex = new Point(left + 8 * block, top + 10 * block);
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var skin = new SolidColorBrush(Color.FromRgb(0xE8, 0xC8, 0xA6));
+        var hair = new SolidColorBrush(Color.FromRgb(0x4A, 0x37, 0x28));
+        var brow = new Pen(new SolidColorBrush(Ink), Math.Max(1.0, r.Height * 0.07));
 
-        dc.DrawGeometry(new SolidColorBrush(colors.Top), pen, Tri(topVertex, rightVertex, leftVertex, centreVertex));
-        dc.DrawGeometry(new SolidColorBrush(colors.Left), pen, Tri(leftVertex, centreVertex, bottomVertex, new Point(left + 2 * block, top + 11 * block)));
-        dc.DrawGeometry(new SolidColorBrush(colors.Right), pen, Tri(rightVertex, new Point(left + 14 * block, top + 11 * block), bottomVertex, centreVertex));
+        // 头发（顶条）
+        dc.DrawRectangle(hair, pen, new Rect(r.X, r.Y, r.Width, r.Height * 0.22));
+
+        // 脸
+        dc.DrawRectangle(skin, pen, new Rect(r.X + r.Width * 0.04, r.Y + r.Height * 0.2, r.Width * 0.92, r.Height * 0.78));
+
+        // 眉毛
+        dc.DrawLine(brow, new Point(r.X + r.Width * 0.22, r.Y + r.Height * 0.42),
+            new Point(r.X + r.Width * 0.42, r.Y + r.Height * 0.46));
+        dc.DrawLine(brow, new Point(r.X + r.Width * 0.58, r.Y + r.Height * 0.46),
+            new Point(r.X + r.Width * 0.78, r.Y + r.Height * 0.42));
+
+        // 鼻子（竖直长条）
+        dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0xD2, 0xAA, 0x86)), pen,
+            new Rect(r.X + r.Width * 0.42, r.Y + r.Height * 0.48, r.Width * 0.16, r.Height * 0.36));
     }
 
-    private static StreamGeometry Tri(params Point[] points)
+    /// <summary>末影之眼：眼白 + 绿虹膜 + 深瞳。</summary>
+    private static void DrawEye(DrawingContext dc, Rect r)
+    {
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var c = new Point(r.X + r.Width / 2, r.Y + r.Height / 2);
+
+        dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0xF4, 0xF8, 0xFA)), pen, c, r.Width / 2, r.Height / 2);
+        dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0x5E, 0xE0, 0x7E)), null, c, r.Width * 0.34, r.Height * 0.34);
+        dc.DrawEllipse(new SolidColorBrush(Ink), null, c, r.Width * 0.13, r.Height * 0.13);
+    }
+
+    /// <summary>鞘翅：两片对称翅膀（贝塞尔轮廓）。</summary>
+    private static void DrawElytra(DrawingContext dc, Rect r)
+    {
+        var pen = new Pen(new SolidColorBrush(Color.FromRgb(0x5E, 0x3E, 0x86)), 1);
+        var fill = new SolidColorBrush(Color.FromRgb(0xC0, 0x9C, 0xF0));
+        var mid = new Point(r.X + r.Width / 2, r.Y + r.Height * 0.16);
+
+        var leftWing = new StreamGeometry();
+        using (var ctx = leftWing.Open())
+        {
+            ctx.BeginFigure(mid, true, true);
+            ctx.BezierTo(new Point(r.X - r.Width * 0.05, r.Y + r.Height * 0.3),
+                new Point(r.X - r.Width * 0.05, r.Y + r.Height * 0.85),
+                new Point(r.X + r.Width * 0.44, r.Y + r.Height), true, false);
+            ctx.LineTo(new Point(r.X + r.Width / 2, r.Y + r.Height * 0.5), true, false);
+        }
+
+        leftWing.Freeze();
+        dc.DrawGeometry(fill, pen, leftWing);
+
+        var rightWing = new StreamGeometry();
+        using (var ctx = rightWing.Open())
+        {
+            ctx.BeginFigure(new Point(mid.X, mid.Y), true, true);
+            ctx.BezierTo(new Point(r.X + r.Width * 1.05, r.Y + r.Height * 0.3),
+                new Point(r.X + r.Width * 1.05, r.Y + r.Height * 0.85),
+                new Point(r.X + r.Width * 0.56, r.Y + r.Height), true, false);
+            ctx.LineTo(new Point(r.X + r.Width / 2, r.Y + r.Height * 0.5), true, false);
+        }
+
+        rightWing.Freeze();
+        dc.DrawGeometry(fill, pen, rightWing);
+    }
+
+    /// <summary>宝箱：箱体 + 盖缝 + 金锁。</summary>
+    private static void DrawChest(DrawingContext dc, Rect r)
+    {
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var wood = new SolidColorBrush(Color.FromRgb(0xD8, 0x9E, 0x58));
+        var dark = new SolidColorBrush(Color.FromRgb(0xA8, 0x6E, 0x30));
+
+        dc.DrawRectangle(wood, pen, new Rect(r.X, r.Y + r.Height * 0.18, r.Width, r.Height * 0.82));
+        dc.DrawRectangle(dark, pen, new Rect(r.X, r.Y + r.Height * 0.18, r.Width, r.Height * 0.26));
+        dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0xFF, 0xD6, 0x4A)), pen,
+            new Rect(r.X + r.Width * 0.4, r.Y + r.Height * 0.36, r.Width * 0.2, r.Height * 0.3));
+    }
+
+    /// <summary>船：梯形船体 + 桅杆 + 帆。</summary>
+    private static void DrawBoat(DrawingContext dc, Rect r)
+    {
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var wood = new SolidColorBrush(Color.FromRgb(0xD8, 0x9E, 0x58));
+
+        var hull = new StreamGeometry();
+        using (var ctx = hull.Open())
+        {
+            ctx.BeginFigure(new Point(r.X, r.Y + r.Height * 0.6), true, true);
+            ctx.LineTo(new Point(r.X + r.Width, r.Y + r.Height * 0.6), true, false);
+            ctx.LineTo(new Point(r.X + r.Width * 0.78, r.Y + r.Height), true, false);
+            ctx.LineTo(new Point(r.X + r.Width * 0.22, r.Y + r.Height), true, false);
+        }
+
+        hull.Freeze();
+        dc.DrawGeometry(wood, pen, hull);
+
+        var mast = new Pen(new SolidColorBrush(Themed.Ink), Math.Max(1.2, r.Width * 0.07));
+        dc.DrawLine(mast, new Point(r.X + r.Width / 2, r.Y + r.Height * 0.08), new Point(r.X + r.Width / 2, r.Y + r.Height * 0.6));
+
+        var sail = new StreamGeometry();
+        using (var ctx = sail.Open())
+        {
+            ctx.BeginFigure(new Point(r.X + r.Width / 2, r.Y + r.Height * 0.12), true, true);
+            ctx.LineTo(new Point(r.X + r.Width * 0.92, r.Y + r.Height * 0.52), true, false);
+            ctx.LineTo(new Point(r.X + r.Width / 2, r.Y + r.Height * 0.52), true, false);
+        }
+
+        sail.Freeze();
+        dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xF4, 0xF0, 0xE4)), pen, sail);
+    }
+
+    /// <summary>弩（掠夺者前哨站）：横臂 + 弓弦 + 托。</summary>
+    private static void DrawCrossbow(DrawingContext dc, Rect r)
+    {
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var wood = new SolidColorBrush(Color.FromRgb(0xC8, 0x8A, 0x4E));
+
+        dc.DrawRectangle(wood, pen, new Rect(r.X + r.Width * 0.34, r.Y + r.Height * 0.3, r.Width * 0.32, r.Height * 0.7));
+        dc.DrawLine(new Pen(wood, Math.Max(1.5, r.Width * 0.12)), new Point(r.X, r.Y + r.Height * 0.34),
+            new Point(r.X + r.Width, r.Y + r.Height * 0.34));
+        dc.DrawLine(new Pen(new SolidColorBrush(Ink), 1), new Point(r.X, r.Y + r.Height * 0.34),
+            new Point(r.X + r.Width / 2, r.Y + r.Height * 0.62));
+        dc.DrawLine(new Pen(new SolidColorBrush(Ink), 1), new Point(r.X + r.Width, r.Y + r.Height * 0.34),
+            new Point(r.X + r.Width / 2, r.Y + r.Height * 0.62));
+    }
+
+    /// <summary>铁轨（废弃矿井）：两条轨道 + 枕木。</summary>
+    private static void DrawRail(DrawingContext dc, Rect r)
+    {
+        var rail = new Pen(new SolidColorBrush(Color.FromRgb(0xA8, 0xAE, 0xB6)), Math.Max(1.2, r.Width * 0.08));
+        var tie = new SolidColorBrush(Color.FromRgb(0xB0, 0x86, 0x54));
+
+        for (var i = 0; i < 4; i++)
+        {
+            var y = r.Y + r.Height * (0.16 + i * 0.22);
+            dc.DrawRectangle(tie, null, new Rect(r.X + r.Width * 0.1, y, r.Width * 0.8, r.Height * 0.08));
+        }
+
+        dc.DrawLine(rail, new Point(r.X + r.Width * 0.26, r.Y), new Point(r.X + r.Width * 0.26, r.Y + r.Height));
+        dc.DrawLine(rail, new Point(r.X + r.Width * 0.74, r.Y), new Point(r.X + r.Width * 0.74, r.Y + r.Height));
+    }
+
+    /// <summary>炼药锅（女巫小屋）：圆柱锅体 + 内部液体。</summary>
+    private static void DrawCauldron(DrawingContext dc, Rect r)
+    {
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var metal = new SolidColorBrush(Color.FromRgb(0x5A, 0x62, 0x6C));
+
+        dc.DrawRectangle(metal, pen, new Rect(r.X + r.Width * 0.12, r.Y + r.Height * 0.3, r.Width * 0.76, r.Height * 0.62));
+        dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0x62, 0xC8, 0x54)), pen,
+            new Point(r.X + r.Width / 2, r.Y + r.Height * 0.32), r.Width * 0.38, r.Height * 0.12);
+    }
+
+    /// <summary>等轴测立方体：顶面 + 左面 + 右面。</summary>
+    private static void DrawIsoCube(DrawingContext dc, Block colors, Rect r)
+    {
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var w = r.Width;
+        var h = r.Height;
+
+        var topVertex = new Point(r.X + w / 2, r.Y);
+        var rightVertex = new Point(r.X + w, r.Y + h * 0.3);
+        var bottomVertex = new Point(r.X + w / 2, r.Y + h);
+        var leftVertex = new Point(r.X, r.Y + h * 0.3);
+        var centreVertex = new Point(r.X + w / 2, r.Y + h * 0.62);
+
+        dc.DrawGeometry(new SolidColorBrush(colors.Top), pen, Poly(topVertex, rightVertex, leftVertex, centreVertex));
+        dc.DrawGeometry(new SolidColorBrush(colors.Left), pen, Poly(leftVertex, centreVertex, bottomVertex, new Point(r.X, r.Y + h * 0.72)));
+        dc.DrawGeometry(new SolidColorBrush(colors.Right), pen, Poly(rightVertex, new Point(r.X + w, r.Y + h * 0.72), bottomVertex, centreVertex));
+    }
+
+    private static StreamGeometry Poly(params Point[] points)
     {
         var geometry = new StreamGeometry();
         using (var ctx = geometry.Open())
@@ -161,47 +281,8 @@ public static class PixelIcons
         return geometry;
     }
 
-    private static void DrawPixels(DrawingContext dc, string packed, double left, double top, double block)
+    private static class Themed
     {
-        var rows = packed.Split('|');
-        var brushes = new Dictionary<char, SolidColorBrush>();
-
-        SolidColorBrush BrushOf(char c)
-        {
-            if (brushes.TryGetValue(c, out var cached)) return cached;
-
-            var color = c switch
-            {
-                'o' => Outline,
-                'w' => Color.FromRgb(0xFF, 0xFF, 0xFF),
-                'g' => Color.FromRgb(0x6E, 0xD8, 0x5E),
-                'a' => Color.FromRgb(0xE8, 0xA9, 0x5E),
-                'A' => Color.FromRgb(0xC4, 0x7C, 0x35),
-                'y' => Color.FromRgb(0xFF, 0xD6, 0x4A),
-                'v' => Color.FromRgb(0xC8, 0x9C, 0xFF),
-                'V' => Color.FromRgb(0x8A, 0x5A, 0xD8),
-                's' => Color.FromRgb(0xD8, 0xC2, 0xA4),
-                'S' => Color.FromRgb(0xA8, 0x8E, 0x70),
-                'K' => Color.FromRgb(0x4A, 0x50, 0x5A),
-                _ => Colors.Magenta,
-            };
-
-            var brush = new SolidColorBrush(color);
-            brush.Freeze();
-            brushes[c] = brush;
-            return brush;
-        }
-
-        for (var gy = 0; gy < Grid; gy++)
-        {
-            var row = gy < rows.Length ? rows[gy] : string.Empty;
-
-            for (var gx = 0; gx < Grid; gx++)
-            {
-                var ch = gx < row.Length ? row[gx] : '.';
-                if (ch == '.' || ch == ' ') continue;
-                dc.DrawRectangle(BrushOf(ch), null, new Rect(left + gx * block, top + gy * block, block, block));
-            }
-        }
+        public static readonly Color Ink = Color.FromRgb(0x2A, 0x22, 0x1C);
     }
 }
