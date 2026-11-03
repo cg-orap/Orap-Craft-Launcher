@@ -136,12 +136,14 @@ public partial class MainWindow : Window
                 UseAeroCaptionButtons = false,
             });
 
-            WindowState = WindowState.Maximized;
+            WindowState = WindowState.Normal;
+            ResizeMode = ResizeMode.NoResize;
+            FillPrimaryScreen();
             _isFullscreen = true;
         }
         else
         {
-            WindowState = WindowState.Normal;
+            ResizeMode = ResizeMode.CanResize;
 
             if (_chromeBeforeFullscreen is not null)
             {
@@ -167,6 +169,32 @@ public partial class MainWindow : Window
                 EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
             },
         });
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    private const int SmCxScreen = 0;
+    private const int SmCyScreen = 1;
+    private const uint SwpFramechanged = 0x0020;
+    private const uint SwpShowwindow = 0x0040;
+
+    /// <summary>
+    /// 按**设备像素**把窗口铺满主屏。
+    /// WPF 的 Width/Height 是 DIP，多层缩放叠加后经常差一截（表现就是"全屏了但四周还有桌面"）；
+    /// 直接用 SetWindowPos 指定像素矩形最可靠。
+    /// </summary>
+    private void FillPrimaryScreen()
+    {
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+
+        SetWindowPos(handle, IntPtr.Zero, 0, 0,
+            GetSystemMetrics(SmCxScreen), GetSystemMetrics(SmCyScreen),
+            SwpFramechanged | SwpShowwindow);
     }
 
     private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)
