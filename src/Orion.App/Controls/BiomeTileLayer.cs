@@ -195,7 +195,14 @@ public sealed class BiomeTileLayer
         var current = new List<(BitmapSource, double, double, double)>();
         var fallback = new List<(BitmapSource, double, double, double)>();
 
-        foreach (var tile in _tiles.Values)
+        // 必须在锁内做快照：后台渲染线程会往 _tiles 里 Add/Remove，
+        // 直接在 OnRender 里遍历 Values 会抛 "Collection was modified"，
+        // 而这个异常抛在 WPF 渲染回调里 → 全局未处理异常弹窗。
+        List<Tile> snapshot;
+
+        lock (_gate) snapshot = _tiles.Values.ToList();
+
+        foreach (var tile in snapshot)
         {
             if (tile.WorldLeft + tile.SpanBlocks <= viewLeft) continue;
             if (tile.WorldTop + tile.SpanBlocks <= viewTop) continue;
