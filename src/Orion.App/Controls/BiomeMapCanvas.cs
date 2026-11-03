@@ -927,8 +927,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
 
         _drawndedup.Clear();
 
+        // 远距不用粗预览垫底（分辨率差 4 倍 → 大色块）
+        var drawPreview = step <= 8;
+
         // 预览层先垫底：拖出去的那部分不会是空白，而是"稍旧的粗图"
-        if (_previewBitmap is not null && _previewWorldWidth > 0)
+        if (drawPreview && _previewBitmap is not null && _previewWorldWidth > 0)
         {
             var rect = new Rect(
                 (_previewWorldLeft - viewLeft) / step,
