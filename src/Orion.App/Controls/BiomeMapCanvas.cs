@@ -153,7 +153,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         _tileLayer.Updated = () => Dispatcher.BeginInvoke(new Action(() =>
         {
             _loading = false;
-            InvalidateVisual();
+            RequestCoalescedRedraw();
         }));
     }
 
@@ -498,6 +498,28 @@ public sealed class BiomeMapCanvas : FrameworkElement
     /// </summary>
     private bool _renderPendingAfterGesture;
     private long _lastDragPreviewTicks;
+
+    private DispatcherTimer? _redrawTimer;
+
+    /// <summary>把"每块瓦片到达都重绘"合并成 30fps：拖动时画面连续、不抖。</summary>
+    private void RequestCoalescedRedraw()
+    {
+        _redrawTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+
+        if (_redrawTimer.IsEnabled) return;
+
+        _redrawTimer.Tick -= OnRedrawTimerTick;
+        _redrawTimer.Tick += OnRedrawTimerTick;
+        _redrawTimer.Start();
+    }
+
+    private void OnRedrawTimerTick(object? sender, EventArgs e)
+    {
+        _redrawTimer?.Stop();
+        InvalidateVisual();
+    }
+    private int _lastPlanCenterX;
+    private int _lastPlanCenterZ;
 
     private void ScheduleRenderAfterGesture()
     {
@@ -1185,6 +1207,17 @@ public sealed class BiomeMapCanvas : FrameworkElement
             {
                 _lastDragPreviewTicks = now;
                 QueuePreviewRender();
+            }
+
+            // 只有移动超过半块瓦片才重新规划，减少每帧的分配与加锁
+            var spanBlocks = BiomeTileLayer.TileSpan(BiomeTileLayer.Resolve(BlocksPerPixel).RenderStep);
+
+            if (Math.Abs(_centerBlockX - _lastPlanCenterX) > spanBlocks / 2 ||
+                Math.Abs(_centerBlockZ - _lastPlanCenterZ) > spanBlocks / 2)
+            {
+                _lastPlanCenterX = _centerBlockX;
+                _lastPlanCenterZ = _centerBlockZ;
+                PlanTiles();
             }
 
             InvalidateVisual();

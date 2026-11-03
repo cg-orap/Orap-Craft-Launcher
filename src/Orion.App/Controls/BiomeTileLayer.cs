@@ -70,7 +70,7 @@ public sealed class BiomeTileLayer
 
     /// <summary>排入"当前视口需要的瓦片"，多余/过期的直接丢弃。</summary>
     public void Plan(int step, double viewLeft, double viewTop, double viewWidth, double viewHeight,
-        int maxConcurrent = 3)
+        int maxConcurrent = 4)
     {
         var (renderStep, _, _) = Resolve(step);
         var span = TileSpan(renderStep);
@@ -107,7 +107,7 @@ public sealed class BiomeTileLayer
         Pump(maxConcurrent);
     }
 
-    private void Pump(int maxConcurrent = 3)
+    private void Pump(int maxConcurrent = 4)
     {
         while (true)
         {
