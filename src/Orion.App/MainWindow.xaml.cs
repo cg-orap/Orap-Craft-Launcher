@@ -109,6 +109,7 @@ public partial class MainWindow : Window
     private bool _isFullscreen;
     private WindowState _stateBeforeFullscreen = WindowState.Normal;
     private System.Windows.Shell.WindowChrome? _chromeBeforeFullscreen;
+    private System.Windows.Rect _boundsBeforeFullscreen;
 
 
     /// <summary>全屏切换：隐藏自绘标题栏、铺满屏幕（F11 或右上角按钮）。</summary>
@@ -116,18 +117,16 @@ public partial class MainWindow : Window
 
     private void ToggleFullscreen()
     {
-        // 不再切 WindowStyle（那样会在部分机器上留下白边/不铺满）。
-        // 改为把 WindowChrome 的边框/标题高度归零，再显式铺满工作区。
+        // 不再手动算 WorkArea 尺寸（DIP/像素混用会让窗口"变小一截"），
+        // 改成：进入用 Maximized + 边框归零；退出恢复到进入前的窗口位置与大小。
         var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
 
         if (!_isFullscreen)
         {
             _chromeBeforeFullscreen = chrome;
             _stateBeforeFullscreen = WindowState;
+            _boundsBeforeFullscreen = new System.Windows.Rect(Left, Top, Width, Height);
 
-            // 注意：**不隐藏** TitleBar。
-            // 隐藏后第 0 行仍占位、背景是窗口底色 → 顶部会出现一条黑框，而且按钮也没了。
-            // 全屏时保留标题栏（三键仍然可点，能退出全屏），只是把窗口边框归零。
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
                 CaptionHeight = 0,
@@ -137,30 +136,37 @@ public partial class MainWindow : Window
                 UseAeroCaptionButtons = false,
             });
 
-            WindowState = WindowState.Normal;
-
-            var area = SystemParameters.WorkArea;
-            Left = area.Left;
-            Top = area.Top;
-            Width = area.Width;
-            Height = area.Height;
-
+            WindowState = WindowState.Maximized;
             _isFullscreen = true;
         }
         else
         {
             WindowState = WindowState.Normal;
-            Width = 1280;
-            Height = 820;
 
             if (_chromeBeforeFullscreen is not null)
             {
                 System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeBeforeFullscreen);
             }
 
+            // 先回 Normal 再套用旧尺寸，否则 WPF 会用最大化尺寸覆盖
+            Left = _boundsBeforeFullscreen.Left;
+            Top = _boundsBeforeFullscreen.Top;
+            Width = _boundsBeforeFullscreen.Width;
+            Height = _boundsBeforeFullscreen.Height;
+
             WindowState = _stateBeforeFullscreen;
             _isFullscreen = false;
         }
+
+        // 切换动画：整窗快速淡入，避免"啪"地跳变
+        BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0.55, 1.0,
+            new System.Windows.Duration(TimeSpan.FromMilliseconds(180)))
+        {
+            EasingFunction = new System.Windows.Media.Animation.CubicEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
+            },
+        });
     }
 
     private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)
