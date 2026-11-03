@@ -205,6 +205,7 @@ public partial class MainWindow : Window
             SwpFramechanged | SwpShowwindow);
     }
 
+
     private void OnMinimize(object sender, System.Windows.RoutedEventArgs e)
         => WindowState = WindowState.Minimized;
 

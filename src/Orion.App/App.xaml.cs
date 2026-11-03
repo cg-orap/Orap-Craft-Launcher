@@ -326,7 +326,9 @@ public partial class App : Application
 
         if (app.MainWindow is Window window)
         {
-            window.Background = Brushes.Transparent;
+            // 注意：WindowStyle=SingleBorderWindow 时背景必须是**不透明**的，
+            // 否则最大化后边框一圈会透出桌面（表现为"没铺满"）。
+            window.Background = new SolidColorBrush(windowColor);
 
             var dark = windowColor.R + windowColor.G + windowColor.B < 384;
 
