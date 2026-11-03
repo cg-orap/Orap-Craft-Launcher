@@ -121,9 +121,19 @@ public partial class MainWindow : Window
             _styleBeforeFullscreen = WindowStyle;
 
             TitleBar.Visibility = System.Windows.Visibility.Collapsed;
+
+            // 先还原成 Normal 再改样式，否则 WPF 会保留旧的可视区域（表现为白边、不铺满）
+            WindowState = WindowState.Normal;
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
-            WindowState = WindowState.Normal;
+
+            var screen = SystemParameters.PrimaryScreenWidth;
+            var screenHeight = SystemParameters.PrimaryScreenHeight;
+            Left = 0;
+            Top = 0;
+            Width = screen;
+            Height = screenHeight;
+
             WindowState = WindowState.Maximized;
 
             _isFullscreen = true;
@@ -133,6 +143,9 @@ public partial class MainWindow : Window
             TitleBar.Visibility = System.Windows.Visibility.Visible;
             WindowStyle = _styleBeforeFullscreen;
             ResizeMode = ResizeMode.CanResize;
+            WindowState = WindowState.Normal;
+            Width = 1280;
+            Height = 820;
             WindowState = _stateBeforeFullscreen;
 
             _isFullscreen = false;

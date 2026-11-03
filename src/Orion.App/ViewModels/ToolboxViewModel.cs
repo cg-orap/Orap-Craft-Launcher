@@ -290,7 +290,7 @@ public sealed class ToolboxViewModel : ObservableObject
     private bool _showStructures = true;
 
     /// <summary>结构筛选：只勾选的类型会画在地图上（空 = 全部）。</summary>
-    public ObservableList<StructureFilterOption> StructureFilterOptions { get; } =
+    public ObservableList<StructureFilterOption> StructureFilterOptions { get; private set; } =
     [
         // 主世界
         new("village", "村庄"),
@@ -732,7 +732,7 @@ public sealed class ToolboxViewModel : ObservableObject
     }
 
     // ── 定位生物群系（像 cubiomes-viewer 的 biome finder）──────
-    public ObservableList<BiomeOption> BiomeOptions { get; } = [];
+    public ObservableList<BiomeOption> BiomeOptions { get; private set; } = [];
 
     /// <summary>全部群系（不过滤维度）的母表，永不修改，切换维度时从这里筛选。</summary>
     private readonly List<BiomeOption> _masterBiomes = [];
@@ -795,12 +795,15 @@ public sealed class ToolboxViewModel : ObservableObject
         // 快照母表：避免在枚举过程中被别处修改（C# 会抛 Collection was modified）
         var allBiomes = LoadAllBiomes().ToArray();
 
-        BiomeOptions.Clear();
+        var nextBiomes = new ObservableList<BiomeOption>();
 
         foreach (var option in allBiomes)
         {
-            if (keep(option.Key)) BiomeOptions.Add(option);
+            if (keep(option.Key)) nextBiomes.Add(option);
         }
+
+        BiomeOptions = nextBiomes;
+        OnPropertyChanged(nameof(BiomeOptions));
 
         SelectedBiome = BiomeOptions.FirstOrDefault(o => o.Name == biome?.Name) ?? BiomeOptions.FirstOrDefault();
 
@@ -816,15 +819,18 @@ public sealed class ToolboxViewModel : ObservableObject
 
         var allStructures = AllStructureFilterOptions.ToArray();
 
-        StructureFilterOptions.Clear();
+        var nextStructures = new ObservableList<StructureFilterOption>();
 
         foreach (var option in allStructures)
         {
             if (DimensionFilter.IsStructureInDimension(option.Group, _dimensionIndex))
             {
-                StructureFilterOptions.Add(option);
+                nextStructures.Add(option);
             }
         }
+
+        StructureFilterOptions = nextStructures;
+        OnPropertyChanged(nameof(StructureFilterOptions));
 
         OnPropertyChanged(nameof(StructureFilterOptions));
     }

@@ -305,7 +305,7 @@ public static class PixelIcons
 
             // 整体提亮：原调色板偏暗，压在浅色底板上会显成一块黑
             var baseColor = Palette.TryGetValue(c, out var color) ? color : Colors.Magenta;
-            var brush = new SolidColorBrush(Lighten(baseColor, 0.34));
+            var brush = new SolidColorBrush(Lighten(baseColor, 0.55));
             brush.Freeze();
             brushes[c] = brush;
             return brush;
