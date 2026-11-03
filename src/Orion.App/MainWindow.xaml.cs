@@ -160,15 +160,32 @@ public partial class MainWindow : Window
             _isFullscreen = false;
         }
 
-        // 切换动画：整窗快速淡入，避免"啪"地跳变
-        BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0.55, 1.0,
-            new System.Windows.Duration(TimeSpan.FromMilliseconds(180)))
+        // 切换动画：整窗淡入 + 内容轻微放大，380ms 缓出 —— 比之前 180ms 更容易看清
+        var ease = new System.Windows.Media.Animation.QuinticEase
         {
-            EasingFunction = new System.Windows.Media.Animation.CubicEase
-            {
-                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
-            },
+            EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
+        };
+
+        BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0.6, 1.0,
+            new System.Windows.Duration(TimeSpan.FromMilliseconds(380)))
+        {
+            EasingFunction = ease,
         });
+
+        if (Content is System.Windows.FrameworkElement content)
+        {
+            var scale = new System.Windows.Media.ScaleTransform(0.985, 0.985);
+
+            content.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
+            content.RenderTransform = scale;
+
+            scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0.985, 1.0,
+                    new System.Windows.Duration(TimeSpan.FromMilliseconds(380))) { EasingFunction = ease });
+            scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0.985, 1.0,
+                    new System.Windows.Duration(TimeSpan.FromMilliseconds(380))) { EasingFunction = ease });
+        }
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -176,6 +193,15 @@ public partial class MainWindow : Window
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SystemParametersInfo(uint action, uint param, ref Rect rect, uint winIni);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left, Top, Right, Bottom;
+    }
 
     private const int SmCxScreen = 0;
     private const int SmCyScreen = 1;
@@ -192,6 +218,20 @@ public partial class MainWindow : Window
         var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         if (handle == IntPtr.Zero) return;
 
+        // 铺满**工作区**（屏幕减去任务栏），而不是整块屏幕：
+        // 用户要求全屏时不要把 Windows 任务栏也盖住。
+        var work = new Rect();
+        const uint SpiGetWorkArea = 0x0030;
+
+        if (SystemParametersInfo(SpiGetWorkArea, 0, ref work, 0))
+        {
+            SetWindowPos(handle, IntPtr.Zero, work.Left, work.Top,
+                work.Right - work.Left, work.Bottom - work.Top,
+                SwpFramechanged | SwpShowwindow);
+            return;
+        }
+
+        // 兜底：拿不到工作区就用整屏
         SetWindowPos(handle, IntPtr.Zero, 0, 0,
             GetSystemMetrics(SmCxScreen), GetSystemMetrics(SmCyScreen),
             SwpFramechanged | SwpShowwindow);
