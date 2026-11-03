@@ -48,7 +48,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
     // 与 cubiomes 的 scale 取值对齐：每格 1/4/16/64 方块
     // 细档位：每档 2 倍。cubiomes 只支持 1/4/16/64 的采样 scale，中间档用"渲染更大再缩小"实现。
     /// <summary>缩放档位（方块/像素）。数组首尾就是上下限：最小 1（看清楚 1 格），最大 64（看大范围）。</summary>
-    private static readonly int[] ZoomSteps = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
+    private static readonly int[] ZoomSteps = [1, 2, 3, 4, 6, 8, 12, 16];
 
     /// <summary>是否已到最大放大倍数（每像素 1 格）。</summary>
     public bool AtMaxZoom => _zoomIndex <= 0;
