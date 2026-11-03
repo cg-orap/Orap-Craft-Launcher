@@ -117,95 +117,33 @@ public partial class MainWindow : Window
     private void OnToggleFullscreen(object sender, System.Windows.RoutedEventArgs e) => ToggleFullscreen();
 
     /// <summary>
-    /// 全屏切换（两段式）：
-    ///   第一段：WindowState=Maximized —— 让 Windows 播它自己的放大动画；
-    ///   第二段：动画结束后切成 WS_POPUP 并钉到工作区矩形
-    ///           —— 解决"自绘标题栏 + WindowChrome 下最大化铺不满"的问题。
-    /// 退出时反向：先还原窗口样式（仍是最大化状态）→ WindowState=Normal 播还原动画
-    ///           → 动画结束后套回原来的位置与尺寸。
+    /// 全屏切换：只做 WindowState 最大/还原，不碰窗口样式、不做 Win32 调用。
+    ///
+    /// 说明：前面试过 SetWindowPos / WS_POPUP / WindowChrome 归零等方案，
+    /// 结果要么铺不满、要么直接抛 OverflowException（异常弹窗）。
+    /// 这里退回到最稳的做法 —— 交给 WPF/Windows 自己处理最大化与还原动画。
     /// </summary>
     private void ToggleFullscreen()
     {
-        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-        if (handle == IntPtr.Zero) return;
-
         if (!_isFullscreen)
         {
             _stateBeforeFullscreen = WindowState;
             _boundsBeforeFullscreen = new System.Windows.Rect(Left, Top, Width, Height);
-            _chromeBeforeFullscreen = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
-            _styleBeforeFullscreen = GetWindowLong(handle, GwlStyle);
 
-            _isFullscreen = true;
-
-            // 第一段：系统动画
             WindowState = WindowState.Maximized;
-
-            // 第二段：动画结束后对齐到工作区（任务栏保留）
-            ScheduleAfterSystemAnimation(() =>
-            {
-                if (!_isFullscreen) return;
-
-                SetWindowLong(handle, GwlStyle, WsPopup | WsVisible);
-                FillWorkArea(handle);
-            });
+            _isFullscreen = true;
+            return;
         }
-        else
-        {
-            _isFullscreen = false;
 
-            // 先还原样式，窗口仍占满工作区 → 再让系统播还原动画
-            SetWindowLong(handle, GwlStyle, _styleBeforeFullscreen);
+        WindowState = WindowState.Normal;
 
-            if (_chromeBeforeFullscreen is not null)
-            {
-                System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeBeforeFullscreen);
-            }
+        Left = _boundsBeforeFullscreen.Left;
+        Top = _boundsBeforeFullscreen.Top;
+        Width = _boundsBeforeFullscreen.Width;
+        Height = _boundsBeforeFullscreen.Height;
 
-            WindowState = WindowState.Normal;
-
-            ScheduleAfterSystemAnimation(() =>
-            {
-                if (_isFullscreen) return;
-
-                SetWindowPos(handle, IntPtr.Zero,
-                    (int)_boundsBeforeFullscreen.Left, (int)_boundsBeforeFullscreen.Top,
-                    (int)_boundsBeforeFullscreen.Width, (int)_boundsBeforeFullscreen.Height,
-                    SwpFramechanged | SwpShowwindow);
-
-                WindowState = _stateBeforeFullscreen;
-            });
-        }
-    }
-
-    /// <summary>等系统的最大化/还原动画播完（约 260ms）再执行。</summary>
-    private void ScheduleAfterSystemAnimation(Action action)
-    {
-        var timer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(260),
-        };
-
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            action();
-        };
-
-        timer.Start();
-    }
-
-    private void FillWorkArea(IntPtr handle)
-    {
-        var work = new Rect();
-        const uint SpiGetWorkArea = 0x0030;
-
-        if (SystemParametersInfo(SpiGetWorkArea, 0, ref work, 0))
-        {
-            SetWindowPos(handle, IntPtr.Zero, work.Left, work.Top,
-                work.Right - work.Left, work.Bottom - work.Top,
-                SwpFramechanged | SwpShowwindow);
-        }
+        WindowState = _stateBeforeFullscreen;
+        _isFullscreen = false;
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
