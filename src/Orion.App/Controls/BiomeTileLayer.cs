@@ -34,6 +34,7 @@ public sealed class BiomeTileLayer
 
     private readonly Dictionary<long, Tile> _tiles = [];
     private readonly HashSet<long> _inFlight = [];
+    private readonly Dictionary<long, int> _failures = [];
     private readonly Queue<(int RenderStep, int TileX, int TileZ)> _queue = [];
     private readonly object _gate = new();
 
@@ -135,7 +136,28 @@ public sealed class BiomeTileLayer
             if (renderer is null) return;
 
             var pixels = await renderer(request).ConfigureAwait(false);
-            if (pixels is null) return;
+
+            if (pixels is null)
+            {
+                // 失败重试（最多 3 次）：否则拖过去的区域会一直是个黑洞
+                var retryKey = Key(renderStep, tileX, tileZ);
+
+                lock (_gate)
+                {
+                    _failures.TryGetValue(retryKey, out var fails);
+                    fails++;
+
+                    if (fails <= 3)
+                    {
+                        _failures[retryKey] = fails;
+                        _queue.Enqueue(job);
+                    }
+                }
+
+                return;
+            }
+
+            lock (_gate) _failures.Remove(Key(renderStep, tileX, tileZ));
 
             var bitmap = BitmapSource.Create(TilePixels, TilePixels, 96, 96,
                 System.Windows.Media.PixelFormats.Bgra32, null, pixels, TilePixels * 4);
