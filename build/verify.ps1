@@ -99,7 +99,20 @@ else {
 # ---------------------------------------------------------------- 4. startup smoke
 if ($SkipSmoke) {
     Write-Stage '4/4 smoke (skipped)'
-    Write-Host 'verify: build, tests and publish OK (startup not exercised)' -ForegroundColor Green
+    # publish 会重建 dist\win-x64，补回便携标记与数据联接，否则双击 exe 会退回 %APPDATA%
+$portableMarker = Join-Path $repo 'dist\win-x64\portable.txt'
+$portableData   = Join-Path $repo 'dist\win-x64\data'
+$sharedRoot     = 'D:\DSH\gd\orion'
+
+if ((Test-Path (Join-Path $repo 'dist\win-x64')) -and -not (Test-Path $portableMarker)) {
+    New-Item -ItemType File -Force -Path $portableMarker | Out-Null
+}
+
+if ((Test-Path $portableMarker) -and -not (Test-Path $portableData) -and (Test-Path $sharedRoot)) {
+    cmd /c "mklink /J `"$portableData`" `"$sharedRoot`"" | Out-Null
+}
+
+Write-Host 'verify: build, tests and publish OK (startup not exercised)' -ForegroundColor Green
     exit 0
 }
 
@@ -170,4 +183,18 @@ Write-Host ''
 Write-Host "verify: build, tests, publish and startup smoke all OK" -ForegroundColor Green
 Write-Host "  exe:      $exe"
 Write-Host "  data root: $smokeRoot"
+
+  # publish 会重建 dist\win-x64，补回便携标记与数据联接（否则双击 exe 退回 %APPDATA%）
+  $portableMarker = Join-Path $repo 'dist\win-x64\portable.txt'
+  $portableData   = Join-Path $repo 'dist\win-x64\data'
+  $sharedRoot     = 'D:\DSH\gd\orion'
+
+  if ((Test-Path (Join-Path $repo 'dist\win-x64')) -and -not (Test-Path $portableMarker)) {
+    New-Item -ItemType File -Force -Path $portableMarker | Out-Null
+  }
+
+  if ((Test-Path $portableMarker) -and -not (Test-Path $portableData) -and (Test-Path $sharedRoot)) {
+    cmd /c "mklink /J `"$portableData`" `"$sharedRoot`"" | Out-Null
+  }
+
 exit 0
