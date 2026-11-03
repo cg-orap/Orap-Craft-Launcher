@@ -606,7 +606,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
                     var worldLeft = centerX - (int)(viewWidth / 2.0 * step);
                     var worldTop = centerZ - (int)(viewHeight / 2.0 * step);
                     BiomeMapStyler.Stylize(pixels, pixelWidth, pixelHeight, worldLeft, worldTop,
-                        Math.Max(1, step / supersample), textures: false, borders: false, hillshade: true);
+                        Math.Max(1, step / supersample), textures: true, borders: false, hillshade: true);
                 }
 
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -1057,7 +1057,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
         }
 
         // 定位标记
-        if (_showStructures)
+        // 放大到很近（step <= 8）时不画结构：这个尺度下图标会挤成一片，
+        // 反而把地形盖住 —— 用户明确要求这种时候不显示。
+        if (_showStructures && step > 8)
         {
             foreach (var marker in _structures)
             {
