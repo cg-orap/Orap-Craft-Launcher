@@ -38,6 +38,44 @@ public static class PixelIcons
         ["end_gateway"] = new(Color.FromRgb(0xE8,0xE8,0xD0), Color.FromRgb(0xB8,0xB8,0x9E), Color.FromRgb(0x8A,0x8A,0x74)),
     };
 
+    /// <summary>村民头像：方脑袋 + 粗眉 + 大鼻子（村庄最直白的图标）。</summary>
+    private const string VillagerRows =
+        "................|" +
+        "...oooooooooo...|" +
+        "..oaassssssaao..|" +
+        "..osssssssssso..|" +
+        "..osssssssssso..|" +
+        "..osooooooosso..|" +
+        "..osssoossssso..|" +
+        "..osssoossssso..|" +
+        "..osssssssssso..|" +
+        "..ossSssssSsso..|" +
+        "..osssssssssso..|" +
+        "..osssooooosso..|" +
+        "..ossssoosssso..|" +
+        "..osssssssssso..|" +
+        "...oooooooooo...|" +
+        "................";
+
+    /// <summary>炼药锅（女巫小屋）。</summary>
+    private const string CauldronRows =
+        "................|" +
+        "................|" +
+        "..oooooooooooo..|" +
+        "..oKKKKKKKKKKo..|" +
+        "..oKggggggggKo..|" +
+        "..oKggggggggKo..|" +
+        "..oKKKKKKKKKKo..|" +
+        "...oKKKKKKKKo...|" +
+        "...oKKKKKKKKo...|" +
+        "...oKKKKKKKKo...|" +
+        "....oooooooo....|" +
+        "................|" +
+        "................|" +
+        "................|" +
+        "................|" +
+        "................";
+
     private const string EyeRows = "................|....oooooooo....|..oowwwwwwwwoo..|.owwwwwwwwwwwwo.|.owwwggggggwwwo.|.owwggoggggogwo.|owwggogggggogwo.|owwggoogggoggwo.|owwggggggggggwo.|owwggggggggggwo.|.owwggggggggwwo.|.owwwggggggwwwo.|..oowwwwwwwwoo..|....oooooooo....|................|................";
     private const string ChestRows = "................|...oooooooooo...|..oaaaaaaaaaao..|..oaaaaaaaaaao..|..oooooooooooo..|..oaaayyyyaaao..|..oaaayyyyaaao..|..oaaaaaaaaaao..|..oaaayyyyaaao..|..oaaaaaaaaaao..|..oaaaaaaaaaao..|..oooooooooooo..|................|................|................|................";
     private const string BoatRows = "................|................|................|.......ao.......|.......ao.......|..oooooooooooo..|..oaaaaaaaaaao..|.oaaaaaaaaaaaao.|.oAAAaaaaaaAAAo.|..oAAAAAAAAAAo..|...oooooooooo...|................|................|................|................|................";
@@ -46,7 +84,8 @@ public static class PixelIcons
     private const string CrossbowRows = "................|....oooooooo....|...oaaaaaaaa o..|..oaa......aao..|..oa........ao..|.oaa...oo...aao.|.oa...oaa o..ao.|.oa..oa..ao..ao.|.oa..oa..ao..ao.|.oa..oa..ao..ao.|.oa...oaa o..ao.|.oaa...oo...aao.|..oa........ao..|..oaa......aao..|...oooooooooo...|................";
 
     public static bool Has(string key) => Blocks.ContainsKey(key) ||
-        key is "stronghold" or "treasure" or "shipwreck" or "end_ship" or "mineshaft" or "outpost";
+        key is "stronghold" or "treasure" or "shipwreck" or "end_ship" or "mineshaft" or "outpost"
+            or "village" or "swamp_hut";
 
     public static void Draw(DrawingContext dc, string key, Brush tint, Point centre, double size)
     {
@@ -63,17 +102,23 @@ public static class PixelIcons
         plate.Freeze();
         dc.DrawRectangle(plate, null, new Rect(left, top, span, span));
 
-        if (Blocks.TryGetValue(key, out var colors)) DrawIsoCube(dc, colors, left, top, block);
-        else DrawPixels(dc, key switch
+        // 优先用"物品/生物"图标（玩家一眼能认），其余用代表性方块
+        var item = key switch
         {
+            "village" => VillagerRows,
+            "outpost" => CrossbowRows,
             "stronghold" => EyeRows,
             "treasure" => ChestRows,
             "shipwreck" => BoatRows,
             "end_ship" => ElytraRows,
             "mineshaft" => RailRows,
-            "outpost" => CrossbowRows,
-            _ => ChestRows,
-        }, left, top, block);
+            "swamp_hut" => CauldronRows,
+            _ => null,
+        };
+
+        if (item is not null) DrawPixels(dc, item, left, top, block);
+        else if (Blocks.TryGetValue(key, out var colors)) DrawIsoCube(dc, colors, left, top, block);
+        else DrawPixels(dc, ChestRows, left, top, block);
 
         var light = new SolidColorBrush(Color.FromArgb(0x88, 0xFF, 0xFF, 0xFF));
         var dark = new SolidColorBrush(Color.FromArgb(0x55, 0x30, 0x38, 0x40));
@@ -135,6 +180,9 @@ public static class PixelIcons
                 'y' => Color.FromRgb(0xFF, 0xD6, 0x4A),
                 'v' => Color.FromRgb(0xC8, 0x9C, 0xFF),
                 'V' => Color.FromRgb(0x8A, 0x5A, 0xD8),
+                's' => Color.FromRgb(0xD8, 0xC2, 0xA4),
+                'S' => Color.FromRgb(0xA8, 0x8E, 0x70),
+                'K' => Color.FromRgb(0x4A, 0x50, 0x5A),
                 _ => Colors.Magenta,
             };
 
