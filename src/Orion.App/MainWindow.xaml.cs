@@ -116,12 +116,16 @@ public partial class MainWindow : Window
     /// <summary>全屏切换：隐藏自绘标题栏、铺满屏幕（F11 或右上角按钮）。</summary>
     private void OnToggleFullscreen(object sender, System.Windows.RoutedEventArgs e) => ToggleFullscreen();
 
+    /// <summary>
+    /// 全屏切换（两段式）：
+    ///   第一段：WindowState=Maximized —— 让 Windows 播它自己的放大动画；
+    ///   第二段：动画结束后切成 WS_POPUP 并钉到工作区矩形
+    ///           —— 解决"自绘标题栏 + WindowChrome 下最大化铺不满"的问题。
+    /// 退出时反向：先还原窗口样式（仍是最大化状态）→ WindowState=Normal 播还原动画
+    ///           → 动画结束后套回原来的位置与尺寸。
+    /// </summary>
     private void ToggleFullscreen()
     {
-        // 用 Win32 把窗口切成 WS_POPUP 并直接钉到"工作区矩形"：
-        // · 不再依赖 WindowState=Maximized（在自绘标题栏 + WindowChrome 下，
-        //   最大化后的可见区域常常比屏幕小一圈 —— 之前几次"四周露桌面"就是这个）
-        // · 目标矩形取 SPI_GETWORKAREA，所以任务栏不会被遮住
         var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         if (handle == IntPtr.Zero) return;
 
@@ -132,36 +136,75 @@ public partial class MainWindow : Window
             _chromeBeforeFullscreen = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
             _styleBeforeFullscreen = GetWindowLong(handle, GwlStyle);
 
-            // WS_POPUP 会去掉系统边框；保留 WS_VISIBLE
-            SetWindowLong(handle, GwlStyle, WsPopup | WsVisible);
-
-            var work = new Rect();
-            const uint SpiGetWorkArea = 0x0030;
-
-            if (SystemParametersInfo(SpiGetWorkArea, 0, ref work, 0))
-            {
-                SetWindowPos(handle, IntPtr.Zero, work.Left, work.Top,
-                    work.Right - work.Left, work.Bottom - work.Top,
-                    SwpFramechanged | SwpShowwindow);
-            }
-
             _isFullscreen = true;
+
+            // 第一段：系统动画
+            WindowState = WindowState.Maximized;
+
+            // 第二段：动画结束后对齐到工作区（任务栏保留）
+            ScheduleAfterSystemAnimation(() =>
+            {
+                if (!_isFullscreen) return;
+
+                SetWindowLong(handle, GwlStyle, WsPopup | WsVisible);
+                FillWorkArea(handle);
+            });
         }
         else
         {
+            _isFullscreen = false;
+
+            // 先还原样式，窗口仍占满工作区 → 再让系统播还原动画
             SetWindowLong(handle, GwlStyle, _styleBeforeFullscreen);
-            SetWindowPos(handle, IntPtr.Zero,
-                (int)_boundsBeforeFullscreen.Left, (int)_boundsBeforeFullscreen.Top,
-                (int)_boundsBeforeFullscreen.Width, (int)_boundsBeforeFullscreen.Height,
-                SwpFramechanged | SwpShowwindow);
 
             if (_chromeBeforeFullscreen is not null)
             {
                 System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeBeforeFullscreen);
             }
 
-            WindowState = _stateBeforeFullscreen;
-            _isFullscreen = false;
+            WindowState = WindowState.Normal;
+
+            ScheduleAfterSystemAnimation(() =>
+            {
+                if (_isFullscreen) return;
+
+                SetWindowPos(handle, IntPtr.Zero,
+                    (int)_boundsBeforeFullscreen.Left, (int)_boundsBeforeFullscreen.Top,
+                    (int)_boundsBeforeFullscreen.Width, (int)_boundsBeforeFullscreen.Height,
+                    SwpFramechanged | SwpShowwindow);
+
+                WindowState = _stateBeforeFullscreen;
+            });
+        }
+    }
+
+    /// <summary>等系统的最大化/还原动画播完（约 260ms）再执行。</summary>
+    private void ScheduleAfterSystemAnimation(Action action)
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(260),
+        };
+
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            action();
+        };
+
+        timer.Start();
+    }
+
+    private void FillWorkArea(IntPtr handle)
+    {
+        var work = new Rect();
+        const uint SpiGetWorkArea = 0x0030;
+
+        if (SystemParametersInfo(SpiGetWorkArea, 0, ref work, 0))
+        {
+            SetWindowPos(handle, IntPtr.Zero, work.Left, work.Top,
+                work.Right - work.Left, work.Bottom - work.Top,
+                SwpFramechanged | SwpShowwindow);
         }
     }
 
