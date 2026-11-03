@@ -357,6 +357,13 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var fromStep = (double)ZoomSteps[previousIndex];
         _zoomIndex = target;
 
+        // 缩放换档后，旧的预览层是上一档的比例与纹理规则 —— 直接画出来就是"色块"。
+        // 立刻作废并用新档位重排一张，缺口最多空白一帧，不会出现错色块。
+        _previewBitmap = null;
+        _previewVersion++;
+        QueuePreviewRender();
+        PlanTiles();
+
         StartZoomAnimation(fromStep, ZoomSteps[target]);
         ScheduleRenderAfterGesture();
 
