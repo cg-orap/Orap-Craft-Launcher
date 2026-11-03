@@ -1057,9 +1057,9 @@ public sealed class BiomeMapCanvas : FrameworkElement
         }
 
         // 定位标记
-        // 放大到很近（step <= 8）时不画结构：这个尺度下图标会挤成一片，
-        // 反而把地形盖住 —— 用户明确要求这种时候不显示。
-        if (_showStructures && step > 8)
+        // 缩小到一定程度（step > 16，即 24/32/48/64 格每像素）时不画结构：
+        // 视野里结构太多，图标会挤成一片把地形盖住 —— 这种时候不显示。
+        if (_showStructures && step <= 16)
         {
             foreach (var marker in _structures)
             {
