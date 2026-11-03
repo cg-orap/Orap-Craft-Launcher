@@ -89,6 +89,11 @@ public sealed class BiomeMapCanvas : FrameworkElement
     private bool _showStructures = true;
     private HashSet<string>? _allowedStructures;
     private readonly List<StructureMarker> _structures = [];
+
+    /// <summary>单帧最多画多少个结构图标（太密时优先保留靠前的，也就是靠中心的）。</summary>
+    private const int MaxMarkers = 90;
+
+    private readonly HashSet<int> _drawndedup = [];
     private (int X, int Z)? _spawn;
     private string? _hoverStructure;
 
@@ -879,6 +884,8 @@ public sealed class BiomeMapCanvas : FrameworkElement
         var viewLeft = _centerBlockX - width / 2.0 * step;
         var viewTop = _centerBlockZ - height / 2.0 * step;
 
+        _drawndedup.Clear();
+
         // 预览层先垫底：拖出去的那部分不会是空白，而是"稍旧的粗图"
         if (_previewBitmap is not null && _previewWorldWidth > 0)
         {
@@ -888,7 +895,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 _previewWorldWidth / step,
                 _previewWorldHeight / step);
 
-            dc.PushOpacity(0.9);
+            dc.PushOpacity(1.0);
             dc.DrawImage(_previewBitmap, rect);
             dc.Pop();
         }
