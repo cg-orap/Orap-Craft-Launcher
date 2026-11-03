@@ -125,8 +125,9 @@ public partial class MainWindow : Window
             _chromeBeforeFullscreen = chrome;
             _stateBeforeFullscreen = WindowState;
 
-            TitleBar.Visibility = System.Windows.Visibility.Collapsed;
-
+            // 注意：**不隐藏** TitleBar。
+            // 隐藏后第 0 行仍占位、背景是窗口底色 → 顶部会出现一条黑框，而且按钮也没了。
+            // 全屏时保留标题栏（三键仍然可点，能退出全屏），只是把窗口边框归零。
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
                 CaptionHeight = 0,
@@ -148,7 +149,6 @@ public partial class MainWindow : Window
         }
         else
         {
-            TitleBar.Visibility = System.Windows.Visibility.Visible;
             WindowState = WindowState.Normal;
             Width = 1280;
             Height = 820;

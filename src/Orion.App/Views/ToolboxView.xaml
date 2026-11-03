@@ -281,6 +281,8 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Margin="10">
                         <Button Style="{StaticResource SecondaryButton}" Width="34" Height="28" Padding="0"
+                                Background="{DynamicResource SurfaceAltBg}"
+                                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
                                 Click="OnZoomIn" ToolTip="放大一档（滚轮向上）"
                                 AutomationProperties.AutomationId="ZoomInButton">
                             <Grid Width="16" Height="16">
@@ -294,6 +296,8 @@
                             </Grid>
                         </Button>
                         <Button Style="{StaticResource SecondaryButton}" Width="34" Height="28" Padding="0"
+                                Background="{DynamicResource SurfaceAltBg}"
+                                BorderBrush="{DynamicResource BorderBrushSoft}" BorderThickness="1"
                                 Margin="6,0,0,0" Click="OnZoomOut" ToolTip="缩小一档（滚轮向下）"
                                 AutomationProperties.AutomationId="ZoomOutButton">
                             <Grid Width="16" Height="16">
