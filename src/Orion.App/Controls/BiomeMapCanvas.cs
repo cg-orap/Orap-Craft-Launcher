@@ -139,8 +139,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
                 var span = BiomeTileLayer.TilePixels * request.RenderStep;
                 BiomeMapStyler.Stylize(rgba, BiomeTileLayer.TilePixels, BiomeTileLayer.TilePixels,
                     request.CenterX - span / 2, request.CenterZ - span / 2,
-                    Math.Max(1, request.RenderStep), textures: true, borders: true, hillshade: true,
-                    edgeMargin: 2);
+                    Math.Max(1, request.RenderStep), textures: true, borders: false, hillshade: false);
             }
 
             return ToBgra(rgba);
@@ -1060,7 +1059,7 @@ public sealed class BiomeMapCanvas : FrameworkElement
         // 定位标记
         // 缩小到一定程度（step > 16，即 24/32/48/64 格每像素）时不画结构：
         // 视野里结构太多，图标会挤成一片把地形盖住 —— 这种时候不显示。
-        if (_showStructures && step <= 16)
+        if (_showStructures && step <= 8)
         {
             foreach (var marker in _structures)
             {
