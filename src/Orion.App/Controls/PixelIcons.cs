@@ -72,8 +72,7 @@ public static class PixelIcons
             case "mineshaft": DrawRail(dc, inner); break;
             case "swamp_hut": DrawCauldron(dc, inner); break;
             default:
-                if (Blocks.TryGetValue(key, out var colors)) DrawIsoCube(dc, colors, inner);
-                else DrawIsoCube(dc, new Block(Color.FromRgb(0xC8, 0xC8, 0xC8), Color.FromRgb(0x9E, 0x9E, 0x9E), Color.FromRgb(0x76, 0x76, 0x76)), inner);
+                DrawShape(dc, key, inner);
                 break;
         }
 
@@ -248,6 +247,128 @@ public static class PixelIcons
         dc.DrawRectangle(metal, pen, new Rect(r.X + r.Width * 0.12, r.Y + r.Height * 0.3, r.Width * 0.76, r.Height * 0.62));
         dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0x62, 0xC8, 0x54)), pen,
             new Point(r.X + r.Width / 2, r.Y + r.Height * 0.32), r.Width * 0.38, r.Height * 0.12);
+    }
+
+    /// <summary>
+    /// 每个结构一种**专属轮廓**（不再"同一个方块换颜色"）：
+    /// 金字塔 / 阶梯神庙 / 高塔 / 拱门 / 桥 / 圆顶 / 断柱 / 笼子 / 房屋 / 传送门。
+    /// </summary>
+    private static void DrawShape(DrawingContext dc, string key, Rect r)
+    {
+        var (main, accent, kind) = key switch
+        {
+            "desert_pyramid" => (Color.FromRgb(0xE8, 0xC8, 0x76), Color.FromRgb(0xB0, 0x8C, 0x42), "pyramid"),
+            "monument" => (Color.FromRgb(0x4E, 0xD0, 0xC8), Color.FromRgb(0x22, 0x8C, 0x94), "ziggurat"),
+            "jungle_temple" => (Color.FromRgb(0x7C, 0xA8, 0x62), Color.FromRgb(0x44, 0x64, 0x34), "ziggurat"),
+            "trail_ruins" => (Color.FromRgb(0xD8, 0xA8, 0x7C), Color.FromRgb(0x8C, 0x60, 0x3C), "column"),
+            "igloo" => (Color.FromRgb(0xFF, 0xFF, 0xFF), Color.FromRgb(0x9E, 0xC4, 0xD8), "dome"),
+            "mansion" => (Color.FromRgb(0x5E, 0x3E, 0x26), Color.FromRgb(0xFF, 0xD6, 0x4A), "house"),
+            "fortress" => (Color.FromRgb(0x8E, 0x36, 0x30), Color.FromRgb(0xFF, 0x9A, 0x3C), "bridge"),
+            "bastion" => (Color.FromRgb(0x4A, 0x44, 0x52), Color.FromRgb(0x8E, 0x86, 0x96), "tower"),
+            "end_city" => (Color.FromRgb(0xC0, 0x98, 0xEC), Color.FromRgb(0x7C, 0x54, 0xA8), "tower"),
+            "ruined_portal" => (Color.FromRgb(0x3A, 0x2A, 0x52), Color.FromRgb(0xC8, 0x9C, 0xFF), "arch"),
+            "ruined_portal_nether" => (Color.FromRgb(0x3A, 0x2A, 0x52), Color.FromRgb(0xC8, 0x9C, 0xFF), "arch"),
+            "ancient_city" => (Color.FromRgb(0x2E, 0x3A, 0x40), Color.FromRgb(0x4E, 0xE8, 0xD8), "arch"),
+            "trial_chambers" => (Color.FromRgb(0xC8, 0x7C, 0x3C), Color.FromRgb(0xFF, 0xE0, 0x7A), "cage"),
+            "ocean_ruin" => (Color.FromRgb(0x62, 0xC8, 0xC0), Color.FromRgb(0x1E, 0x7C, 0x84), "column"),
+            "end_gateway" => (Color.FromRgb(0xE0, 0xE0, 0xC8), Color.FromRgb(0x4E, 0xE8, 0xA8), "arch"),
+            _ => (Color.FromRgb(0xB4, 0xB4, 0xB4), Color.FromRgb(0x70, 0x70, 0x70), "tower"),
+        };
+
+        var pen = new Pen(new SolidColorBrush(Ink), 1);
+        var fill = new SolidColorBrush(main);
+        var hi = new SolidColorBrush(accent);
+        var x = r.X; var y = r.Y; var w = r.Width; var h = r.Height;
+
+        switch (kind)
+        {
+            case "pyramid":
+                dc.DrawGeometry(fill, pen, Poly(new Point(x + w / 2, y), new Point(x + w, y + h * 0.85),
+                    new Point(x, y + h * 0.85)));
+                dc.DrawRectangle(hi, pen, new Rect(x + w * 0.42, y + h * 0.62, w * 0.16, h * 0.23));
+                break;
+
+            case "ziggurat":
+                for (var i = 0; i < 3; i++)
+                {
+                    var inset = w * 0.14 * i;
+                    dc.DrawRectangle(i == 0 ? fill : (i == 1 ? hi : fill), pen,
+                        new Rect(x + inset, y + h * (0.2 + 0.22 * i), w - inset * 2, h * 0.2));
+                }
+
+                dc.DrawRectangle(hi, pen, new Rect(x + w * 0.44, y + h * 0.06, w * 0.12, h * 0.16));
+                break;
+
+            case "tower":
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.26, y + h * 0.22, w * 0.48, h * 0.78));
+                for (var i = 0; i < 3; i++)
+                {
+                    dc.DrawRectangle(hi, pen, new Rect(x + w * (0.22 + i * 0.2), y + h * 0.06, w * 0.14, h * 0.18));
+                }
+
+                break;
+
+            case "arch":
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.14, y + h * 0.12, w * 0.16, h * 0.88));
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.7, y + h * 0.12, w * 0.16, h * 0.88));
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.14, y + h * 0.12, w * 0.72, h * 0.16));
+                dc.DrawRectangle(hi, null, new Rect(x + w * 0.34, y + h * 0.32, w * 0.32, h * 0.62));
+                break;
+
+            case "bridge":
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.08, y + h * 0.34, w * 0.84, h * 0.18));
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.2, y + h * 0.52, w * 0.16, h * 0.48));
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.64, y + h * 0.52, w * 0.16, h * 0.48));
+                dc.DrawEllipse(hi, null, new Point(x + w * 0.5, y + h * 0.2), w * 0.14, h * 0.14);
+                break;
+
+            case "dome":
+                dc.DrawGeometry(fill, pen, Arc(x + w / 2, y + h * 0.6, w * 0.46, h * 0.5));
+                dc.DrawRectangle(hi, pen, new Rect(x + w * 0.42, y + h * 0.56, w * 0.16, h * 0.4));
+                break;
+
+            case "column":
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.34, y + h * 0.16, w * 0.32, h * 0.62));
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.14, y + h * 0.78, w * 0.72, h * 0.14));
+                dc.DrawRectangle(hi, pen, new Rect(x + w * 0.2, y + h * 0.06, w * 0.6, h * 0.12));
+                break;
+
+            case "cage":
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x3A, 0x30, 0x28)), pen,
+                    new Rect(x + w * 0.14, y + h * 0.18, w * 0.72, h * 0.72));
+                for (var i = 0; i < 4; i++)
+                {
+                    dc.DrawLine(new Pen(fill, Math.Max(1, w * 0.06)),
+                        new Point(x + w * (0.2 + i * 0.2), y + h * 0.18),
+                        new Point(x + w * (0.2 + i * 0.2), y + h * 0.9));
+                }
+
+                dc.DrawEllipse(hi, null, new Point(x + w / 2, y + h * 0.54), w * 0.12, h * 0.12);
+                break;
+
+            case "house":
+                dc.DrawGeometry(fill, pen, Poly(new Point(x + w / 2, y + h * 0.08), new Point(x + w, y + h * 0.42),
+                    new Point(x, y + h * 0.42)));
+                dc.DrawRectangle(fill, pen, new Rect(x + w * 0.16, y + h * 0.42, w * 0.68, h * 0.5));
+                dc.DrawRectangle(hi, pen, new Rect(x + w * 0.28, y + h * 0.54, w * 0.16, h * 0.16));
+                dc.DrawRectangle(hi, pen, new Rect(x + w * 0.58, y + h * 0.54, w * 0.16, h * 0.16));
+                dc.DrawRectangle(hi, pen, new Rect(x + w * 0.44, y + h * 0.76, w * 0.14, h * 0.16));
+                break;
+        }
+    }
+
+    private static StreamGeometry Arc(double cx, double cy, double radiusX, double radiusY)
+    {
+        var geometry = new StreamGeometry();
+        using (var ctx = geometry.Open())
+        {
+            ctx.BeginFigure(new Point(cx - radiusX, cy), true, true);
+            ctx.ArcTo(new Point(cx + radiusX, cy), new Size(radiusX, radiusY), 0, true,
+                SweepDirection.Clockwise, true, false);
+        }
+
+        geometry.Freeze();
+        return geometry;
     }
 
     /// <summary>等轴测立方体：顶面 + 左面 + 右面。</summary>
