@@ -346,9 +346,18 @@ public static class PixelIcons
         var left = centre.X - span / 2;
         var top = centre.Y - span / 2;
 
-        // 白底：把图标从深色地形里"托"出来（画面已经很深，不要再叠黑）
-        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)), null,
-            new Rect(left, top, span, span));
+        // ── 立体底板（顺序很重要：投影 → 底板 → 像素图 → 内斜角 → 外框）──
+        // 投影画在底板**之前**，才会落在图标外侧；上一版把它画在最后，等于给图标蒙黑纱。
+        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x66, 0x00, 0x00, 0x00)), null,
+            new Rect(left + 1.5, top + 2, span, span));
+
+        var plate = new LinearGradientBrush(
+            Color.FromRgb(0xFF, 0xFF, 0xFF),
+            Color.FromRgb(0xDF, 0xE6, 0xEC),
+            new Point(0, 0), new Point(0, 1));
+        plate.Freeze();
+
+        dc.DrawRectangle(plate, null, new Rect(left, top, span, span));
 
         var brushes = new Dictionary<char, SolidColorBrush>();
 
@@ -375,7 +384,22 @@ public static class PixelIcons
             }
         }
 
-        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0xFF, 0x8E, 0x96, 0x9E)), 1),
-            new Rect(left - 0.5, top - 0.5, span + 1, span + 1));
+        // 内斜角：上/左提亮、下/右压暗 → 看起来像嵌在卡槽里
+        var bevelLight = new SolidColorBrush(Color.FromArgb(0x88, 0xFF, 0xFF, 0xFF));
+        var bevelDark = new SolidColorBrush(Color.FromArgb(0x55, 0x30, 0x38, 0x40));
+
+        dc.DrawLine(new Pen(bevelLight, 1), new Point(left, top), new Point(left + span, top));
+        dc.DrawLine(new Pen(bevelLight, 1), new Point(left, top), new Point(left, top + span));
+        dc.DrawLine(new Pen(bevelDark, 1), new Point(left, top + span), new Point(left + span, top + span));
+        dc.DrawLine(new Pen(bevelDark, 1), new Point(left + span, top), new Point(left + span, top + span));
+
+        // 外框：左上亮、右下暗的渐变描边
+        var bezel = new LinearGradientBrush(
+            Color.FromRgb(0xF2, 0xF6, 0xF9),
+            Color.FromRgb(0x8A, 0x93, 0x9C),
+            new Point(0, 0), new Point(1, 1));
+        bezel.Freeze();
+
+        dc.DrawRectangle(null, new Pen(bezel, 1.2), new Rect(left - 0.6, top - 0.6, span + 1.2, span + 1.2));
     }
 }
