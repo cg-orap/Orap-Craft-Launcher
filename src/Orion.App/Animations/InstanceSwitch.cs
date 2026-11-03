@@ -63,26 +63,17 @@ public static class InstanceSwitch
             new DoubleAnimation(0.62, 1, total) { EasingFunction = Motion.Soft },
             HandoffBehavior.SnapshotAndReplace);
 
-        // 位移 + 缩放放在一个 TransformGroup 里（不破坏元素已有的变换）
-        var translate = new TranslateTransform(0, offset);
-        var scale = new ScaleTransform(0.994, 0.994);
-
-        var group = new TransformGroup();
-        group.Children.Add(scale);
-        group.Children.Add(translate);
-
-        element.RenderTransformOrigin = new Point(0.5, 0.5);
-        element.RenderTransform = group;
+        // 只用一个 TranslateTransform 做位移（并通过 Motion.EnsureTranslate 复用已有的），
+        // 绝不把 RenderTransform 换成 TransformGroup：
+        // 样式里的悬停动效会取 RenderTransform.Y，换成组之后就解析失败 →
+        // "无法解析属性路径 RenderTransform.Y"。放大不再是必需，去掉它。
+        var translate = Motion.EnsureTranslate(element);
+        translate.Y = offset;
 
         translate.BeginAnimation(TranslateTransform.YProperty,
             new DoubleAnimation(offset, 0, total) { EasingFunction = Motion.Soft });
 
-        scale.BeginAnimation(ScaleTransform.ScaleXProperty,
-            new DoubleAnimation(0.994, 1, total) { EasingFunction = Motion.Soft });
-        scale.BeginAnimation(ScaleTransform.ScaleYProperty,
-            new DoubleAnimation(0.994, 1, total) { EasingFunction = Motion.Soft });
-
-        // 动画结束后把变换归零并摘掉，避免影响后续布局测量
+        // 动画结束后把位移归零，避免影响后续布局测量
         var timer = new System.Windows.Threading.DispatcherTimer
         {
             Interval = total + TimeSpan.FromMilliseconds(80),
@@ -94,8 +85,6 @@ public static class InstanceSwitch
 
             translate.BeginAnimation(TranslateTransform.YProperty, null);
             translate.Y = 0;
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         };
 
         timer.Start();
