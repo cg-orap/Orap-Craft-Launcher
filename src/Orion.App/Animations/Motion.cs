@@ -177,6 +177,16 @@ public static class Motion
             return added;
         }
 
+        // 关键：如果元素上已经有一个 TranslateTransform（模板/样式里的悬停位移动画会对
+        // RenderTransform.Y 取值），这里**绝不能**把它换成 ScaleTransform ——
+        // 换掉之后样式里的 RenderTransform.Y 动画解析失败，直接抛
+        // "无法解析属性路径 RenderTransform.Y 中的所有属性引用"。
+        if (element.RenderTransform is TranslateTransform or not null)
+        {
+            // 已存在位移变换：放弃缩放（宁可少一个动效，也不要崩），返回一个游离对象让调用方安全空转。
+            return new ScaleTransform(1, 1);
+        }
+
         scale = new ScaleTransform();
         if (element.RenderTransformOrigin == new Point(0, 0))
         {
