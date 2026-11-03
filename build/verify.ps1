@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Pre-commit guardrail for the launcher: build, test, publish and prove the EXE actually starts.
 
@@ -43,7 +43,7 @@ $ProgressPreference = 'SilentlyContinue'
 $repo = Split-Path -Parent $PSScriptRoot
 $solution = Join-Path $repo 'OrionLauncher.sln'
 $tests = Join-Path $repo 'tests\Orion.Tests\Orion.Tests.csproj'
-$exe = Join-Path $repo 'dist\win-x64\OrapCraftLauncher.exe'
+$exe = Join-Path $repo 'dist\win-x64\Orap Craft Launcher.exe'
 $smokeRoot = Join-Path $repo 'artifacts\verify-root'
 
 function Write-Stage([string]$name) {
@@ -88,7 +88,7 @@ if ($SkipPublish) {
 else {
     Write-Stage '3/4 publish'
     # the publish step rewrites dist, so a running instance would lock the EXE
-    Get-Process OrapCraftLauncher -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process 'Orap Craft Launcher' -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Milliseconds 800
 
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'build.ps1') -DotnetRoot $DotnetRoot
@@ -104,7 +104,7 @@ if ($SkipSmoke) {
 }
 
 Write-Stage '4/4 startup smoke'
-Get-Process OrapCraftLauncher -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process 'Orap Craft Launcher' -ErrorAction SilentlyContinue | Stop-Process -Force
 if (Test-Path $smokeRoot) { Remove-Item $smokeRoot -Recurse -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
 
@@ -114,13 +114,13 @@ $window = $false
 
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 500
-    $proc = Get-Process OrapCraftLauncher -ErrorAction SilentlyContinue
+    $proc = Get-Process 'Orap Craft Launcher' -ErrorAction SilentlyContinue
     if (-not $proc) { break }          # died: reported below with the log tail
     $proc.Refresh()
     if ($proc.MainWindowHandle -ne 0) { $window = $true; break }
 }
 
-$proc = Get-Process OrapCraftLauncher -ErrorAction SilentlyContinue
+$proc = Get-Process 'Orap Craft Launcher' -ErrorAction SilentlyContinue
 $log = Get-ChildItem (Join-Path $smokeRoot 'logs') -Filter 'launcher-*.log' -ErrorAction SilentlyContinue |
        Sort-Object LastWriteTime | Select-Object -Last 1
 

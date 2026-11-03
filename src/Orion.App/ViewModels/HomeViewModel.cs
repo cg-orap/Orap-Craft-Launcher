@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -256,7 +256,7 @@ public sealed class HomeViewModel : ObservableObject
     {
         get
         {
-            var seed = _main.CurrentInstance?.Name ?? "Orap Craft";
+            var seed = _main.CurrentInstance?.Name ?? "Orap Craft Launcher";
             var hash = 0;
             foreach (var ch in seed) hash = (hash * 31 + ch) & 0x7FFFFFFF;
 

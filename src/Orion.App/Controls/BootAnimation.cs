@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -105,7 +105,7 @@ public sealed class BootAnimation : Grid
             Margin = new Thickness(0, 22, 0, 0),
         };
 
-        var title = "Orap Craft";
+        var title = "Orap Craft Launcher";
         for (var i = 0; i < title.Length; i++)
         {
             var glyph = title[i] == ' ' ? "\u00A0" : title[i].ToString();

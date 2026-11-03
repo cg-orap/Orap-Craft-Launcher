@@ -154,7 +154,7 @@
                                RenderOptions.BitmapScalingMode="HighQuality"
                                AutomationProperties.AutomationId="TitleBarLogo" />
                     </Border>
-                    <TextBlock Text="Orap Craft" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="Orap Craft Launcher" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                     <TextBlock Text="v0.2" FontSize="10" Margin="8,2,0,0" VerticalAlignment="Center"
                                Foreground="{DynamicResource MutedTextBrush}" />
                 </StackPanel>
