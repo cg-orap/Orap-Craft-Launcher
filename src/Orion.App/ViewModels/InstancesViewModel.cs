@@ -363,14 +363,46 @@ public sealed class InstancesViewModel : ObservableObject
 
     private void OpenFolder()
     {
-        var directory = SelectedInstance?.GameDirectory;
-        if (directory is null || !Directory.Exists(directory))
+        var instance = SelectedInstance;
+        var directory = instance?.GameDirectory;
+
+        // 目录还没生成（例如原版从未启动过）时先建出来，别让按钮变成"没反应"
+        if (!string.IsNullOrWhiteSpace(directory))
         {
-            Status = "游戏目录尚不存在。";
+            try
+            {
+                Directory.CreateDirectory(directory);
+            }
+            catch
+            {
+                // 建不出来就走下面的兜底
+            }
+        }
+
+        // 兜底：没有选中版本、或目录确实拿不到 → 打开实例根目录，
+        // 让按钮永远有可见反馈，而不是静默什么都不做。
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            directory = _main.Context.Paths.InstancesDir;
+            Status = instance is null
+                ? "未选择版本，已打开实例目录。"
+                : "游戏目录不存在，已打开实例目录。";
+        }
+
+        if (!Directory.Exists(directory))
+        {
+            Status = "实例目录也不存在：" + directory;
             return;
         }
 
-        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{directory}\"") { UseShellExecute = true });
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{directory}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Status = "打开目录失败：" + ex.Message;
+        }
     }
 
     private void OpenVersionFolder()
